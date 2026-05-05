@@ -75,11 +75,21 @@ class Question:
 
 
 @dataclass(frozen=True)
+class Claim:
+    id: str
+    subject: str
+    attribute: str
+    value: str
+    source_text: str = ""
+
+
+@dataclass(frozen=True)
 class Answer:
     id: str
     question_id: str
     text: str
     topic_ids: tuple[str, ...] = ()
+    claims: tuple[Claim, ...] = ()
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -121,4 +131,3 @@ class Case:
     ai_suggestions: tuple[AISuggestion, ...] = ()
     audit_events: tuple[AuditEvent, ...] = ()
     created_at: datetime = field(default_factory=datetime.utcnow)
-
