@@ -1,6 +1,6 @@
 import unittest
 
-from interigaition.api.app import AddAnswerRequest, StartSessionRequest, create_app
+from interigaition.api.app import AddAnswerRequest, HTTPException, StartSessionRequest, create_app
 from interigaition.domain.session import ParticipantRole
 
 
@@ -68,6 +68,72 @@ class ApiAppTest(unittest.TestCase):
         self.assertIn("review", review["snapshot"])
         self.assertIn("indicators", review)
         self.assertIn("Decision-support indicators", review["report_markdown"])
+
+    def test_start_session_rejects_duplicate_session_id(self) -> None:
+        app = create_app()
+        start = endpoint(app, "start_session")
+        request = StartSessionRequest(
+            session_id="api-session-duplicate",
+            case_id="case-001",
+            participant_id="person-001",
+            initial_role=ParticipantRole.WITNESS,
+        )
+
+        start(request)
+
+        with self.assertRaises(HTTPException) as caught:
+            start(request)
+
+        self.assertEqual(caught.exception.status_code, 409)
+
+    def test_add_session_answer_validates_payload(self) -> None:
+        app = create_app()
+        start = endpoint(app, "start_session")
+        add_answer = endpoint(app, "add_session_answer")
+        start(
+            StartSessionRequest(
+                session_id="api-session-validation",
+                case_id="case-001",
+                participant_id="person-001",
+                initial_role=ParticipantRole.WITNESS,
+            )
+        )
+
+        cases = [
+            AddAnswerRequest(
+                id="api-answer-empty",
+                question_id="q-001",
+                text="   ",
+                event_id="api-event-empty",
+            ),
+            AddAnswerRequest(
+                id="api-answer-unknown-question",
+                question_id="q-999",
+                text="Answer text.",
+                event_id="api-event-unknown-question",
+            ),
+            AddAnswerRequest(
+                id="api-answer-unknown-topic",
+                question_id="q-001",
+                text="Answer text.",
+                topic_ids=["topic-unknown"],
+                event_id="api-event-unknown-topic",
+            ),
+            AddAnswerRequest(
+                id="api-answer-bad-claim",
+                question_id="q-001",
+                text="Answer text.",
+                event_id="api-event-bad-claim",
+                claims=[{"id": "claim-001", "subject": "event"}],
+            ),
+        ]
+
+        for request in cases:
+            with self.subTest(request=request.id):
+                with self.assertRaises(HTTPException) as caught:
+                    add_answer("api-session-validation", request)
+
+                self.assertEqual(caught.exception.status_code, 400)
 
 
 if __name__ == "__main__":

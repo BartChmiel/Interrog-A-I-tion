@@ -1,9 +1,4 @@
-const CONFIG = {
-  apiBaseUrl: "http://127.0.0.1:8000",
-  caseId: "case-001",
-  sessionId: `prototype-session-${Date.now()}`,
-  participantId: "person-001",
-};
+const CONFIG = runtimeConfig();
 
 const state = {
   locale: "pl",
@@ -41,6 +36,7 @@ const copy = {
     apiOnline: "API online",
     apiUnavailable: "API offline",
     offlineDataset: "demo lokalne",
+    retryApi: "Połącz ponownie",
     answerRequired: "wpisz odpowiedź",
     answerSaved: "odpowiedź zapisana",
     answerSaveFailed: "błąd zapisu",
@@ -75,6 +71,7 @@ const copy = {
     apiOnline: "API online",
     apiUnavailable: "API offline",
     offlineDataset: "local demo",
+    retryApi: "Reconnect",
     answerRequired: "enter an answer",
     answerSaved: "answer recorded",
     answerSaveFailed: "save failed",
@@ -333,6 +330,17 @@ function renderStatus() {
     chip.textContent = item.label;
     strip.appendChild(chip);
   });
+
+  if (state.apiMode === "offline") {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "status-action";
+    retry.textContent = t("retryApi");
+    retry.addEventListener("click", () => {
+      initializeApiWorkflow();
+    });
+    strip.appendChild(retry);
+  }
 }
 
 function renderQuestions() {
@@ -637,12 +645,16 @@ function formatTime(value) {
 }
 
 async function initializeApiWorkflow() {
+  if (state.isSubmitting || state.apiMode === "connecting") {
+    return;
+  }
+
   setApiState("connecting", "apiConnecting");
   render();
 
   try {
     await loadCaseReview();
-    await startSession();
+    await startOrResumeSession();
     await refreshSessionReview();
     setApiState("online", "apiOnline");
   } catch (error) {
@@ -670,6 +682,18 @@ async function startSession() {
       initial_role: "witness",
     }),
   });
+}
+
+async function startOrResumeSession() {
+  try {
+    await startSession();
+  } catch (error) {
+    if (error.status === 409) {
+      await refreshSessionReview();
+      return;
+    }
+    throw error;
+  }
 }
 
 async function refreshSessionReview() {
@@ -762,10 +786,26 @@ async function fetchJson(path, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    const error = new Error(`${response.status} ${response.statusText}`);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();
+}
+
+function runtimeConfig() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    apiBaseUrl: normalizeApiBaseUrl(params.get("api") || "http://127.0.0.1:8000"),
+    caseId: params.get("case") || "case-001",
+    sessionId: params.get("session") || `prototype-session-${Date.now()}`,
+    participantId: params.get("participant") || "person-001",
+  };
+}
+
+function normalizeApiBaseUrl(value) {
+  return value.trim().replace(/\/+$/, "");
 }
 
 function setApiState(mode, messageKey) {

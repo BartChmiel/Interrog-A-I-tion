@@ -141,6 +141,22 @@ h2 {
   color: #7a5a00;
 }
 
+.status-action {
+  min-height: 28px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+
+.status-action:hover {
+  background: #e7f5ee;
+}
+
 .language-toggle {
   border: 1px solid var(--line);
   border-radius: 8px;

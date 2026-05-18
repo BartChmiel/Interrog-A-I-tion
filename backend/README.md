@@ -63,3 +63,5 @@ Enable reload explicitly when developing the API:
 ```powershell
 python -m interigaition.api.app --reload
 ```
+
+The prototype validates live answer payloads before adding them to a session. Empty answers, unknown question ids, unknown topic ids, malformed claims, and duplicate session ids return explicit HTTP errors instead of being accepted silently.

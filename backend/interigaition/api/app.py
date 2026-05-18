@@ -79,6 +79,7 @@ from interigaition.storage.json_case_loader import load_case_from_json
 
 
 SYNTHETIC_CASES_ROOT = PROJECT_ROOT / "data" / "synthetic"
+REQUIRED_CLAIM_FIELDS = ("id", "subject", "attribute", "value")
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,12 @@ def create_app() -> FastAPI:
 
     @app.post("/sessions")
     def start_session(request: StartSessionRequest) -> dict[str, Any]:
+        _require_non_empty("session_id", request.session_id)
+        _require_non_empty("case_id", request.case_id)
+        _require_non_empty("participant_id", request.participant_id)
+        if request.session_id in sessions:
+            raise HTTPException(status_code=409, detail="Session already exists.")
+
         _load_synthetic_case(request.case_id, locale="en")
         session = start_interview_session(
             session_id=request.session_id,
@@ -168,6 +175,9 @@ def create_app() -> FastAPI:
         session = sessions.get(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
+
+        case = _load_synthetic_case(session.case_id, locale="en")
+        _validate_answer_request(case, request)
 
         answer = Answer(
             id=request.id,
@@ -259,6 +269,44 @@ def _load_synthetic_case(case_id: str, locale: str) -> Case:
         raise HTTPException(status_code=404, detail="Synthetic case not found.")
 
     return load_case_from_json(path, locale=locale)
+
+
+def _validate_answer_request(case: Case, request: AddAnswerRequest) -> None:
+    _require_non_empty("id", request.id)
+    _require_non_empty("question_id", request.question_id)
+    _require_non_empty("text", request.text)
+    _require_known_id(
+        "question_id",
+        request.question_id,
+        {question.id for question in case.questions},
+    )
+
+    topic_ids = {topic.id for topic in case.topics}
+    for topic_id in request.topic_ids:
+        _require_known_id("topic_id", topic_id, topic_ids)
+
+    for index, raw_claim in enumerate(request.claims):
+        missing = tuple(
+            field
+            for field in REQUIRED_CLAIM_FIELDS
+            if not str(raw_claim.get(field, "")).strip()
+        )
+        if missing:
+            fields = ", ".join(missing)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Claim {index} is missing required field(s): {fields}.",
+            )
+
+
+def _require_non_empty(field_name: str, value: str) -> None:
+    if not str(value).strip():
+        raise HTTPException(status_code=400, detail=f"{field_name} cannot be empty.")
+
+
+def _require_known_id(field_name: str, value: str, allowed_values: set[str]) -> None:
+    if value not in allowed_values:
+        raise HTTPException(status_code=400, detail=f"Unknown {field_name}: {value}.")
 
 
 def _to_jsonable(value: Any) -> Any:
