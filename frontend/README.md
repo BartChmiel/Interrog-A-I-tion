@@ -1,20 +1,25 @@
 # Frontend
 
-The first frontend milestone is a dependency-light static prototype.
+The frontend now has two tracks:
 
-Why:
+- `prototype/` - dependency-light static prototype kept as a workflow reference,
+- `app/` - React + TypeScript + Vite application foundation for the product UI.
 
-- it can be opened directly in a browser,
-- it does not require Node, Vite, or React yet,
-- it lets us evaluate the live interview workflow before committing to UI implementation details,
-- it can connect to the local FastAPI prototype when the backend is running,
-- it keeps the product conversation focused on usability and operational flow.
-
-Open:
+Run the static prototype:
 
 ```text
 frontend/prototype/index.html
 ```
+
+Run the React application:
+
+```powershell
+cd frontend\app
+npm install
+npm run dev
+```
+
+The app reads the local API from `VITE_API_BASE_URL` or the `api` query parameter. Default: `http://127.0.0.1:8000`.
 
 Expected future path:
 

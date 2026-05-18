@@ -100,9 +100,20 @@ The project owner should evaluate:
 - whether the question list and answer stream match the intended workflow,
 - whether the prototype should now move to React/Vite.
 
+## Current STOP
+
+Milestone 5: React/Vite frontend foundation has reached its first review point.
+
+The project owner should evaluate:
+
+- whether the React app preserves the intended live interview layout,
+- whether the componentized UI should now become the main frontend target,
+- whether the static prototype should remain maintained or become archival,
+- whether the next milestone should be API persistence, frontend state hardening, or local model output in live mode.
+
 ## Next Expected STOP
 
-The next expected STOP is before migrating the static prototype to React/Vite or before connecting real local model output to live mode.
+The next expected STOP is before adding persistent case/session storage, before connecting real local model output to live mode, or before introducing export formats intended to look official.
 
 ## Decision Note
 

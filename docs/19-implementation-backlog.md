@@ -92,7 +92,7 @@ Success criteria:
 
 ## Milestone 5: First UI
 
-Status: first static prototype implemented in `frontend/prototype`. It can now connect to the local API for a synthetic live-session review loop, handle local API reconnects, and accept runtime query parameters while React/Vite implementation is deferred until the workflow is reviewed.
+Status: first static prototype implemented in `frontend/prototype`, with React + TypeScript + Vite foundation added in `frontend/app`. The React app preserves the live-session review loop, local API reconnect path, PL/EN UI switching, and decision-support indicator layout.
 
 Tasks:
 

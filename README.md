@@ -89,7 +89,7 @@ Some early planning documents still have Polish filenames and Polish content. Th
 ## Repository Structure
 
 - `backend/` - local API, domain logic, analysis, storage, AI, export.
-- `frontend/` - future application UI.
+- `frontend/` - static prototype and React/Vite application UI.
 - `locales/` - user-facing language packs.
 - `prompts/` - versioned model instructions and task prompts.
 - `schemas/` - JSON Schema contracts.

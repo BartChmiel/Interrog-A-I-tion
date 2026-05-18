@@ -1,0 +1,124 @@
+export type Locale = "pl" | "en";
+
+export type ApiMode = "connecting" | "online" | "offline";
+
+export type RuntimeConfig = {
+  apiBaseUrl: string;
+  caseId: string;
+  sessionId: string;
+  participantId: string;
+};
+
+export type LocalizedText = Partial<Record<Locale, string>>;
+
+export type Question = {
+  id: string;
+  text: string;
+  source: string;
+  question_type: string;
+  topic_ids: string[];
+  neutrality_flags?: string[];
+};
+
+export type Answer = {
+  id: string;
+  question_id: string;
+  text: string;
+  topic_ids: string[];
+  created_at?: string;
+};
+
+export type CaseData = {
+  id: string;
+  title: string;
+  description: string;
+  questions: Question[];
+  answers: Answer[];
+};
+
+export type RoleAssignment = {
+  participant_id: string;
+  role: string;
+  assigned_at: string;
+  reason: string;
+};
+
+export type InterviewSession = {
+  id: string;
+  case_id: string;
+  participant_id: string;
+  role_history: RoleAssignment[];
+  answers: Answer[];
+  events: Array<{ id: string; event_type: string; timestamp: string }>;
+};
+
+export type ReviewFinding = {
+  category: string;
+  title: string;
+  detail: string;
+  linked_ids: string[];
+  severity: "low" | "medium" | "high";
+  metadata?: Record<string, unknown>;
+};
+
+export type InterviewReview = {
+  case_id: string;
+  covered_topic_ids: string[];
+  missing_topic_ids: string[];
+  findings: ReviewFinding[];
+};
+
+export type IndicatorFactor = {
+  id: string;
+  label: string;
+  description: string;
+  value: string;
+  linked_ids: string[];
+};
+
+export type Indicator = {
+  id: string;
+  category: string;
+  label: string;
+  description: string;
+  score: number | null;
+  confidence: number;
+  factors: IndicatorFactor[];
+  interpretation: string;
+  limitations: string[];
+};
+
+export type CaseReviewResponse = {
+  case: CaseData;
+  review: InterviewReview;
+  indicators: Indicator[];
+  report_markdown: string;
+};
+
+export type SessionReviewResponse = {
+  session: InterviewSession;
+  snapshot: {
+    session_id: string;
+    case_id: string;
+    sequence_no: number;
+    review: InterviewReview;
+    generated_at: string;
+  };
+  indicators: Indicator[];
+  report_markdown: string;
+};
+
+export type QuestionView = {
+  id: string;
+  text: LocalizedText;
+  type: LocalizedText;
+  topicIds: string[];
+  risk?: LocalizedText;
+};
+
+export type AnswerView = {
+  id: string;
+  questionId: string;
+  text: LocalizedText;
+  time: string;
+};
