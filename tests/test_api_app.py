@@ -32,6 +32,7 @@ class ApiAppTest(unittest.TestCase):
         app = create_app()
         start = endpoint(app, "start_session")
         add_answer = endpoint(app, "add_session_answer")
+        review_session = endpoint(app, "review_session_endpoint")
 
         session = start(
             StartSessionRequest(
@@ -59,7 +60,15 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(len(updated["answers"]), 1)
         self.assertEqual(updated["events"][-1]["event_type"], "answer_added")
 
+        review = review_session("api-session-001", locale="en")
+
+        self.assertEqual(review["session"]["id"], "api-session-001")
+        self.assertEqual(review["snapshot"]["session_id"], "api-session-001")
+        self.assertEqual(review["snapshot"]["sequence_no"], 2)
+        self.assertIn("review", review["snapshot"])
+        self.assertIn("indicators", review)
+        self.assertIn("Decision-support indicators", review["report_markdown"])
+
 
 if __name__ == "__main__":
     unittest.main()
-

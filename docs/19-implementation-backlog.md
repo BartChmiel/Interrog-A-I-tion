@@ -73,7 +73,7 @@ Success criteria:
 
 ## Milestone 4: FastAPI Prototype
 
-Status: implemented as a local API app shape with endpoint tests. In the current sandbox, real FastAPI imports from local `.deps_stable/` are blocked by filesystem permissions, so tests use the app's restricted-environment fallback. A normal local environment should use real FastAPI.
+Status: implemented as a local API app shape with endpoint tests, including deterministic live-session review. A normal local environment should use real FastAPI and Uvicorn.
 
 Tasks:
 

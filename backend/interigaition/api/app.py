@@ -59,11 +59,13 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
 
 from interigaition.analysis.credibility_indicators import generate_indicators
 from interigaition.analysis.interview_review import review_case
+from interigaition.analysis.live_review import review_live_session
 from interigaition.domain.models import Answer, Claim, Case
 from interigaition.domain.session import (
     InterviewSession,
     ParticipantRole,
     add_answer,
+    merge_session_answers,
     start_interview_session,
 )
 from interigaition.export.markdown_report import render_review_markdown
@@ -166,6 +168,32 @@ def create_app() -> FastAPI:
         updated = add_answer(session, answer=answer, event_id=request.event_id)
         sessions[session_id] = updated
         return _to_jsonable(updated)
+
+    @app.get("/sessions/{session_id}/review")
+    def review_session_endpoint(
+        session_id: str,
+        locale: str = Query(default="en"),
+    ) -> dict[str, Any]:
+        session = sessions.get(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
+        case = _load_synthetic_case(session.case_id, locale=locale)
+        snapshot = review_live_session(case, session)
+        case_view = merge_session_answers(case, session)
+        indicators = generate_indicators(case_view, snapshot.review)
+
+        return {
+            "session": _to_jsonable(session),
+            "snapshot": _to_jsonable(snapshot),
+            "indicators": _to_jsonable(indicators),
+            "report_markdown": render_review_markdown(
+                case_view,
+                snapshot.review,
+                locale=locale,
+                indicators=indicators,
+            ),
+        }
 
     return app
 
