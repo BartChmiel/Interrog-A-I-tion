@@ -43,26 +43,23 @@ python -m unittest discover -s ..\tests
 
 ## Local API prototype
 
-FastAPI dependencies are currently installed into the local `.deps/` directory for the development prototype.
-If `.deps/` contains stale packages, use `.deps_stable/`.
-
-In restricted sandbox environments, package directories created by an escalated install may not be readable. The API module includes a minimal fallback router for tests in that situation. Normal development should use real FastAPI.
+FastAPI dependencies can be installed into the current Python user site for the development prototype. The API module includes a minimal fallback router for tests in restricted environments, but normal development should use real FastAPI and Uvicorn.
 
 From repository root:
 
 ```powershell
-python -m pip install --target .deps_stable fastapi==0.115.12 uvicorn==0.30.6
+python -m pip install --user fastapi==0.115.12 uvicorn==0.30.6
 ```
 
 From `backend/`:
 
 ```powershell
+python -m interigaition.api.app --help
 python -m interigaition.api.app
 ```
 
-If you run Uvicorn directly from the repository root, expose local dependencies:
+Enable reload explicitly when developing the API:
 
 ```powershell
-$env:PYTHONPATH=".deps_stable;backend"
-python -m uvicorn interigaition.api.app:app --reload
+python -m interigaition.api.app --reload
 ```

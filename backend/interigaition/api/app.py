@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import sys
+import argparse
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from typing import Any, Callable
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-LOCAL_DEPS = PROJECT_ROOT / ".deps_stable"
-if LOCAL_DEPS.exists() and str(LOCAL_DEPS) not in sys.path:
-    sys.path.insert(0, str(LOCAL_DEPS))
 
 try:
     from fastapi import FastAPI, HTTPException, Query  # type: ignore  # noqa: E402
@@ -176,14 +173,35 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Run the InterigA(I)tion local API prototype.",
+    )
+    parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Bind host for the local API server.",
+    )
+    parser.add_argument(
+        "--port",
+        default=8000,
+        type=int,
+        help="Bind port for the local API server.",
+    )
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable Uvicorn reload for local development.",
+    )
+    args = parser.parse_args(argv)
+
     import uvicorn
 
     uvicorn.run(
         "interigaition.api.app:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
     )
 
 
