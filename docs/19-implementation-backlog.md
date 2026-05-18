@@ -92,7 +92,7 @@ Success criteria:
 
 ## Milestone 5: First UI
 
-Status: first static prototype implemented in `frontend/prototype`. React/Vite implementation is deferred until the workflow is reviewed.
+Status: first static prototype implemented in `frontend/prototype`. It can now connect to the local API for a synthetic live-session review loop, while React/Vite implementation is deferred until the workflow is reviewed.
 
 Tasks:
 

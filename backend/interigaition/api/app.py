@@ -12,7 +12,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 try:
     from fastapi import FastAPI, HTTPException, Query  # type: ignore  # noqa: E402
+    from fastapi.middleware.cors import CORSMiddleware  # type: ignore  # noqa: E402
 except Exception:  # pragma: no cover - exercised in restricted local environments
+    CORSMiddleware = None
+
     @dataclass(frozen=True)
     class _FallbackRoute:
         path: str
@@ -29,6 +32,9 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
     class FastAPI:
         def __init__(self, **_: Any) -> None:
             self.routes: list[_FallbackRoute] = []
+
+        def add_middleware(self, *_: Any, **__: Any) -> None:
+            return None
 
         def get(self, path: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
             return self._route(path, ("GET",))
@@ -99,6 +105,20 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Local API for the AI-assisted investigative interviewing prototype.",
     )
+    if CORSMiddleware is not None:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[
+                "http://127.0.0.1:5500",
+                "http://localhost:5500",
+                "http://127.0.0.1:8000",
+                "http://localhost:8000",
+                "null",
+            ],
+            allow_credentials=False,
+            allow_methods=["GET", "POST"],
+            allow_headers=["*"],
+        )
     sessions: dict[str, InterviewSession] = {}
 
     @app.get("/health")

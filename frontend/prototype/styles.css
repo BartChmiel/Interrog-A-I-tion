@@ -123,6 +123,24 @@ h2 {
   white-space: nowrap;
 }
 
+.chip[data-state="online"] {
+  border-color: #b9dccb;
+  background: #e7f5ee;
+  color: #17613e;
+}
+
+.chip[data-state="connecting"] {
+  border-color: #c8d8e6;
+  background: #edf5fb;
+  color: #255e87;
+}
+
+.chip[data-state="offline"] {
+  border-color: #e6d3a5;
+  background: #fff7df;
+  color: #7a5a00;
+}
+
 .language-toggle {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -262,7 +280,7 @@ h2 {
   padding: 12px;
 }
 
-.note-composer {
+.answer-composer {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
@@ -270,7 +288,7 @@ h2 {
   border-top: 1px solid var(--line);
 }
 
-.note-composer textarea {
+.answer-composer textarea {
   width: 100%;
   resize: vertical;
   min-height: 74px;
@@ -279,7 +297,7 @@ h2 {
   padding: 10px;
 }
 
-#add-note-button {
+#record-answer-button {
   min-width: 120px;
   border: 0;
   border-radius: 8px;
@@ -287,6 +305,16 @@ h2 {
   color: #fff;
   cursor: pointer;
   padding: 0 16px;
+}
+
+#record-answer-button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.empty-state {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .indicator-header {
@@ -363,11 +391,11 @@ h2 {
     justify-content: space-between;
   }
 
-  .note-composer {
+  .answer-composer {
     grid-template-columns: 1fr;
   }
 
-  #add-note-button {
+  #record-answer-button {
     min-height: 42px;
   }
 }

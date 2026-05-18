@@ -1,7 +1,21 @@
+const CONFIG = {
+  apiBaseUrl: "http://127.0.0.1:8000",
+  caseId: "case-001",
+  sessionId: `prototype-session-${Date.now()}`,
+  participantId: "person-001",
+};
+
 const state = {
   locale: "pl",
   activeQuestionId: "q-001",
-  notes: [],
+  apiMode: "offline",
+  apiMessageKey: "offlineDataset",
+  caseData: null,
+  session: null,
+  indicators: [],
+  findings: [],
+  localAnswers: [],
+  isSubmitting: false,
 };
 
 const copy = {
@@ -10,7 +24,6 @@ const copy = {
     mode: "Live",
     airgapped: "Air-gapped",
     role: "Świadek",
-    language: "Język",
     questions: "Plan pytań",
     liveInterview: "Sesja przesłuchania",
     indicators: "Wskaźniki",
@@ -20,24 +33,31 @@ const copy = {
     findings: "Ustalenia",
     currentQuestion: "Aktywne pytanie",
     answer: "Odpowiedź",
-    notePlaceholder: "Notatka robocza",
-    addNote: "Dodaj",
+    answerPlaceholder: "Zapisz odpowiedź osoby przesłuchiwanej",
+    recordAnswer: "Zapisz",
     confidence: "Pewność",
-    score: "Wynik",
-    factors: "Czynniki",
-    suggestedAction: "Sugestia",
-    source: "Źródło",
-    noNotes: "Brak notatek roboczych.",
-    questionCount: "4 pytania",
-    findingCount: "3 ustalenia",
+    noAnswers: "Brak zapisanych odpowiedzi.",
+    apiConnecting: "łączenie z API",
+    apiOnline: "API online",
+    apiUnavailable: "API offline",
+    offlineDataset: "demo lokalne",
+    answerRequired: "wpisz odpowiedź",
+    answerSaved: "odpowiedź zapisana",
+    answerSaveFailed: "błąd zapisu",
+    reviewUpdated: "review odświeżony",
     roleLine: "Rola: Świadek",
+    questionSingular: "pytanie",
+    questionPluralFew: "pytania",
+    questionPluralMany: "pytań",
+    findingSingular: "ustalenie",
+    findingPluralFew: "ustalenia",
+    findingPluralMany: "ustaleń",
   },
   en: {
     caseSubtitle: "Synthetic bicycle theft interview",
     mode: "Live",
     airgapped: "Air-gapped",
     role: "Witness",
-    language: "Language",
     questions: "Question plan",
     liveInterview: "Interview session",
     indicators: "Indicators",
@@ -47,21 +67,48 @@ const copy = {
     findings: "Findings",
     currentQuestion: "Active question",
     answer: "Answer",
-    notePlaceholder: "Working note",
-    addNote: "Add",
+    answerPlaceholder: "Record the interviewee answer",
+    recordAnswer: "Record",
     confidence: "Confidence",
-    score: "Score",
-    factors: "Factors",
-    suggestedAction: "Suggestion",
-    source: "Source",
-    noNotes: "No working notes.",
-    questionCount: "4 questions",
-    findingCount: "3 findings",
+    noAnswers: "No recorded answers.",
+    apiConnecting: "connecting API",
+    apiOnline: "API online",
+    apiUnavailable: "API offline",
+    offlineDataset: "local demo",
+    answerRequired: "enter an answer",
+    answerSaved: "answer recorded",
+    answerSaveFailed: "save failed",
+    reviewUpdated: "review refreshed",
     roleLine: "Role: Witness",
+    questionSingular: "question",
+    questionPluralFew: "questions",
+    questionPluralMany: "questions",
+    findingSingular: "finding",
+    findingPluralFew: "findings",
+    findingPluralMany: "findings",
   },
 };
 
-const questions = [
+const domainCopy = {
+  pl: {
+    "Topic coverage": "Pokrycie tematów",
+    "Question neutrality": "Neutralność pytań",
+    "Narrative consistency": "Spójność narracji",
+    "Source-of-knowledge coverage": "Pokrycie źródła wiedzy",
+    "Credibility review summary": "Przegląd wiarygodności",
+    "Covered topics": "Tematy pokryte",
+    "Missing topics": "Tematy niepokryte",
+    "Total questions": "Liczba pytań",
+    "Flagged questions": "Pytania z flagami",
+    "Recorded answers": "Zapisane odpowiedzi",
+    "Potential conflicts": "Potencjalne konflikty",
+    "Source topics covered": "Pokryte tematy źródła wiedzy",
+    "Source claims": "Twierdzenia o źródle wiedzy",
+  },
+  en: {},
+};
+
+const seedQuestions = [
   {
     id: "q-001",
     type: { pl: "otwarte", en: "open" },
@@ -69,7 +116,7 @@ const questions = [
       pl: "Proszę opisać zdarzenie własnymi słowami.",
       en: "Please describe the event in your own words.",
     },
-    topics: ["chronologia", "miejsce", "opis osoby"],
+    topicIds: ["topic-chronology", "topic-location", "topic-person"],
   },
   {
     id: "q-002",
@@ -78,7 +125,7 @@ const questions = [
       pl: "O której godzinie to się zaczęło?",
       en: "What time did it start?",
     },
-    topics: ["chronologia"],
+    topicIds: ["topic-chronology"],
   },
   {
     id: "q-003",
@@ -87,7 +134,7 @@ const questions = [
       pl: "Przecież stał Pan przy stojaku rowerowym o 20:00, prawda?",
       en: "You were standing by the bicycle stand at 20:00, correct?",
     },
-    topics: ["miejsce", "chronologia"],
+    topicIds: ["topic-location", "topic-chronology"],
     risk: { pl: "pytanie sugerujące", en: "leading" },
   },
   {
@@ -97,11 +144,11 @@ const questions = [
       pl: "Skąd Pan to wie?",
       en: "How do you know that?",
     },
-    topics: ["źródło wiedzy"],
+    topicIds: ["topic-source"],
   },
 ];
 
-const answers = [
+const seedAnswers = [
   {
     id: "a-001",
     questionId: "q-001",
@@ -131,7 +178,7 @@ const answers = [
   },
 ];
 
-const indicators = [
+const seedIndicators = [
   {
     label: { pl: "Pokrycie tematów", en: "Topic coverage" },
     score: 0.8,
@@ -188,7 +235,7 @@ const suggestions = [
   },
 ];
 
-const findings = [
+const seedFindings = [
   {
     severity: "high",
     title: { pl: "Niepokryty temat: Potencjalne nagranie", en: "Missing topic: Potential recording" },
@@ -220,7 +267,17 @@ function t(key) {
 }
 
 function localize(value) {
+  if (!value) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
   return value[state.locale] || value.en || "";
+}
+
+function domainLabel(label) {
+  return domainCopy[state.locale][label] || label;
 }
 
 function render() {
@@ -228,12 +285,22 @@ function render() {
   document.querySelectorAll("[data-i18n]").forEach((element) => {
     element.textContent = t(element.dataset.i18n);
   });
-  document.getElementById("case-subtitle").textContent = t("caseSubtitle");
-  document.getElementById("question-count").textContent = t("questionCount");
-  document.getElementById("finding-count").textContent = t("findingCount");
+
+  document.getElementById("case-subtitle").textContent = state.caseData?.title || t("caseSubtitle");
+  document.getElementById("question-count").textContent = formatCount(
+    getQuestions().length,
+    "question",
+  );
+  document.getElementById("finding-count").textContent = formatCount(
+    getFindings().length,
+    "finding",
+  );
   document.getElementById("active-role").textContent = t("roleLine");
-  document.getElementById("note-input").placeholder = t("notePlaceholder");
-  document.getElementById("add-note-button").textContent = t("addNote");
+  document.getElementById("answer-input").placeholder = t("answerPlaceholder");
+  document.getElementById("record-answer-button").textContent = state.isSubmitting
+    ? "..."
+    : t("recordAnswer");
+  document.getElementById("record-answer-button").disabled = state.isSubmitting;
 
   document.querySelectorAll(".lang-button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.locale === state.locale);
@@ -251,10 +318,19 @@ function render() {
 function renderStatus() {
   const strip = document.getElementById("status-strip");
   strip.innerHTML = "";
-  [t("mode"), t("airgapped"), t("role")].forEach((label) => {
+
+  [
+    { label: t("mode") },
+    { label: t("airgapped") },
+    { label: t("role") },
+    { label: t(state.apiMessageKey), state: state.apiMode },
+  ].forEach((item) => {
     const chip = document.createElement("span");
     chip.className = "chip";
-    chip.textContent = label;
+    if (item.state) {
+      chip.dataset.state = item.state;
+    }
+    chip.textContent = item.label;
     strip.appendChild(chip);
   });
 }
@@ -262,7 +338,8 @@ function renderStatus() {
 function renderQuestions() {
   const list = document.getElementById("question-list");
   list.innerHTML = "";
-  questions.forEach((question) => {
+
+  getQuestions().forEach((question) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `question-item${question.id === state.activeQuestionId ? " is-active" : ""}`;
@@ -297,12 +374,13 @@ function renderQuestions() {
 
 function renderActiveQuestion() {
   const target = document.getElementById("active-question");
-  const active = questions.find((question) => question.id === state.activeQuestionId);
+  const active = getActiveQuestion();
   target.innerHTML = "";
+
   const label = document.createElement("strong");
   label.textContent = t("currentQuestion");
   const text = document.createElement("p");
-  text.textContent = localize(active.text);
+  text.textContent = active ? localize(active.text) : "";
   target.append(label, text);
 }
 
@@ -310,7 +388,16 @@ function renderAnswers() {
   const stream = document.getElementById("answer-stream");
   stream.innerHTML = "";
 
-  answers.forEach((answer) => {
+  const currentAnswers = getAnswers();
+  if (!currentAnswers.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = t("noAnswers");
+    stream.appendChild(empty);
+    return;
+  }
+
+  currentAnswers.forEach((answer) => {
     const card = document.createElement("article");
     card.className = "answer-card";
     const title = document.createElement("strong");
@@ -323,23 +410,14 @@ function renderAnswers() {
     card.append(title, meta, text);
     stream.appendChild(card);
   });
-
-  state.notes.forEach((note, index) => {
-    const card = document.createElement("article");
-    card.className = "answer-card";
-    const title = document.createElement("strong");
-    title.textContent = `${t("notePlaceholder")} ${index + 1}`;
-    const text = document.createElement("p");
-    text.textContent = note;
-    card.append(title, text);
-    stream.appendChild(card);
-  });
 }
 
 function renderIndicators() {
   const list = document.getElementById("indicator-list");
   list.innerHTML = "";
-  indicators.forEach((indicator) => {
+
+  getIndicators().forEach((indicator) => {
+    const scoreValue = indicator.score ?? 0;
     const card = document.createElement("article");
     card.className = "indicator-card";
 
@@ -347,17 +425,19 @@ function renderIndicators() {
     header.className = "indicator-header";
     const title = document.createElement("strong");
     title.className = "indicator-title";
-    title.textContent = localize(indicator.label);
+    title.textContent = indicatorTitle(indicator);
     const score = document.createElement("span");
     score.className = "score";
-    score.textContent = indicator.score.toFixed(2);
+    score.textContent = indicator.score === null || indicator.score === undefined
+      ? "n/a"
+      : scoreValue.toFixed(2);
     header.append(title, score);
 
     const track = document.createElement("div");
     track.className = "bar-track";
     const fill = document.createElement("div");
     fill.className = "bar-fill";
-    fill.style.setProperty("--value", `${Math.round(indicator.score * 100)}%`);
+    fill.style.setProperty("--value", `${Math.round(scoreValue * 100)}%`);
     track.appendChild(fill);
 
     const confidence = document.createElement("div");
@@ -369,7 +449,7 @@ function renderIndicators() {
     indicator.factors.forEach((factor) => {
       const row = document.createElement("div");
       row.className = "factor-row";
-      row.textContent = localize(factor);
+      row.textContent = factorText(factor);
       factors.appendChild(row);
     });
 
@@ -397,39 +477,319 @@ function renderSuggestions() {
 function renderFindings() {
   const list = document.getElementById("finding-list");
   list.innerHTML = "";
-  findings.forEach((finding) => {
+  getFindings().forEach((finding) => {
     const card = document.createElement("article");
     card.className = "finding-card";
     card.dataset.severity = finding.severity;
     const title = document.createElement("strong");
     title.className = "finding-title";
-    title.textContent = localize(finding.title);
+    title.textContent = findingTitle(finding);
     const meta = document.createElement("div");
     meta.className = "finding-meta";
     meta.textContent = finding.severity;
     const detail = document.createElement("p");
-    detail.textContent = localize(finding.detail);
+    detail.textContent = findingDetail(finding);
     card.append(title, meta, detail);
     list.appendChild(card);
   });
+}
+
+function getQuestions() {
+  const questions = state.caseData?.questions?.length ? state.caseData.questions : seedQuestions;
+  return questions.map(toQuestionView);
+}
+
+function toQuestionView(question) {
+  const seed = seedQuestions.find((candidate) => candidate.id === question.id);
+  const questionType = question.question_type || question.type;
+  return {
+    id: question.id,
+    type: seed?.type || questionTypeLabel(questionType),
+    text: seed?.text || { pl: question.text, en: question.text },
+    topicIds: question.topic_ids || question.topicIds || seed?.topicIds || [],
+    risk: seed?.risk || (question.neutrality_flags?.length ? {
+      pl: "flaga neutralności",
+      en: "neutrality flag",
+    } : null),
+  };
+}
+
+function getActiveQuestion() {
+  return getQuestions().find((question) => question.id === state.activeQuestionId) || getQuestions()[0];
+}
+
+function getAnswers() {
+  const baseAnswers = state.caseData?.answers?.length
+    ? state.caseData.answers.map(toAnswerView)
+    : seedAnswers;
+  const sessionAnswers = state.session?.answers?.map(toAnswerView) || [];
+  return [...baseAnswers, ...state.localAnswers.map(toAnswerView), ...sessionAnswers];
+}
+
+function toAnswerView(answer) {
+  const seed = seedAnswers.find((candidate) => candidate.id === answer.id);
+  return {
+    id: answer.id,
+    questionId: answer.question_id || answer.questionId,
+    time: seed?.time || formatTime(answer.created_at) || answer.time || "",
+    text: seed?.text || { pl: answer.text, en: answer.text },
+  };
+}
+
+function getIndicators() {
+  return state.indicators.length ? state.indicators : seedIndicators;
+}
+
+function getFindings() {
+  return state.findings.length ? state.findings : seedFindings;
+}
+
+function indicatorTitle(indicator) {
+  return domainLabel(localize(indicator.label));
+}
+
+function factorText(factor) {
+  if (factor.label && factor.value !== undefined) {
+    return `${domainLabel(factor.label)}: ${factor.value}`;
+  }
+  return localize(factor);
+}
+
+function findingTitle(finding) {
+  if (typeof finding.title !== "string") {
+    return localize(finding.title);
+  }
+  if (state.locale === "en") {
+    return finding.title;
+  }
+  if (finding.category === "missing_topic") {
+    return `Niepokryty temat: ${finding.metadata?.topic_label || ""}`.trim();
+  }
+  if (finding.category === "question_neutrality") {
+    return "Pytanie może wymagać neutralizacji";
+  }
+  if (finding.category === "potential_inconsistency") {
+    return `Potencjalna niespójność: ${finding.metadata?.attribute || ""}`.trim();
+  }
+  return finding.title;
+}
+
+function findingDetail(finding) {
+  if (typeof finding.detail !== "string") {
+    return localize(finding.detail);
+  }
+  if (state.locale === "en") {
+    return finding.detail;
+  }
+  if (finding.category === "missing_topic") {
+    return "Temat nie został pokryty żadnym pytaniem ani odpowiedzią.";
+  }
+  if (finding.category === "question_neutrality") {
+    return "Pytanie wymaga przeglądu pod kątem neutralności językowej.";
+  }
+  if (finding.category === "potential_inconsistency") {
+    return "W materiale zapisano różne wartości dla tego samego elementu narracji. Wymaga to doprecyzowania, a nie automatycznego werdyktu.";
+  }
+  return finding.detail;
+}
+
+function questionTypeLabel(questionType) {
+  const labels = {
+    open: { pl: "otwarte", en: "open" },
+    clarifying: { pl: "doprecyzowujące", en: "clarifying" },
+    chronological: { pl: "chronologiczne", en: "chronological" },
+    source_of_knowledge: { pl: "źródło wiedzy", en: "source of knowledge" },
+    control: { pl: "kontrolne", en: "control" },
+    summary: { pl: "podsumowanie", en: "summary" },
+    challenge: { pl: "konfrontujące", en: "challenge" },
+  };
+  return labels[questionType] || { pl: questionType, en: questionType };
+}
+
+function formatCount(count, kind) {
+  if (state.locale === "en") {
+    const key = count === 1 ? `${kind}Singular` : `${kind}PluralMany`;
+    return `${count} ${t(key)}`;
+  }
+
+  const lastDigit = count % 10;
+  const lastTwo = count % 100;
+  const suffix = count === 1
+    ? t(`${kind}Singular`)
+    : lastDigit >= 2 && lastDigit <= 4 && !(lastTwo >= 12 && lastTwo <= 14)
+      ? t(`${kind}PluralFew`)
+      : t(`${kind}PluralMany`);
+  return `${count} ${suffix}`;
+}
+
+function formatTime(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleTimeString(state.locale === "pl" ? "pl-PL" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+async function initializeApiWorkflow() {
+  setApiState("connecting", "apiConnecting");
+  render();
+
+  try {
+    await loadCaseReview();
+    await startSession();
+    await refreshSessionReview();
+    setApiState("online", "apiOnline");
+  } catch (error) {
+    console.warn("Local API unavailable, using static demo data.", error);
+    setApiState("offline", "apiUnavailable");
+  }
+
+  render();
+}
+
+async function loadCaseReview() {
+  const payload = await fetchJson(`/cases/${CONFIG.caseId}/review?locale=${state.locale}`);
+  state.caseData = payload.case;
+  state.indicators = payload.indicators || [];
+  state.findings = payload.review?.findings || [];
+}
+
+async function startSession() {
+  state.session = await fetchJson("/sessions", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: CONFIG.sessionId,
+      case_id: CONFIG.caseId,
+      participant_id: CONFIG.participantId,
+      initial_role: "witness",
+    }),
+  });
+}
+
+async function refreshSessionReview() {
+  const payload = await fetchJson(`/sessions/${CONFIG.sessionId}/review?locale=${state.locale}`);
+  state.session = payload.session;
+  state.indicators = payload.indicators || [];
+  state.findings = payload.snapshot?.review?.findings || [];
+}
+
+async function refreshLocalizedApiState() {
+  if (state.apiMode !== "online") {
+    return;
+  }
+
+  setApiState("connecting", "apiConnecting");
+  render();
+
+  try {
+    await loadCaseReview();
+    await refreshSessionReview();
+    setApiState("online", "reviewUpdated");
+  } catch (error) {
+    console.warn("Could not refresh localized API state.", error);
+    setApiState("offline", "apiUnavailable");
+  }
+
+  render();
+}
+
+async function recordAnswer() {
+  const input = document.getElementById("answer-input");
+  const value = input.value.trim();
+  if (!value) {
+    setApiState(state.apiMode, "answerRequired");
+    renderStatus();
+    return;
+  }
+
+  const active = getActiveQuestion();
+  state.isSubmitting = true;
+  render();
+
+  if (state.apiMode !== "online" || !state.session) {
+    state.localAnswers.push({
+      id: `local-answer-${state.localAnswers.length + 1}`,
+      question_id: active.id,
+      text: value,
+      topic_ids: active.topicIds,
+      created_at: new Date().toISOString(),
+    });
+    input.value = "";
+    state.isSubmitting = false;
+    setApiState("offline", "answerSaved");
+    render();
+    return;
+  }
+
+  try {
+    const timestamp = Date.now();
+    await fetchJson(`/sessions/${CONFIG.sessionId}/answers`, {
+      method: "POST",
+      body: JSON.stringify({
+        id: `ui-answer-${timestamp}`,
+        question_id: active.id,
+        text: value,
+        topic_ids: active.topicIds,
+        event_id: `ui-event-answer-${timestamp}`,
+        claims: [],
+      }),
+    });
+    await refreshSessionReview();
+    input.value = "";
+    setApiState("online", "reviewUpdated");
+  } catch (error) {
+    console.error("Could not record answer.", error);
+    setApiState("offline", "answerSaveFailed");
+  }
+
+  state.isSubmitting = false;
+  render();
+}
+
+async function fetchJson(path, options = {}) {
+  const headers = options.body
+    ? { "Content-Type": "application/json", ...(options.headers || {}) }
+    : options.headers;
+  const response = await fetch(`${CONFIG.apiBaseUrl}${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+function setApiState(mode, messageKey) {
+  state.apiMode = mode;
+  state.apiMessageKey = messageKey;
 }
 
 document.querySelectorAll(".lang-button").forEach((button) => {
   button.addEventListener("click", () => {
     state.locale = button.dataset.locale;
     render();
+    refreshLocalizedApiState();
   });
 });
 
-document.getElementById("add-note-button").addEventListener("click", () => {
-  const input = document.getElementById("note-input");
-  const value = input.value.trim();
-  if (!value) {
-    return;
+document.getElementById("record-answer-button").addEventListener("click", () => {
+  recordAnswer();
+});
+
+document.getElementById("answer-input").addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+    recordAnswer();
   }
-  state.notes.push(value);
-  input.value = "";
-  renderAnswers();
 });
 
 render();
+initializeApiWorkflow();
