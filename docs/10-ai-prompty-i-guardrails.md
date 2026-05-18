@@ -45,14 +45,16 @@ Model nie moze generowac:
 
 ## Guardrails procesu
 
-Kazda odpowiedz AI powinna miec:
+Kazda odpowiedz AI dotyczaca istotnej decyzji analitycznej powinna miec:
 
 - typ sugestii,
 - uzasadnienie,
 - poziom pewnosci,
 - powiazanie z materialem sprawy,
 - ostrzezenie, jesli model wychodzi poza material,
-- status: zaproponowane, zaakceptowane, zmienione albo odrzucone.
+- slad audytowy.
+
+W trybie live nie kazda drobna podpowiedz musi wymagac formalnego klikniecia "zaakceptuj/odrzuc". Ciezszy workflow akceptacji powinien dotyczyc sugestii wysokiego ryzyka, raportow i wskaznikow wiarygodnosci.
 
 ## Prompty jako artefakty
 
@@ -94,4 +96,3 @@ Preferowany format to strukturalny JSON zgodny ze schematem, np.:
 5. Walidacja guardrails.
 6. Zapis sugestii w audycie.
 7. Decyzja uzytkownika.
-

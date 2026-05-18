@@ -1,0 +1,9 @@
+{
+  "app.name": "InterigA(I)tion",
+  "startup.language_label": "Language",
+  "startup.language_en": "English",
+  "startup.language_pl": "Polish",
+  "case.open": "Open case",
+  "case.review": "Review case",
+  "report.generate": "Generate report"
+}

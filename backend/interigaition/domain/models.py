@@ -7,8 +7,12 @@ They do not model a person's truthfulness, guilt, or psychological profile.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class Actor(StrEnum):
@@ -90,7 +94,7 @@ class Answer:
     text: str
     topic_ids: tuple[str, ...] = ()
     claims: tuple[Claim, ...] = ()
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
 
 
 @dataclass(frozen=True)
@@ -104,7 +108,7 @@ class AISuggestion:
     risk_flags: tuple[str, ...] = ()
     confidence: float | None = None
     status: SuggestionStatus = SuggestionStatus.PROPOSED
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
 
 
 @dataclass(frozen=True)
@@ -130,4 +134,4 @@ class Case:
     answers: tuple[Answer, ...] = ()
     ai_suggestions: tuple[AISuggestion, ...] = ()
     audit_events: tuple[AuditEvent, ...] = ()
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)

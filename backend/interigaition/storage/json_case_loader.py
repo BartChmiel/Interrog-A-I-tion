@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -86,7 +86,7 @@ def _load_claim(data: dict[str, Any]) -> Claim:
 
 def _parse_datetime(value: str | None) -> datetime:
     if not value:
-        return datetime.utcnow()
+        return datetime.now(UTC)
 
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 

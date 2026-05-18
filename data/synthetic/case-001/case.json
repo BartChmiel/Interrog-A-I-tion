@@ -1,0 +1,173 @@
+{
+  "id": "case-001",
+  "title": "Synthetic bicycle theft interview",
+  "title_i18n": {
+    "en": "Synthetic bicycle theft interview",
+    "pl": "Syntetyczne przesłuchanie dotyczące kradzieży roweru"
+  },
+  "description": "Synthetic training case. A witness reports seeing a person near a bicycle stand. The scenario contains one uncovered topic and one deliberate time inconsistency.",
+  "description_i18n": {
+    "en": "Synthetic training case. A witness reports seeing a person near a bicycle stand. The scenario contains one uncovered topic and one deliberate time inconsistency.",
+    "pl": "Syntetyczna sprawa treningowa. Świadek opisuje osobę widzianą przy stojaku rowerowym. Scenariusz zawiera jeden niepokryty temat i jedną celową niespójność czasu."
+  },
+  "created_at": "2026-05-05T12:00:00Z",
+  "topics": [
+    {
+      "id": "topic-chronology",
+      "label": "Chronology",
+      "label_i18n": {
+        "en": "Chronology",
+        "pl": "Chronologia"
+      },
+      "description": "Order and timing of events.",
+      "description_i18n": {
+        "en": "Order and timing of events.",
+        "pl": "Kolejność i czas zdarzeń."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-location",
+      "label": "Location",
+      "label_i18n": {
+        "en": "Location",
+        "pl": "Miejsce"
+      },
+      "description": "Where the event happened.",
+      "description_i18n": {
+        "en": "Where the event happened.",
+        "pl": "Miejsce zdarzenia."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-person",
+      "label": "Person description",
+      "label_i18n": {
+        "en": "Person description",
+        "pl": "Opis osoby"
+      },
+      "description": "Observable description of the person.",
+      "description_i18n": {
+        "en": "Observable description of the person.",
+        "pl": "Obserwowalny opis osoby."
+      },
+      "priority": "medium"
+    },
+    {
+      "id": "topic-source",
+      "label": "Source of knowledge",
+      "label_i18n": {
+        "en": "Source of knowledge",
+        "pl": "Źródło wiedzy"
+      },
+      "description": "How the witness knows the information.",
+      "description_i18n": {
+        "en": "How the witness knows the information.",
+        "pl": "Sposób, w jaki świadek zna daną informację."
+      },
+      "priority": "medium"
+    },
+    {
+      "id": "topic-recording",
+      "label": "Potential recording",
+      "label_i18n": {
+        "en": "Potential recording",
+        "pl": "Potencjalne nagranie"
+      },
+      "description": "Whether cameras or other recordings may exist.",
+      "description_i18n": {
+        "en": "Whether cameras or other recordings may exist.",
+        "pl": "Czy mogą istnieć kamery lub inne nagrania."
+      },
+      "priority": "high"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-001",
+      "text": "Prosze opisac zdarzenie wlasnymi slowami.",
+      "source": "human",
+      "question_type": "open",
+      "topic_ids": ["topic-chronology", "topic-location", "topic-person"]
+    },
+    {
+      "id": "q-002",
+      "text": "O ktorej godzinie to sie zaczelo?",
+      "source": "human",
+      "question_type": "chronological",
+      "topic_ids": ["topic-chronology"]
+    },
+    {
+      "id": "q-003",
+      "text": "Przeciez stal Pan przy stojaku rowerowym o 20:00, prawda?",
+      "source": "human",
+      "question_type": "challenge",
+      "topic_ids": ["topic-location", "topic-chronology"]
+    },
+    {
+      "id": "q-004",
+      "text": "Skad Pan to wie?",
+      "source": "human",
+      "question_type": "source_of_knowledge",
+      "topic_ids": ["topic-source"]
+    }
+  ],
+  "answers": [
+    {
+      "id": "a-001",
+      "question_id": "q-001",
+      "text": "Widzialem mezczyzne przy stojaku rowerowym przed biblioteka. To bylo okolo 19:45. Potem odszedl z ciemnym rowerem.",
+      "topic_ids": ["topic-chronology", "topic-location", "topic-person"],
+      "created_at": "2026-05-05T12:03:00Z",
+      "claims": [
+        {
+          "id": "c-001",
+          "subject": "event",
+          "attribute": "time",
+          "value": "19:45",
+          "source_text": "To bylo okolo 19:45."
+        },
+        {
+          "id": "c-002",
+          "subject": "event",
+          "attribute": "location",
+          "value": "bicycle stand near library",
+          "source_text": "przy stojaku rowerowym przed biblioteka"
+        }
+      ]
+    },
+    {
+      "id": "a-002",
+      "question_id": "q-002",
+      "text": "Wydaje mi sie, ze zaczelo sie raczej po 20:10, bo wtedy wyszedlem z zajec.",
+      "topic_ids": ["topic-chronology"],
+      "created_at": "2026-05-05T12:05:00Z",
+      "claims": [
+        {
+          "id": "c-003",
+          "subject": "event",
+          "attribute": "time",
+          "value": "20:10",
+          "source_text": "zaczelo sie raczej po 20:10"
+        }
+      ]
+    },
+    {
+      "id": "a-003",
+      "question_id": "q-004",
+      "text": "Widzialem to osobiscie z chodnika po drugiej stronie ulicy.",
+      "topic_ids": ["topic-source"],
+      "created_at": "2026-05-05T12:08:00Z",
+      "claims": [
+        {
+          "id": "c-004",
+          "subject": "witness",
+          "attribute": "source_of_knowledge",
+          "value": "direct observation",
+          "source_text": "Widzialem to osobiscie"
+        }
+      ]
+    }
+  ]
+}

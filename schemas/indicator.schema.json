@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interigaition.local/schemas/indicator.schema.json",
+  "title": "Indicator",
+  "type": "object",
+  "required": ["id", "category", "label", "description", "confidence", "factors"],
+  "properties": {
+    "id": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": ["process", "consistency", "evidence_alignment", "credibility_review"]
+    },
+    "label": { "type": "string" },
+    "description": { "type": "string" },
+    "score": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "factors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/factor" }
+    },
+    "linked_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "interpretation": { "type": "string" },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "factor": {
+      "type": "object",
+      "required": ["id", "label", "description", "value"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "value": { "type": "string" },
+        "linked_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "weight": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

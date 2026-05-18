@@ -1,69 +1,98 @@
 # InterigA(I)tion
 
-Lokalny, audytowalny asystent przesluchania z kontrola spojnosci narracji, pokrycia tematow i jakosci pytan.
+Local, air-gapped, auditable AI-assisted investigative interviewing prototype for police and prosecution workflows, focused on live interview support, narrative consistency, topic coverage, credibility indicators, question quality, and human oversight.
 
-Projekt jest pomyslany jako system pomocniczy dla osoby prowadzacej czynnosci, a nie jako automatyczny oceniacz prawdomownosci. AI ma pomagac w:
+The system is designed as a support tool for authorized professionals. It must not automatically decide whether a person is lying, guilty, or procedurally reliable. AI can help with:
 
-- przygotowaniu planu pytan na podstawie materialow sprawy,
-- notowaniu i porzadkowaniu przebiegu przesluchania,
-- sugerowaniu pytan doprecyzowujacych oraz sprawdzajacych spojnosc narracji,
-- wspieraniu neutralnych, metodycznych technik rozmowy sledczej,
-- wskazywaniu luk tematycznych, sprzecznosci i miejsc wymagajacych weryfikacji,
-- tworzeniu roboczych, niewiazacych wskaznikow pokrycia tematu i spojnosci.
+- preparing an interview plan from case material,
+- organizing notes and answers,
+- suggesting neutral follow-up and clarification questions,
+- supporting methodical investigative interviewing techniques,
+- identifying gaps, potential inconsistencies, and items requiring verification,
+- producing non-binding working indicators for topic coverage, narrative consistency, evidence alignment, and credibility assessment.
 
-## Zasada glowna
+## Core Boundary
 
-System nie stwierdza, czy osoba klamie. System moze jedynie wskazywac obserwowalne cechy materialu, takie jak niespojnosc odpowiedzi, brak odpowiedzi, zmiana szczegolu, luka czasowa albo temat niepokryty pytaniami. Interpretacja pozostaje po stronie czlowieka.
+The system does not make an automated legal, procedural, or truthfulness decision. It can describe observable properties of the material, such as missing answers, timeline conflicts, changed details, uncovered topics, source-of-knowledge weaknesses, corroboration gaps, or questions that may need review. Interpretation remains with the authorized human user.
 
-## Wybrany wariant
+## Selected Product Variant
 
-Projekt rozwijamy jako wariant 2: asystent przesluchania z kontrola spojnosci.
+We are building variant 2: an investigative interviewing assistant with narrative consistency support.
 
-Wersja magisterska ma pokazac prototyp, ktory:
+The thesis prototype should demonstrate:
 
-- wspiera planowanie przesluchania,
-- pomaga prowadzic notatki i pytania w toku czynnosci,
-- sugeruje neutralne pytania follow-up,
-- analizuje pokrycie tematow,
-- wykrywa potencjalne niespojnosci narracyjne,
-- generuje raport roboczy wraz ze sladem audytowym.
+- interview planning,
+- interview notes and question tracking,
+- active live-assistant suggestions,
+- topic coverage analysis,
+- potential narrative inconsistency detection,
+- credibility and reliability indicators with audit controls,
+- a working report with an audit trail.
 
-Architektura ma jednak od poczatku zakladac przyszly wariant instytucjonalny: lokalne dzialanie, szyfrowanie, role, audyt, ewaluacje i zgodnosc z regulacjami dotyczacymi AI oraz danych w organach scigania.
+The architecture should also leave a path toward future institutional deployment: local processing, encryption, roles, auditability, evaluation, and compliance with AI and law-enforcement data requirements.
 
-## Dokumentacja
+## Language Policy
 
-- [Wizja i zakres](docs/00-wizja-i-zakres.md)
-- [Wymagania MVP](docs/01-wymagania-mvp.md)
-- [Architektura lokalna](docs/02-architektura-lokalna.md)
-- [Bezpieczenstwo i prywatnosc](docs/03-bezpieczenstwo-i-prywatnosc.md)
-- [Metodyka przesluchania i AI](docs/04-metodyka-przesluchania-i-ai.md)
-- [Plan pracy magisterskiej](docs/05-plan-pracy-magisterskiej.md)
-- [Dane i ewaluacja](docs/06-dane-i-ewaluacja.md)
-- [Ryzyka etyczne i prawne](docs/07-ryzyka-etyczne-i-prawne.md)
-- [Wariant 2 i roadmapa](docs/08-wariant-2-roadmapa.md)
-- [Psychologia przesluchaniowa](docs/09-psychologia-przesluchaniowa.md)
-- [AI, prompty i guardrails](docs/10-ai-prompty-i-guardrails.md)
-- [Struktura repozytorium](docs/11-struktura-repozytorium.md)
-- [Slownik pojec](docs/12-slownik-pojec.md)
-- [Zrodla startowe](docs/13-zrodla-startowe.md)
-- [Stos technologiczny](docs/14-stos-technologiczny.md)
-- [Publikacja na GitHub](docs/15-publikacja-github.md)
+Engineering artifacts are English-first:
 
-## Proponowane etapy
+- code,
+- comments,
+- commit messages,
+- technical documentation,
+- schemas,
+- prompts,
+- architecture decisions.
 
-1. Doprecyzowanie zakresu badawczego i prawnego.
-2. Projekt MVP bez danych wrazliwych.
-3. Lokalny prototyp z szyfrowanym magazynem spraw.
-4. Modul AI do generowania planu pytan i pytan follow-up.
-5. Modul analizy pokrycia tematow i spojnosci odpowiedzi.
-6. Ewaluacja na danych syntetycznych, potem na danych zanonimizowanych.
+User-facing content is localized through language packs. The first supported locales are:
 
-## Struktura kodu
+- `en` - English,
+- `pl` - Polish.
 
-- `backend/` - lokalne API, logika domenowa, analiza, storage, AI i eksport.
-- `frontend/` - przyszly interfejs aplikacji.
-- `prompts/` - wersjonowane szablony promptow i instrukcje modeli.
-- `schemas/` - kontrakty danych w JSON Schema.
-- `research/` - protokoly badawcze, scenariusze ewaluacyjne i notatki.
-- `data/synthetic/` - dane syntetyczne dopuszczalne do pracy w repo.
-- `tests/` - testy jednostkowe, integracyjne i ewaluacyjne.
+Cases, UI labels, report templates, and future installer/startup language selection should use the `locales/` structure instead of hard-coded strings.
+
+## Documentation
+
+- [Vision and Scope](docs/00-wizja-i-zakres.md)
+- [MVP Requirements](docs/01-wymagania-mvp.md)
+- [Local Architecture](docs/02-architektura-lokalna.md)
+- [Security and Privacy](docs/03-bezpieczenstwo-i-prywatnosc.md)
+- [Interviewing Methodology and AI](docs/04-metodyka-przesluchania-i-ai.md)
+- [Thesis Plan](docs/05-plan-pracy-magisterskiej.md)
+- [Data and Evaluation](docs/06-dane-i-ewaluacja.md)
+- [Ethical and Legal Risks](docs/07-ryzyka-etyczne-i-prawne.md)
+- [Variant 2 Roadmap](docs/08-wariant-2-roadmapa.md)
+- [Investigative Interviewing Psychology](docs/09-psychologia-przesluchaniowa.md)
+- [AI Prompts and Guardrails](docs/10-ai-prompty-i-guardrails.md)
+- [Repository Structure](docs/11-struktura-repozytorium.md)
+- [Glossary](docs/12-slownik-pojec.md)
+- [Initial Sources](docs/13-zrodla-startowe.md)
+- [Technology Stack](docs/14-stos-technologiczny.md)
+- [GitHub Publication](docs/15-publikacja-github.md)
+- [Language and Localization](docs/16-language-and-localization.md)
+- [Product Strategy](docs/17-product-strategy.md)
+- [Credibility Indicators Governance](docs/18-credibility-indicators-governance.md)
+- [Implementation Backlog](docs/19-implementation-backlog.md)
+- [Milestone Gates](docs/20-milestone-gates.md)
+
+Some early planning documents still have Polish filenames and Polish content. They should be migrated to English before the first public release.
+
+## Suggested Stages
+
+1. Define research, legal, and ethical scope.
+2. Build an MVP using synthetic data only.
+3. Add live-interview workflow and local case storage.
+4. Add AI-assisted planning, live follow-up support, and visual bullet summaries.
+5. Add topic coverage, narrative consistency, and credibility-indicator analysis.
+6. Add air-gapped security, per-case workspaces, export integrity, and audit.
+7. Evaluate on synthetic data first, then on formally approved anonymized or public data.
+
+## Repository Structure
+
+- `backend/` - local API, domain logic, analysis, storage, AI, export.
+- `frontend/` - future application UI.
+- `locales/` - user-facing language packs.
+- `prompts/` - versioned model instructions and task prompts.
+- `schemas/` - JSON Schema contracts.
+- `research/` - research protocols, evaluation scenarios, notes.
+- `data/synthetic/` - synthetic data allowed in the repository.
+- `tests/` - unit, integration, and evaluation tests.

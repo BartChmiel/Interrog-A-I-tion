@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from interigaition.analysis.interview_review import InterviewReview
+from interigaition.domain.indicators import Indicator
 from interigaition.domain.models import Case
 from interigaition.i18n.localization import LanguagePack, load_language_pack
 
 
-def render_review_markdown(case: Case, review: InterviewReview, locale: str = "en") -> str:
+def render_review_markdown(
+    case: Case,
+    review: InterviewReview,
+    locale: str = "en",
+    indicators: tuple[Indicator, ...] = (),
+) -> str:
     """Render a concise working report."""
 
     language = load_language_pack(locale, namespace="report")
@@ -23,9 +29,17 @@ def render_review_markdown(case: Case, review: InterviewReview, locale: str = "e
         f"- {language.text('report.covered_topics')}: {len(review.covered_topic_ids)}",
         f"- {language.text('report.missing_topics')}: {len(review.missing_topic_ids)}",
         "",
-        f"## {language.text('report.findings_heading')}",
-        "",
     ]
+
+    if indicators:
+        lines.extend(_render_indicators(language, indicators))
+
+    lines.extend(
+        [
+            f"## {language.text('report.findings_heading')}",
+            "",
+        ]
+    )
 
     if not review.findings:
         lines.append(language.text("report.no_findings"))
@@ -49,6 +63,86 @@ def render_review_markdown(case: Case, review: InterviewReview, locale: str = "e
             )
 
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _render_indicators(language: LanguagePack, indicators: tuple[Indicator, ...]) -> list[str]:
+    lines = [
+        f"## {language.text('report.indicators_heading')}",
+        "",
+        language.text("report.indicators_disclaimer"),
+        "",
+    ]
+
+    for indicator in indicators:
+        category = language.text(
+            f"indicator_category.{indicator.category.value}",
+            default=indicator.category.value,
+        )
+        label = language.text(f"indicator.{indicator.id}.label", default=indicator.label)
+        description = language.text(
+            f"indicator.{indicator.id}.description",
+            default=indicator.description,
+        )
+        interpretation = language.text(
+            f"indicator.{indicator.id}.interpretation",
+            default=indicator.interpretation,
+        )
+        limitations = tuple(
+            language.text(f"indicator.{indicator.id}.limitation.{index}", default=limitation)
+            for index, limitation in enumerate(indicator.limitations, start=1)
+        )
+
+        lines.extend(
+            [
+                f"### {label}",
+                "",
+                f"- {language.text('report.category')}: {category}",
+                f"- {language.text('report.score')}: {_format_score(indicator.score)}",
+                f"- {language.text('report.score_bar')}: {_score_bar(indicator.score)}",
+                f"- {language.text('report.color_band')}: {language.text(f'color.{_score_band(indicator.score)}')}",
+                f"- {language.text('report.confidence')}: {indicator.confidence:.2f}",
+                f"- {language.text('report.detail')}: {description}",
+                f"- {language.text('report.interpretation')}: {interpretation}",
+            ]
+        )
+
+        if limitations:
+            lines.append(f"- {language.text('report.limitations')}: {'; '.join(limitations)}")
+
+        if indicator.factors:
+            lines.append(f"- {language.text('report.factors')}:")
+            for factor in indicator.factors:
+                factor_label = language.text(f"factor.{factor.id}.label", default=factor.label)
+                lines.append(f"  - {factor_label}: {factor.value}")
+
+        lines.append("")
+
+    return lines
+
+
+def _format_score(score: float | None) -> str:
+    if score is None:
+        return "n/a"
+
+    return f"{score:.2f}"
+
+
+def _score_bar(score: float | None, width: int = 10) -> str:
+    if score is None:
+        return "[----------]"
+
+    filled = round(max(0.0, min(1.0, score)) * width)
+    return f"[{'#' * filled}{'-' * (width - filled)}]"
+
+
+def _score_band(score: float | None) -> str:
+    if score is None:
+        return "gray"
+    if score >= 0.8:
+        return "green"
+    if score >= 0.6:
+        return "yellow"
+    return "red"
 
 
 def _localized_finding_title(

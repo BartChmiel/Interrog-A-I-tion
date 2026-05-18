@@ -10,6 +10,8 @@
 __pycache__/
 .pytest_cache/
 .venv/
+.deps/
+.deps_stable/
 venv/
 
 # Node
@@ -25,4 +27,3 @@ build/
 data/private/
 data/cases/
 exports/private/
-

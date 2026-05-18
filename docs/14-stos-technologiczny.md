@@ -163,11 +163,13 @@ Technologie:
 ## Czego unikamy na starcie
 
 - LangChain jako glowna warstwa aplikacji: moze zaciemnic audyt i utrudnic opis pracy.
-- Automatyczny scoring wiarygodnosci osoby.
+- Nieaudytowalny, automatyczny scoring osoby bez rozbicia na czynniki.
 - Chmurowe LLM-y jako domyslna sciezka.
 - Zbyt wczesny desktop packaging.
 - Mikroserwisy.
 - Baza serwerowa, dopoki nie ma realnej potrzeby.
+
+Wskazniki spojnosci, wiarygodnosci materialu i zgodnosci z dowodami moga byc rozwijane, ale musza miec widoczne czynniki, slady audytu i kontrole czlowieka.
 
 ## Decyzja dla pierwszej wersji
 
@@ -198,4 +200,3 @@ To daje najlepszy balans: szybka praca magisterska, sensowna inzynieria, droga d
 - Chroma: https://docs.trychroma.com/
 - uv: https://docs.astral.sh/uv/
 - pytest: https://docs.pytest.org/en/stable/
-

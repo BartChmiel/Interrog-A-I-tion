@@ -7,6 +7,13 @@ readme = "README.md"
 authors = [
   { name = "InterigA(I)tion research project" }
 ]
+dependencies = [
+  "fastapi==0.115.12",
+  "uvicorn==0.30.6"
+]
+
+[project.scripts]
+interigaition = "interigaition.cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["backend"]
@@ -19,4 +26,3 @@ target-version = "py311"
 python_version = "3.11"
 strict = true
 mypy_path = "backend"
-

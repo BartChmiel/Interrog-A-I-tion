@@ -4,6 +4,17 @@ from __future__ import annotations
 
 
 FORBIDDEN_CLAIM_PATTERNS: tuple[str, ...] = (
+    "is lying",
+    "person is lying",
+    "the person is lying",
+    "is guilty",
+    "person is guilty",
+    "the person is guilty",
+    "detected deception",
+    "deception detected",
+    "lie detected",
+    "truthfulness score",
+    "deception score",
     "klamie",
     "kłamie",
     "na pewno klamie",
@@ -33,4 +44,3 @@ def is_ai_output_allowed(text: str) -> bool:
     """Check whether model output respects the project's core interpretive boundary."""
 
     return not find_forbidden_claims(text)
-

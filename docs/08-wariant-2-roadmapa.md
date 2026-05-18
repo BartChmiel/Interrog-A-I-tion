@@ -1,91 +1,141 @@
-# Wariant 2 i roadmapa
+# Variant 2 Roadmap
 
-## Decyzja projektowa
+## Product Decision
 
-Wybrany kierunek to wariant 2: asystent przesluchania z kontrola spojnosci.
+The selected direction is variant 2: an investigative interviewing assistant with narrative consistency and credibility-indicator support.
 
-Nie budujemy systemu do wykrywania klamstwa. Budujemy system, ktory pomaga czlowiekowi:
+The primary target users are police and prosecution professionals. The thesis work should be developed as a real product seed, not only as a disposable academic prototype.
 
-- przygotowac neutralny plan pytan,
-- prowadzic uporzadkowane notatki,
-- sprawdzac pokrycie tematow,
-- identyfikowac luki,
-- wskazywac potencjalne niespojnosci,
-- zadawac pytania doprecyzowujace,
-- zachowac audyt pracy z AI.
+## Product Scope
 
-## Produkt w wersji magisterskiej
+The system should support:
 
-MVP powinno byc demonstratorem:
+- live interview preparation and conduct,
+- active assistance during the interview,
+- visual bullet summaries while the interview progresses,
+- topic coverage tracking,
+- internal question classification for visualization,
+- narrative consistency analysis during and after the interview,
+- credibility and reliability indicators,
+- report generation aligned with institutional standards,
+- full auditability and human authority over decisions.
 
-- lokalnym,
-- bezpiecznym,
-- dzialajacym na danych syntetycznych,
-- z jasnym rozdzialem czlowiek/AI,
-- z raportem i metrykami.
+## Main Interview Roles
 
-## Perspektywa 3-5 lat
+The system must support multiple procedural roles:
 
-Docelowy system moglby rozwijac sie w kierunku narzedzia instytucjonalnego dla policji, prokuratury, bieglych lub jednostek szkoleniowych.
+- witness,
+- suspect,
+- injured party or victim,
+- expert,
+- other participant.
 
-Wymagaloby to:
+The design must allow role changes over time. In real investigations, a witness may become a suspect, an injured party may become a perpetrator, and role boundaries may shift as evidence develops.
 
-- formalnej oceny ryzyka AI,
-- konsultacji prawnych,
-- walidacji psychologicznej,
-- badan z praktykami,
-- certyfikacji lub procesu zgodnosci,
-- wdrozenia lokalnego albo on-premise,
-- jasnych zasad odpowiedzialnosci za sugestie AI.
+## Strategic Direction
 
-## Etapy rozwoju
+The deployment horizon is:
 
-### Etap 0: fundamenty
+1. Poland,
+2. European Union,
+3. wider international use.
 
-- dokumentacja wizji,
-- definicja ograniczen,
-- model zagrozen,
-- dane syntetyczne,
-- wstepne schematy danych.
+The first implementation should therefore be local and Polish-ready, while the engineering and documentation remain English-first and jurisdiction-aware.
 
-### Etap 1: prototyp badawczy
+## Thesis/Product Balance
 
-- tworzenie sprawy,
-- plan pytan,
-- notatki odpowiedzi,
-- generowanie pytan follow-up,
-- raport pokrycia tematow,
-- prosty dziennik audytu.
+The project should satisfy both:
 
-### Etap 2: analiza spojnosci
+- a computer science thesis in ML/cybersecurity,
+- a serious path toward a real investigative technology product.
 
-- ekstrakcja twierdzen,
-- porownywanie czasu, miejsca, osob i kolejnosci zdarzen,
-- wykrywanie luk,
-- oznaczanie poziomu pewnosci modelu,
-- walidacja ekspercka.
+This means that each feature should be:
 
-### Etap 3: bezpieczenstwo lokalne
+- researchable,
+- testable,
+- auditable,
+- defensible under legal and ethical constraints,
+- designed with future institutional deployment in mind.
 
-- szyfrowanie danych,
-- role uzytkownikow,
-- kontrola eksportu,
-- integralnosc audytu,
-- tryb offline.
+## Stages
 
-### Etap 4: pilot instytucjonalny
+### Stage 0: Foundation
 
-- testy z praktykami,
-- procedury anonimizacji,
-- instrukcja uzytkownika,
-- szkolenie AI literacy,
-- ocena ryzyka i zgodnosci.
+- product strategy,
+- language policy,
+- initial synthetic cases,
+- deterministic review pipeline,
+- documentation and architecture decisions,
+- first tests.
 
-## Nieprzekraczalne granice
+### Stage 1: Live Research Prototype
 
-- brak automatycznego werdyktu prawdomownosci,
-- brak scoringu osoby,
-- brak ukrytego wplywu AI na protokol,
-- brak wysylania materialow poza kontrolowane srodowisko,
-- brak generowania pytan opartych na presji, manipulacji lub stereotypach.
+- live interview session model,
+- case workspace model,
+- topic and question panels,
+- answer note-taking,
+- visual bullet-point summary,
+- deterministic analysis refresh after each answer,
+- localized working report.
 
+### Stage 2: AI Assistant Layer
+
+- model client interface,
+- fake model client for tests,
+- Ollama adapter,
+- prompt rendering,
+- JSON output validation,
+- guardrails,
+- AI-generated follow-up suggestions,
+- AI-generated summaries.
+
+### Stage 3: Credibility and Reliability Indicators
+
+- topic coverage score,
+- narrative consistency score,
+- source-of-knowledge quality indicators,
+- evidence alignment indicators,
+- contradiction density,
+- uncertainty and confidence display,
+- factor-level breakdown,
+- audit record of indicator generation.
+
+### Stage 4: Security and Institutional Readiness
+
+- per-case workspace,
+- encryption-at-rest path,
+- export hashes,
+- append-only audit log,
+- air-gapped mode,
+- role-based access,
+- local model configuration,
+- offline installation path.
+
+### Stage 5: Evaluation
+
+- synthetic benchmark cases,
+- expert review protocol,
+- comparison with and without tool support,
+- false-positive/false-negative tracking,
+- question-quality analysis,
+- AI governance assessment.
+
+### Stage 6: Pilot Path
+
+- private repository,
+- controlled demo,
+- legal review,
+- ethics review,
+- field-practitioner feedback,
+- institutional pilot proposal.
+
+## Non-Negotiable Boundaries
+
+- no automated guilt decision,
+- no automated procedural decision,
+- no hidden influence on official records,
+- no cloud transmission of sensitive case material by default,
+- no pressure/manipulation-oriented question generation,
+- no untraceable credibility output.
+
+Credibility indicators may exist, but they must be decision-support indicators with traceable factors, auditability, and human authority.

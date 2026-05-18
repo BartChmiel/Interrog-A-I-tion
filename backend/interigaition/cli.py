@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from interigaition.analysis.credibility_indicators import generate_indicators
 from interigaition.analysis.interview_review import review_case
 from interigaition.export.markdown_report import render_review_markdown
 from interigaition.storage.json_case_loader import load_case_from_json
@@ -31,7 +32,8 @@ def main() -> int:
     if args.command == "review":
         case = load_case_from_json(args.case_path, locale=args.locale)
         review = review_case(case)
-        print(render_review_markdown(case, review, locale=args.locale), end="")
+        indicators = generate_indicators(case, review)
+        print(render_review_markdown(case, review, locale=args.locale, indicators=indicators), end="")
         return 0
 
     parser.error(f"Unknown command: {args.command}")
