@@ -82,7 +82,7 @@ export const copy = {
   },
 } satisfies Record<Locale, Record<string, string>>;
 
-export const domainCopy = {
+export const domainCopy: Record<Locale, Record<string, string>> = {
   pl: {
     "Topic coverage": "Pokrycie tematów",
     "Question neutrality": "Neutralność pytań",
@@ -99,7 +99,7 @@ export const domainCopy = {
     "Source claims": "Twierdzenia o źródle wiedzy",
   },
   en: {},
-} satisfies Record<Locale, Record<string, string>>;
+};
 
 export type CopyKey = keyof typeof copy.pl;
 
