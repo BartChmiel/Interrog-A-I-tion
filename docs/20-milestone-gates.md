@@ -113,6 +113,18 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Case workspace and access policy boundary has reached its first review point.
+
+The project owner should evaluate:
+
+- whether the initial workspace directories match the expected case lifecycle,
+- whether the prototype roles are sufficient for police/prosecution-oriented workflow testing,
+- whether anonymized imports should remain blocked until encrypted storage is implemented,
+- whether the next security step should be SQLCipher research, export hashing, or UI integration for workspace creation,
+- whether access-policy decisions should be visible in the UI or only enforced by backend/API.
+
+## Current STOP
+
 Milestone 6: SQLite persistence and audit chain has reached its first review point.
 
 The project owner should evaluate:

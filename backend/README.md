@@ -75,3 +75,17 @@ backend/local-data/interigaition.sqlite3
 ```
 
 Session start, answer creation, and review refresh events are also written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage. The storage boundary is designed so a later SQLCipher or encrypted-workspace adapter can replace the plain SQLite file.
+
+## Case workspaces
+
+The security package includes a prototype per-case workspace boundary. A workspace has a `workspace.json` manifest and fixed subdirectories for imports, sessions, exports, audit, and model artifacts.
+
+Plain SQLite prototype workspaces are allowed for synthetic material only. Non-synthetic material is blocked unless the workspace declares encrypted storage as required.
+
+The local API exposes prototype workspace creation, manifest loading, and access-policy decisions through:
+
+```text
+POST /workspaces
+GET /workspaces/{workspace_id}
+GET /workspaces/{workspace_id}/access
+```

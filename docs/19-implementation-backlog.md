@@ -112,7 +112,7 @@ Success criteria:
 
 ## Milestone 6: Security Path
 
-Status: started. SQLite session persistence and a hash-chained append-only audit log are implemented for the local prototype. Encryption, per-case workspaces, and export integrity are not implemented yet.
+Status: started. SQLite session persistence, a hash-chained append-only audit log, and a prototype per-case workspace boundary are implemented. Encryption and export integrity are not implemented yet.
 
 Tasks:
 

@@ -83,6 +83,18 @@ from interigaition.domain.session import (
     start_interview_session,
 )
 from interigaition.export.markdown_report import render_review_markdown
+from interigaition.security.access_policy import (
+    WorkspaceAction,
+    WorkspaceRole,
+    decide_workspace_access,
+)
+from interigaition.security.case_workspace import (
+    CaseWorkspace,
+    CaseWorkspaceManager,
+    DataSensitivity,
+    StorageMode,
+    WorkspaceError,
+)
 from interigaition.storage.json_case_loader import load_case_from_json
 from interigaition.storage.session_store import SessionStore
 from interigaition.storage.sqlite_session_store import SQLiteSessionStore
@@ -90,6 +102,7 @@ from interigaition.storage.sqlite_session_store import SQLiteSessionStore
 
 SYNTHETIC_CASES_ROOT = PROJECT_ROOT / "data" / "synthetic"
 DEFAULT_DATABASE_PATH = BACKEND_ROOT / "local-data" / "interigaition.sqlite3"
+DEFAULT_WORKSPACE_ROOT = BACKEND_ROOT / "local-data" / "workspaces"
 REQUIRED_CLAIM_FIELDS = ("id", "subject", "attribute", "value")
 
 
@@ -111,7 +124,19 @@ class AddAnswerRequest:
     claims: list[dict[str, str]] = field(default_factory=list)
 
 
-def create_app(store: SessionStore | None = None) -> FastAPI:
+@dataclass(frozen=True)
+class CreateWorkspaceRequest:
+    case_id: str
+    created_by: str
+    data_sensitivity: DataSensitivity = DataSensitivity.SYNTHETIC
+    storage_mode: StorageMode = StorageMode.PLAIN_SQLITE_PROTOTYPE
+    workspace_id: str | None = None
+
+
+def create_app(
+    store: SessionStore | None = None,
+    workspace_manager: CaseWorkspaceManager | None = None,
+) -> FastAPI:
     app = FastAPI(
         title="InterigA(I)tion Local API",
         version="0.1.0",
@@ -141,6 +166,7 @@ def create_app(store: SessionStore | None = None) -> FastAPI:
         return response
 
     store = store or SQLiteSessionStore.in_memory()
+    workspace_manager = workspace_manager or CaseWorkspaceManager(DEFAULT_WORKSPACE_ROOT)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -149,6 +175,49 @@ def create_app(store: SessionStore | None = None) -> FastAPI:
     @app.get("/locales")
     def locales() -> dict[str, list[str]]:
         return {"locales": ["en", "pl"]}
+
+    @app.post("/workspaces")
+    def create_workspace(request: CreateWorkspaceRequest) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.create_workspace(
+                case_id=request.case_id,
+                created_by=request.created_by,
+                data_sensitivity=request.data_sensitivity,
+                storage_mode=request.storage_mode,
+                workspace_id=request.workspace_id,
+            )
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return _workspace_response(workspace)
+
+    @app.get("/workspaces/{workspace_id}")
+    def get_workspace(workspace_id: str) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        return _workspace_response(workspace)
+
+    @app.get("/workspaces/{workspace_id}/access")
+    def get_workspace_access(
+        workspace_id: str,
+        role: WorkspaceRole,
+        action: WorkspaceAction,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        return _to_jsonable(
+            decide_workspace_access(
+                role=role,
+                action=action,
+                manifest=workspace.manifest,
+            )
+        )
 
     @app.get("/cases/{case_id}")
     def get_case(case_id: str, locale: str = Query(default="en")) -> dict[str, Any]:
@@ -300,7 +369,10 @@ def create_app(store: SessionStore | None = None) -> FastAPI:
     return app
 
 
-app = create_app(store=SQLiteSessionStore(DEFAULT_DATABASE_PATH))
+app = create_app(
+    store=SQLiteSessionStore(DEFAULT_DATABASE_PATH),
+    workspace_manager=CaseWorkspaceManager(DEFAULT_WORKSPACE_ROOT),
+)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -356,6 +428,13 @@ def _session_audit_events(
         )
         or event.details.get("session_id") == session_id
     )
+
+
+def _workspace_response(workspace: CaseWorkspace) -> dict[str, Any]:
+    return {
+        "root_path": str(workspace.root_path),
+        "manifest": _to_jsonable(workspace.manifest),
+    }
 
 
 def _validate_answer_request(case: Case, request: AddAnswerRequest) -> None:

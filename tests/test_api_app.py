@@ -1,7 +1,20 @@
 import unittest
+import uuid
+from pathlib import Path
 
-from interigaition.api.app import AddAnswerRequest, HTTPException, StartSessionRequest, create_app
+from interigaition.api.app import (
+    AddAnswerRequest,
+    CreateWorkspaceRequest,
+    HTTPException,
+    StartSessionRequest,
+    create_app,
+)
 from interigaition.domain.session import ParticipantRole
+from interigaition.security.access_policy import WorkspaceAction, WorkspaceRole
+from interigaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
+
+
+TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "api"
 
 
 def endpoint(app, name: str):
@@ -27,6 +40,42 @@ class ApiAppTest(unittest.TestCase):
         self.assertIn("review", response)
         self.assertIn("indicators", response)
         self.assertIn("Decision-support indicators", response["report_markdown"])
+
+    def test_workspace_endpoint_flow(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}"
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        get_workspace = endpoint(app, "get_workspace")
+        get_access = endpoint(app, "get_workspace_access")
+
+        created = create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-001",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+        loaded = get_workspace("api-workspace-001")
+        allowed = get_access(
+            "api-workspace-001",
+            role=WorkspaceRole.INVESTIGATOR,
+            action=WorkspaceAction.WRITE_INTERVIEW,
+        )
+        denied = get_access(
+            "api-workspace-001",
+            role=WorkspaceRole.OBSERVER,
+            action=WorkspaceAction.WRITE_INTERVIEW,
+        )
+
+        self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
+        self.assertEqual(loaded["manifest"]["case_id"], "case-001")
+        self.assertTrue(allowed["allowed"])
+        self.assertFalse(denied["allowed"])
 
     def test_session_endpoint_flow(self) -> None:
         app = create_app()
