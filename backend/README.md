@@ -27,6 +27,13 @@ Polish report:
 python -m interigaition.cli review ..\data\synthetic\case-001\case.json --locale pl
 ```
 
+Report export with an integrity manifest:
+
+```powershell
+python -m interigaition.cli review ..\data\synthetic\case-001\case.json --output ..\test-output\report.md --manifest ..\test-output\manifest.json --created-by investigator-001
+python -m interigaition.cli verify-export ..\test-output\manifest.json --root ..\test-output
+```
+
 Pipeline:
 
 1. Wczytuje syntetyczna sprawe z JSON.
@@ -34,6 +41,7 @@ Pipeline:
 3. Oznacza potencjalnie sugerujace pytania.
 4. Wykrywa proste konflikty w ustrukturyzowanych twierdzeniach.
 5. Generuje raport Markdown.
+6. Opcjonalnie zapisuje manifest integralnosci eksportu.
 
 Testy:
 
@@ -75,6 +83,8 @@ backend/local-data/interigaition.sqlite3
 ```
 
 Session start, answer creation, and review refresh events are also written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage. The storage boundary is designed so a later SQLCipher or encrypted-workspace adapter can replace the plain SQLite file.
+
+Markdown exports can be accompanied by an integrity manifest. The manifest stores SHA-256 hashes and sizes for exported files plus a hash of the manifest payload itself.
 
 ## Case workspaces
 

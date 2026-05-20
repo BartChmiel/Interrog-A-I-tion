@@ -113,6 +113,17 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Export integrity manifests have reached their first review point.
+
+The project owner should evaluate:
+
+- whether SHA-256 file hashes plus a manifest hash are sufficient for the thesis prototype,
+- whether export manifests should be shown in the UI or remain a backend/CLI artifact for now,
+- whether future official-looking exports must be blocked until legal/UX wording is reviewed,
+- whether the next security step should be UI workspace integration or a concrete SQLCipher installation route.
+
+## Current STOP
+
 Milestone 6: SQLCipher runtime readiness has reached its first review point.
 
 The project owner should evaluate:
