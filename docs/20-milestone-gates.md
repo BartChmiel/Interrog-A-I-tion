@@ -113,6 +113,17 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: SQLCipher runtime readiness has reached its first review point.
+
+The project owner should evaluate:
+
+- whether encrypted workspace creation should remain blocked until SQLCipher is actually installed,
+- which SQLCipher packaging route should be used for Windows development and future institutional deployment,
+- whether the UI should display the encryption readiness status before allowing non-synthetic imports,
+- whether the next step should be installing SQLCipher locally, implementing export hashing, or wiring workspace screens into the UI.
+
+## Current STOP
+
 Milestone 6: Case workspace and access policy boundary has reached its first review point.
 
 The project owner should evaluate:

@@ -12,6 +12,7 @@ from interigaition.api.app import (
 from interigaition.domain.session import ParticipantRole
 from interigaition.security.access_policy import WorkspaceAction, WorkspaceRole
 from interigaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
+from interigaition.security.encryption_status import EncryptionBackend, EncryptionStatus
 
 
 TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "api"
@@ -44,9 +45,11 @@ class ApiAppTest(unittest.TestCase):
     def test_workspace_endpoint_flow(self) -> None:
         app = create_app(
             workspace_manager=CaseWorkspaceManager(
-                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}"
+                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
             )
         )
+        get_encryption_status = endpoint(app, "get_encryption_status")
         create_workspace = endpoint(app, "create_workspace")
         get_workspace = endpoint(app, "get_workspace")
         get_access = endpoint(app, "get_workspace_access")
@@ -71,11 +74,26 @@ class ApiAppTest(unittest.TestCase):
             role=WorkspaceRole.OBSERVER,
             action=WorkspaceAction.WRITE_INTERVIEW,
         )
+        encryption_status = get_encryption_status()
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
         self.assertEqual(loaded["manifest"]["case_id"], "case-001")
         self.assertTrue(allowed["allowed"])
         self.assertFalse(denied["allowed"])
+        self.assertFalse(encryption_status["available"])
+
+        with self.assertRaises(HTTPException) as caught:
+            create_workspace(
+                CreateWorkspaceRequest(
+                    case_id="case-encrypted-api",
+                    created_by="investigator-001",
+                    workspace_id="api-workspace-encrypted",
+                    data_sensitivity=DataSensitivity.SYNTHETIC,
+                    storage_mode=StorageMode.ENCRYPTED_REQUIRED,
+                )
+            )
+
+        self.assertEqual(caught.exception.status_code, 400)
 
     def test_session_endpoint_flow(self) -> None:
         app = create_app()
@@ -202,6 +220,14 @@ class ApiAppTest(unittest.TestCase):
                     add_answer("api-session-validation", request)
 
                 self.assertEqual(caught.exception.status_code, 400)
+
+
+def _unavailable_encryption_status() -> EncryptionStatus:
+    return EncryptionStatus(
+        backend=EncryptionBackend.STANDARD_SQLITE,
+        available=False,
+        detail="SQLCipher runtime not detected for test.",
+    )
 
 
 if __name__ == "__main__":

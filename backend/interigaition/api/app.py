@@ -176,6 +176,10 @@ def create_app(
     def locales() -> dict[str, list[str]]:
         return {"locales": ["en", "pl"]}
 
+    @app.get("/security/encryption")
+    def get_encryption_status() -> dict[str, Any]:
+        return _to_jsonable(workspace_manager.encryption_status())
+
     @app.post("/workspaces")
     def create_workspace(request: CreateWorkspaceRequest) -> dict[str, Any]:
         try:

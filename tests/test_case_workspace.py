@@ -15,6 +15,7 @@ from interigaition.security.case_workspace import (
     WorkspaceError,
     WorkspaceStatus,
 )
+from interigaition.security.encryption_status import EncryptionBackend, EncryptionStatus
 
 
 TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "workspaces"
@@ -66,8 +67,41 @@ class CaseWorkspaceTest(unittest.TestCase):
                         storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
                     )
 
+    def test_rejects_encrypted_workspace_when_runtime_is_unavailable(self) -> None:
+        manager = CaseWorkspaceManager(
+            _workspace_root("encrypted-unavailable"),
+            encryption_status_provider=_unavailable_encryption_status,
+        )
+
+        with self.assertRaises(WorkspaceError):
+            manager.create_workspace(
+                case_id="case-encrypted",
+                created_by="investigator-001",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.ENCRYPTED_REQUIRED,
+            )
+
+    def test_allows_encrypted_workspace_when_runtime_is_available(self) -> None:
+        manager = CaseWorkspaceManager(
+            _workspace_root("encrypted-available"),
+            encryption_status_provider=_available_encryption_status,
+        )
+
+        workspace = manager.create_workspace(
+            case_id="case-anonymized",
+            created_by="investigator-001",
+            data_sensitivity=DataSensitivity.ANONYMIZED,
+            storage_mode=StorageMode.ENCRYPTED_REQUIRED,
+        )
+
+        self.assertTrue(workspace.manifest.allows_sensitive_material)
+        self.assertEqual(workspace.manifest.storage_mode, StorageMode.ENCRYPTED_REQUIRED)
+
     def test_workspace_access_policy_blocks_risky_operations(self) -> None:
-        manager = CaseWorkspaceManager(_workspace_root("policy"))
+        manager = CaseWorkspaceManager(
+            _workspace_root("policy"),
+            encryption_status_provider=_available_encryption_status,
+        )
         workspace = manager.create_workspace(
             case_id="case-policy",
             created_by="prosecutor-001",
@@ -112,6 +146,23 @@ def _workspace_root(name: str) -> Path:
     root = TEST_OUTPUT_ROOT / f"{name}-{uuid.uuid4()}"
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+def _available_encryption_status() -> EncryptionStatus:
+    return EncryptionStatus(
+        backend=EncryptionBackend.SQLCIPHER,
+        available=True,
+        version="4.0-test",
+        detail="SQLCipher runtime detected for test.",
+    )
+
+
+def _unavailable_encryption_status() -> EncryptionStatus:
+    return EncryptionStatus(
+        backend=EncryptionBackend.STANDARD_SQLITE,
+        available=False,
+        detail="SQLCipher runtime not detected for test.",
+    )
 
 
 if __name__ == "__main__":

@@ -82,6 +82,12 @@ The security package includes a prototype per-case workspace boundary. A workspa
 
 Plain SQLite prototype workspaces are allowed for synthetic material only. Non-synthetic material is blocked unless the workspace declares encrypted storage as required.
 
+Encrypted workspace creation is also blocked until the local SQLite runtime reports SQLCipher support through `PRAGMA cipher_version`. The readiness status is exposed at:
+
+```text
+GET /security/encryption
+```
+
 The local API exposes prototype workspace creation, manifest loading, and access-policy decisions through:
 
 ```text

@@ -9,7 +9,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+from interigaition.security.encryption_status import (
+    EncryptionStatus,
+    inspect_sqlcipher_status,
+)
 
 
 WORKSPACE_SCHEMA_VERSION = 1
@@ -80,8 +85,16 @@ class CaseWorkspace:
 class CaseWorkspaceManager:
     """Creates and opens local per-case workspace directories."""
 
-    def __init__(self, root_path: Path | str) -> None:
+    def __init__(
+        self,
+        root_path: Path | str,
+        encryption_status_provider: Callable[[], EncryptionStatus] | None = None,
+    ) -> None:
         self.root_path = Path(root_path).resolve()
+        self._encryption_status_provider = encryption_status_provider or inspect_sqlcipher_status
+
+    def encryption_status(self) -> EncryptionStatus:
+        return self._encryption_status_provider()
 
     def create_workspace(
         self,
@@ -104,6 +117,13 @@ class CaseWorkspaceManager:
             raise WorkspaceError(
                 "Non-synthetic case material requires encrypted workspace storage."
             )
+        if storage_mode == StorageMode.ENCRYPTED_REQUIRED:
+            encryption_status = self.encryption_status()
+            if not encryption_status.available:
+                raise WorkspaceError(
+                    "Encrypted workspace storage is not available: "
+                    f"{encryption_status.detail}"
+                )
 
         effective_workspace_id = workspace_id or f"{case_id}-{uuid.uuid4().hex[:12]}"
         workspace_root = (self.root_path / effective_workspace_id).resolve()
