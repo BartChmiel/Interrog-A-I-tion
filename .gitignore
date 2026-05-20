@@ -5,6 +5,9 @@
 *.sqlite
 *.sqlite3
 *.db
+.local/
+test-output/
+local-data/
 
 # Python
 __pycache__/

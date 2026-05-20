@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import sqlite3
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from typing import Any, Callable
 
 
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 try:
@@ -35,6 +37,12 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
 
         def add_middleware(self, *_: Any, **__: Any) -> None:
             return None
+
+        def middleware(self, *_: Any, **__: Any) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+            def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+                return func
+
+            return decorator
 
         def get(self, path: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
             return self._route(path, ("GET",))
@@ -66,7 +74,7 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
 from interigaition.analysis.credibility_indicators import generate_indicators
 from interigaition.analysis.interview_review import review_case
 from interigaition.analysis.live_review import review_live_session
-from interigaition.domain.models import Answer, Claim, Case
+from interigaition.domain.models import Actor, Answer, AuditEvent, Claim, Case
 from interigaition.domain.session import (
     InterviewSession,
     ParticipantRole,
@@ -76,9 +84,12 @@ from interigaition.domain.session import (
 )
 from interigaition.export.markdown_report import render_review_markdown
 from interigaition.storage.json_case_loader import load_case_from_json
+from interigaition.storage.session_store import SessionStore
+from interigaition.storage.sqlite_session_store import SQLiteSessionStore
 
 
 SYNTHETIC_CASES_ROOT = PROJECT_ROOT / "data" / "synthetic"
+DEFAULT_DATABASE_PATH = BACKEND_ROOT / "local-data" / "interigaition.sqlite3"
 REQUIRED_CLAIM_FIELDS = ("id", "subject", "attribute", "value")
 
 
@@ -100,7 +111,7 @@ class AddAnswerRequest:
     claims: list[dict[str, str]] = field(default_factory=list)
 
 
-def create_app() -> FastAPI:
+def create_app(store: SessionStore | None = None) -> FastAPI:
     app = FastAPI(
         title="InterigA(I)tion Local API",
         version="0.1.0",
@@ -122,7 +133,14 @@ def create_app() -> FastAPI:
             allow_methods=["GET", "POST"],
             allow_headers=["*"],
         )
-    sessions: dict[str, InterviewSession] = {}
+
+    @app.middleware("http")
+    async def add_private_network_access_header(request: Any, call_next: Callable[[Any], Any]) -> Any:
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
+
+    store = store or SQLiteSessionStore.in_memory()
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -159,7 +177,7 @@ def create_app() -> FastAPI:
         _require_non_empty("session_id", request.session_id)
         _require_non_empty("case_id", request.case_id)
         _require_non_empty("participant_id", request.participant_id)
-        if request.session_id in sessions:
+        if store.get_session(request.session_id) is not None:
             raise HTTPException(status_code=409, detail="Session already exists.")
 
         _load_synthetic_case(request.case_id, locale="en")
@@ -168,13 +186,28 @@ def create_app() -> FastAPI:
             case_id=request.case_id,
             participant_id=request.participant_id,
             initial_role=request.initial_role,
+            event_id=f"event-{request.session_id}-session-started",
         )
-        sessions[session.id] = session
+        try:
+            store.create_session(session)
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=409, detail="Session already exists.") from exc
+        store.append_audit_event(
+            actor=Actor.SYSTEM,
+            action="session_started",
+            object_type="session",
+            object_id=session.id,
+            details={
+                "case_id": session.case_id,
+                "participant_id": session.participant_id,
+                "initial_role": session.current_role.value,
+            },
+        )
         return _to_jsonable(session)
 
     @app.post("/sessions/{session_id}/answers")
     def add_session_answer(session_id: str, request: AddAnswerRequest) -> dict[str, Any]:
-        session = sessions.get(session_id)
+        session = store.get_session(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
 
@@ -198,7 +231,19 @@ def create_app() -> FastAPI:
             ),
         )
         updated = add_answer(session, answer=answer, event_id=request.event_id)
-        sessions[session_id] = updated
+        store.save_session(updated)
+        store.append_audit_event(
+            actor=Actor.HUMAN,
+            action="answer_added",
+            object_type="answer",
+            object_id=answer.id,
+            details={
+                "session_id": session_id,
+                "case_id": session.case_id,
+                "question_id": answer.question_id,
+                "topic_ids": list(answer.topic_ids),
+            },
+        )
         return _to_jsonable(updated)
 
     @app.get("/sessions/{session_id}/review")
@@ -206,7 +251,7 @@ def create_app() -> FastAPI:
         session_id: str,
         locale: str = Query(default="en"),
     ) -> dict[str, Any]:
-        session = sessions.get(session_id)
+        session = store.get_session(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
 
@@ -214,6 +259,18 @@ def create_app() -> FastAPI:
         snapshot = review_live_session(case, session)
         case_view = merge_session_answers(case, session)
         indicators = generate_indicators(case_view, snapshot.review)
+        store.append_audit_event(
+            actor=Actor.SYSTEM,
+            action="review_refreshed",
+            object_type="session",
+            object_id=session.id,
+            details={
+                "case_id": session.case_id,
+                "sequence_no": snapshot.sequence_no,
+                "finding_count": len(snapshot.review.findings),
+                "indicator_count": len(indicators),
+            },
+        )
 
         return {
             "session": _to_jsonable(session),
@@ -227,10 +284,23 @@ def create_app() -> FastAPI:
             ),
         }
 
+    @app.get("/sessions/{session_id}/audit")
+    def get_session_audit(session_id: str) -> dict[str, Any]:
+        session = store.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
+        events = _session_audit_events(store.list_audit_events(), session_id)
+        return {
+            "session_id": session_id,
+            "chain_valid": store.verify_audit_chain(),
+            "events": _to_jsonable(events),
+        }
+
     return app
 
 
-app = create_app()
+app = create_app(store=SQLiteSessionStore(DEFAULT_DATABASE_PATH))
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -271,6 +341,21 @@ def _load_synthetic_case(case_id: str, locale: str) -> Case:
         raise HTTPException(status_code=404, detail="Synthetic case not found.")
 
     return load_case_from_json(path, locale=locale)
+
+
+def _session_audit_events(
+    events: tuple[AuditEvent, ...],
+    session_id: str,
+) -> tuple[AuditEvent, ...]:
+    return tuple(
+        event
+        for event in events
+        if (
+            event.object_type == "session"
+            and event.object_id == session_id
+        )
+        or event.details.get("session_id") == session_id
+    )
 
 
 def _validate_answer_request(case: Case, request: AddAnswerRequest) -> None:

@@ -111,9 +111,21 @@ The project owner should evaluate:
 - whether the static prototype should remain maintained or become archival,
 - whether the next milestone should be API persistence, frontend state hardening, or local model output in live mode.
 
+## Current STOP
+
+Milestone 6: SQLite persistence and audit chain has reached its first review point.
+
+The project owner should evaluate:
+
+- whether plain SQLite is acceptable for the prototype-only storage layer,
+- whether the audit actions are sufficient for the first thesis demo,
+- whether review refreshes should always create audit records,
+- whether the next storage step should be per-case workspaces, export integrity, or SQLCipher research,
+- whether real or anonymized data must remain blocked until encryption and access controls are designed.
+
 ## Next Expected STOP
 
-The next expected STOP is before adding persistent case/session storage, before connecting real local model output to live mode, or before introducing export formats intended to look official.
+The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, or before introducing export formats intended to look official.
 
 ## Decision Note
 

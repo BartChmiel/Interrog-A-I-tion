@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -47,6 +47,7 @@ export function App() {
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const didInitializeApi = useRef(false);
 
   const questions = useMemo<QuestionView[]>(() => {
     return caseData?.questions.length ? caseData.questions.map(toQuestionView) : seedQuestions;
@@ -71,6 +72,10 @@ export function App() {
   }, [locale]);
 
   useEffect(() => {
+    if (didInitializeApi.current) {
+      return;
+    }
+    didInitializeApi.current = true;
     void initializeApiWorkflow();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

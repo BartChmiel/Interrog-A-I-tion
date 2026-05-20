@@ -65,3 +65,13 @@ python -m interigaition.api.app --reload
 ```
 
 The prototype validates live answer payloads before adding them to a session. Empty answers, unknown question ids, unknown topic ids, malformed claims, and duplicate session ids return explicit HTTP errors instead of being accepted silently.
+
+The API also returns `Access-Control-Allow-Private-Network: true` so local browser shells can call the loopback backend during air-gapped development.
+
+Live sessions are persisted in a local SQLite database when the API app is run normally. The default prototype database path is ignored by git:
+
+```text
+backend/local-data/interigaition.sqlite3
+```
+
+Session start, answer creation, and review refresh events are also written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage. The storage boundary is designed so a later SQLCipher or encrypted-workspace adapter can replace the plain SQLite file.

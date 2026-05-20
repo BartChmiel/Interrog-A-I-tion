@@ -69,6 +69,15 @@ class ApiAppTest(unittest.TestCase):
         self.assertIn("indicators", review)
         self.assertIn("Decision-support indicators", review["report_markdown"])
 
+        audit = endpoint(app, "get_session_audit")("api-session-001")
+
+        self.assertTrue(audit["chain_valid"])
+        self.assertEqual(audit["session_id"], "api-session-001")
+        self.assertEqual(
+            [event["action"] for event in audit["events"]],
+            ["session_started", "answer_added", "review_refreshed"],
+        )
+
     def test_start_session_rejects_duplicate_session_id(self) -> None:
         app = create_app()
         start = endpoint(app, "start_session")
@@ -80,6 +89,16 @@ class ApiAppTest(unittest.TestCase):
         )
 
         start(request)
+        other = start(
+            StartSessionRequest(
+                session_id="api-session-other",
+                case_id="case-001",
+                participant_id="person-001",
+                initial_role=ParticipantRole.WITNESS,
+            )
+        )
+
+        self.assertEqual(other["id"], "api-session-other")
 
         with self.assertRaises(HTTPException) as caught:
             start(request)

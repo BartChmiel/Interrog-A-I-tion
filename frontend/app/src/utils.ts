@@ -4,9 +4,10 @@ import { seedAnswers, seedQuestions } from "./demoData";
 export function runtimeConfig(): RuntimeConfig {
   const params = new URLSearchParams(window.location.search);
   const envApi = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const requestedApi = params.get("api") || envApi || "http://127.0.0.1:8000";
 
   return {
-    apiBaseUrl: normalizeApiBaseUrl(params.get("api") || envApi || "http://127.0.0.1:8000"),
+    apiBaseUrl: resolveApiBaseUrl(requestedApi),
     caseId: params.get("case") || "case-001",
     sessionId: params.get("session") || `react-session-${Date.now()}`,
     participantId: params.get("participant") || "person-001",
@@ -15,6 +16,31 @@ export function runtimeConfig(): RuntimeConfig {
 
 export function normalizeApiBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, "");
+}
+
+function resolveApiBaseUrl(value: string): string {
+  const normalized = normalizeApiBaseUrl(value);
+  if (
+    import.meta.env.DEV &&
+    window.location.port === "5173" &&
+    isLoopbackApiUrl(normalized)
+  ) {
+    return "/api";
+  }
+
+  return normalized;
+}
+
+function isLoopbackApiUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      (url.hostname === "127.0.0.1" || url.hostname === "localhost") &&
+      url.port === "8000"
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function questionTypeLabel(questionType: string): { pl: string; en: string } {

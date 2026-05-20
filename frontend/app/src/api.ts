@@ -55,7 +55,13 @@ async function fetchJson<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const headers = options.body ? { "Content-Type": "application/json" } : undefined;
-  const response = await fetch(`${config.apiBaseUrl}${path}`, {
+  const url = `${config.apiBaseUrl}${path}`;
+
+  if (typeof fetch !== "function") {
+    return xhrJson<T>(url, { ...options, headers });
+  }
+
+  const response = await fetch(url, {
     ...options,
     headers,
   });
@@ -67,4 +73,28 @@ async function fetchJson<T>(
   }
 
   return response.json() as Promise<T>;
+}
+
+function xhrJson<T>(url: string, options: RequestInit): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open(options.method ?? "GET", url, true);
+
+    for (const [key, value] of Object.entries(options.headers ?? {})) {
+      request.setRequestHeader(key, String(value));
+    }
+
+    request.onload = () => {
+      if (request.status < 200 || request.status >= 300) {
+        const error = new Error(`${request.status} ${request.statusText}`) as ApiError;
+        error.status = request.status;
+        reject(error);
+        return;
+      }
+
+      resolve(JSON.parse(request.responseText) as T);
+    };
+    request.onerror = () => reject(new Error("Network request failed"));
+    request.send(typeof options.body === "string" ? options.body : null);
+  });
 }
