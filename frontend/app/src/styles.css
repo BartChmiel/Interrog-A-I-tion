@@ -229,7 +229,8 @@ h2 {
 .question-list,
 .indicator-list,
 .suggestion-list,
-.finding-list {
+.finding-list,
+.security-list {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -306,11 +307,74 @@ h2 {
 .answer-card,
 .indicator-card,
 .suggestion-card,
-.finding-card {
+.finding-card,
+.security-item {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-strong);
   padding: 12px;
+}
+
+.security-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.security-item[data-state="ready"] {
+  border-color: #b9dccb;
+}
+
+.security-item[data-state="warning"] {
+  border-color: #ead39c;
+}
+
+.security-item[data-state="blocked"] {
+  border-color: #e5b6ad;
+}
+
+.security-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #e7f5ee;
+  color: var(--accent-strong);
+}
+
+.security-item[data-state="warning"] .security-icon {
+  background: #fff7df;
+  color: #7a5a00;
+}
+
+.security-item[data-state="blocked"] .security-icon {
+  background: #fff0ee;
+  color: var(--danger);
+}
+
+.security-item[data-state="unknown"] .security-icon {
+  background: #edf5fb;
+  color: var(--info);
+}
+
+.security-item strong,
+.security-label,
+.security-detail {
+  display: block;
+}
+
+.security-item strong {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.security-label,
+.security-detail {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .answer-composer {

@@ -7,6 +7,7 @@ export type RuntimeConfig = {
   caseId: string;
   sessionId: string;
   participantId: string;
+  workspaceId: string;
 };
 
 export type LocalizedText = Partial<Record<Locale, string>>;
@@ -106,6 +107,38 @@ export type SessionReviewResponse = {
   };
   indicators: Indicator[];
   report_markdown: string;
+};
+
+export type EncryptionStatus = {
+  backend: "standard_sqlite" | "sqlcipher";
+  available: boolean;
+  detail: string;
+  version: string | null;
+  checked_at: string;
+};
+
+export type WorkspaceManifest = {
+  schema_version: number;
+  workspace_id: string;
+  case_id: string;
+  created_by: string;
+  created_at: string;
+  status: "active" | "sealed" | "archived";
+  data_sensitivity: "synthetic" | "anonymized" | "sensitive";
+  storage_mode: "plain_sqlite_prototype" | "encrypted_required";
+  directories: Record<string, string>;
+};
+
+export type WorkspaceResponse = {
+  root_path: string;
+  manifest: WorkspaceManifest;
+};
+
+export type WorkspaceAccessDecision = {
+  role: string;
+  action: string;
+  allowed: boolean;
+  reason: string;
 };
 
 export type QuestionView = {

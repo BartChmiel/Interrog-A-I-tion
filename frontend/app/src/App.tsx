@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
   CheckCircle2,
+  Database,
+  FileCheck2,
+  KeyRound,
   Languages,
   ListChecks,
   RefreshCw,
@@ -11,19 +14,31 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { addAnswer, loadCaseReview, loadSessionReview, startSession, type ApiError } from "./api";
+import {
+  addAnswer,
+  ensureWorkspace,
+  loadCaseReview,
+  loadEncryptionStatus,
+  loadSessionReview,
+  loadWorkspaceAccess,
+  startSession,
+  type ApiError,
+} from "./api";
 import { seedAnswers, seedFindings, seedIndicators, seedQuestions } from "./demoData";
 import { domainLabel, localize, text, type CopyKey } from "./i18n";
 import type {
   Answer,
   ApiMode,
   CaseData,
+  EncryptionStatus,
   Indicator,
   InterviewSession,
   Locale,
   QuestionView,
   ReviewFinding,
   RuntimeConfig,
+  WorkspaceAccessDecision,
+  WorkspaceResponse,
 } from "./types";
 import {
   formatCount,
@@ -43,6 +58,9 @@ export function App() {
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
+  const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
+  const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
@@ -93,6 +111,7 @@ export function App() {
       setCaseData(caseReview.case);
       setIndicators(caseReview.indicators);
       setFindings(caseReview.review.findings);
+      await refreshSecurityState();
       await startOrResumeSession(config);
       const sessionReview = await loadSessionReview(config, locale);
       setSession(sessionReview.session);
@@ -104,6 +123,24 @@ export function App() {
       console.warn("Local API unavailable, using static demo data.", error);
       setApiMode("offline");
       setStatusKey("offline");
+    }
+  }
+
+  async function refreshSecurityState() {
+    try {
+      const [security, ensuredWorkspace] = await Promise.all([
+        loadEncryptionStatus(config),
+        ensureWorkspace(config),
+      ]);
+      const access = await loadWorkspaceAccess(config);
+      setEncryptionStatus(security);
+      setWorkspace(ensuredWorkspace);
+      setWorkspaceAccess(access);
+    } catch (error) {
+      console.warn("Could not refresh local workspace security state.", error);
+      setEncryptionStatus(null);
+      setWorkspace(null);
+      setWorkspaceAccess(null);
     }
   }
 
@@ -311,6 +348,13 @@ export function App() {
         </section>
 
         <aside className="insight-panel">
+          <SecurityPanel
+            accessDecision={workspaceAccess}
+            encryptionStatus={encryptionStatus}
+            locale={locale}
+            workspace={workspace}
+          />
+
           <section>
             <PanelHeader title={text(locale, "indicators")} meta={text(locale, "visible")} compact />
             <div className="indicator-list">
@@ -354,6 +398,126 @@ export function App() {
       </main>
     </div>
   );
+}
+
+function SecurityPanel({
+  accessDecision,
+  encryptionStatus,
+  locale,
+  workspace,
+}: {
+  accessDecision: WorkspaceAccessDecision | null;
+  encryptionStatus: EncryptionStatus | null;
+  locale: Locale;
+  workspace: WorkspaceResponse | null;
+}) {
+  const manifest = workspace?.manifest;
+  const encryptionReady = encryptionStatus?.available === true;
+  const accessReady = accessDecision?.allowed === true;
+  const workspaceState = manifest ? "ready" : "unknown";
+  const storageState = !manifest
+    ? "unknown"
+    : manifest.storage_mode === "encrypted_required"
+      ? "ready"
+      : "warning";
+  const encryptionState = encryptionStatus ? (encryptionReady ? "ready" : "warning") : "unknown";
+  const accessState = accessDecision ? (accessReady ? "ready" : "blocked") : "unknown";
+  const exportState = manifest ? "ready" : "unknown";
+  const storageDetail = manifest
+    ? text(locale, manifest.storage_mode === "encrypted_required" ? "encryptionRequired" : "prototypeMode")
+    : text(locale, "unknown");
+  const encryptionDetail = encryptionStatus
+    ? text(locale, encryptionReady ? "ready" : "notReady")
+    : text(locale, "unknown");
+  const accessDetail = accessDecision
+    ? text(locale, accessReady ? "allowed" : "blocked")
+    : text(locale, "unknown");
+  const exportDetail = manifest ? text(locale, "manifestReady") : text(locale, "unknown");
+
+  return (
+    <section>
+      <PanelHeader
+        title={text(locale, "security")}
+        meta={manifest?.status ?? text(locale, "unknown")}
+        compact
+      />
+      <div className="security-list">
+        <SecurityItem
+          detail={manifest?.data_sensitivity ?? text(locale, "unknown")}
+          icon={<ShieldCheck size={15} />}
+          state={workspaceState}
+          title={text(locale, "workspaceLabel")}
+          value={manifest?.workspace_id ?? config.workspaceId}
+        />
+        <SecurityItem
+          detail={storageDetail}
+          icon={<Database size={15} />}
+          state={storageState}
+          title={text(locale, "storageMode")}
+          value={storageModeLabel(manifest?.storage_mode, locale)}
+        />
+        <SecurityItem
+          detail={encryptionDetail}
+          icon={<KeyRound size={15} />}
+          state={encryptionState}
+          title={text(locale, "encryption")}
+          value={encryptionStatus?.version ?? encryptionStatus?.backend ?? text(locale, "unknown")}
+        />
+        <SecurityItem
+          detail={accessDetail}
+          icon={<CheckCircle2 size={15} />}
+          state={accessState}
+          title={text(locale, "access")}
+          value={accessDecision ? `${accessDecision.role} / ${accessDecision.action}` : text(locale, "unknown")}
+        />
+        <SecurityItem
+          detail={exportDetail}
+          icon={<FileCheck2 size={15} />}
+          state={exportState}
+          title={text(locale, "exportIntegrity")}
+          value={manifest ? text(locale, "ready") : text(locale, "unknown")}
+        />
+      </div>
+    </section>
+  );
+}
+
+function SecurityItem({
+  detail,
+  icon,
+  state,
+  title,
+  value,
+}: {
+  detail: string;
+  icon: ReactNode;
+  state: "ready" | "warning" | "blocked" | "unknown";
+  title: string;
+  value: string;
+}) {
+  return (
+    <article className="security-item" data-state={state}>
+      <span className="security-icon">{icon}</span>
+      <div>
+        <span className="security-label">{title}</span>
+        <strong>{value}</strong>
+        <span className="security-detail">{detail}</span>
+      </div>
+    </article>
+  );
+}
+
+function storageModeLabel(
+  mode: WorkspaceResponse["manifest"]["storage_mode"] | undefined,
+  locale: Locale,
+): string {
+  if (mode === "encrypted_required") {
+    return text(locale, "encryptedRequired");
+  }
+  if (mode === "plain_sqlite_prototype") {
+    return text(locale, "plainPrototype");
+  }
+  return text(locale, "unknown");
 }
 
 function StatusStrip({

@@ -28,7 +28,7 @@ python -m interigaition.api.app
 The app uses `http://127.0.0.1:8000` by default. You can override it with:
 
 ```text
-http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-001&session=demo-session&participant=person-001
+http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-001&session=demo-session&participant=person-001&workspace=case-001-workspace
 ```
 
 During Vite development, loopback API calls to `127.0.0.1:8000` or `localhost:8000` are routed through the same-origin `/api` proxy. This keeps the embedded browser and strict local browser policies on the happy path without changing the production API URL behavior.
@@ -38,7 +38,10 @@ Supported runtime query parameters:
 - `api`: local API base URL,
 - `case`: synthetic case id,
 - `session`: session id to create or resume,
-- `participant`: participant id.
+- `participant`: participant id,
+- `workspace`: local case workspace id used for security, access, and export-integrity status.
+
+The right insight rail includes a compact security panel backed by the local API. It shows the current workspace, storage mode, encryption runtime status, workspace access decision, and export manifest readiness.
 
 ## Scripts
 

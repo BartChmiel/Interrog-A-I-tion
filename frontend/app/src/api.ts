@@ -1,8 +1,11 @@
 import type {
   CaseReviewResponse,
+  EncryptionStatus,
   InterviewSession,
   RuntimeConfig,
   SessionReviewResponse,
+  WorkspaceAccessDecision,
+  WorkspaceResponse,
 } from "./types";
 
 export type ApiError = Error & { status?: number };
@@ -47,6 +50,56 @@ export async function loadSessionReview(
   locale: string,
 ): Promise<SessionReviewResponse> {
   return fetchJson(config, `/sessions/${config.sessionId}/review?locale=${locale}`);
+}
+
+export async function loadEncryptionStatus(config: RuntimeConfig): Promise<EncryptionStatus> {
+  return fetchJson(config, "/security/encryption");
+}
+
+export async function loadWorkspace(config: RuntimeConfig): Promise<WorkspaceResponse> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}`);
+}
+
+export async function createWorkspace(config: RuntimeConfig): Promise<WorkspaceResponse> {
+  return fetchJson(config, "/workspaces", {
+    method: "POST",
+    body: JSON.stringify({
+      workspace_id: config.workspaceId,
+      case_id: config.caseId,
+      created_by: "local-ui",
+      data_sensitivity: "synthetic",
+      storage_mode: "plain_sqlite_prototype",
+    }),
+  });
+}
+
+export async function ensureWorkspace(config: RuntimeConfig): Promise<WorkspaceResponse> {
+  try {
+    return await loadWorkspace(config);
+  } catch (error) {
+    if ((error as ApiError).status !== 400 && (error as ApiError).status !== 404) {
+      throw error;
+    }
+  }
+
+  try {
+    return await createWorkspace(config);
+  } catch (error) {
+    if ((error as ApiError).status === 400) {
+      return loadWorkspace(config);
+    }
+    throw error;
+  }
+}
+
+export async function loadWorkspaceAccess(
+  config: RuntimeConfig,
+  role = "investigator",
+  action = "write_interview",
+): Promise<WorkspaceAccessDecision> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({ role, action });
+  return fetchJson(config, `/workspaces/${workspaceId}/access?${query.toString()}`);
 }
 
 async function fetchJson<T>(

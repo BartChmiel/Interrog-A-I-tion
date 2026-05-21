@@ -11,6 +11,7 @@ export function runtimeConfig(): RuntimeConfig {
     caseId: params.get("case") || "case-001",
     sessionId: params.get("session") || `react-session-${Date.now()}`,
     participantId: params.get("participant") || "person-001",
+    workspaceId: params.get("workspace") || `${params.get("case") || "case-001"}-workspace`,
   };
 }
 
