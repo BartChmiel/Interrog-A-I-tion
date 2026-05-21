@@ -6,6 +6,7 @@ from interigaition.api.app import (
     AddAnswerRequest,
     CreateWorkspaceRequest,
     HTTPException,
+    RegisterMaterialRequest,
     StartSessionRequest,
     create_app,
 )
@@ -13,6 +14,7 @@ from interigaition.domain.session import ParticipantRole
 from interigaition.security.access_policy import WorkspaceAction, WorkspaceRole
 from interigaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
 from interigaition.security.encryption_status import EncryptionBackend, EncryptionStatus
+from interigaition.storage.material_registry import MaterialSourceType
 
 
 TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "api"
@@ -53,6 +55,9 @@ class ApiAppTest(unittest.TestCase):
         create_workspace = endpoint(app, "create_workspace")
         get_workspace = endpoint(app, "get_workspace")
         get_access = endpoint(app, "get_workspace_access")
+        register_material = endpoint(app, "register_workspace_material")
+        list_materials = endpoint(app, "list_workspace_materials")
+        verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
             CreateWorkspaceRequest(
@@ -75,12 +80,29 @@ class ApiAppTest(unittest.TestCase):
             action=WorkspaceAction.WRITE_INTERVIEW,
         )
         encryption_status = get_encryption_status()
+        material = register_material(
+            "api-workspace-001",
+            RegisterMaterialRequest(
+                id="api-material-001",
+                title="Initial protocol note",
+                content="Witness says the bicycle was near the library.",
+                created_by="investigator-001",
+                source_type=MaterialSourceType.CASE_PROTOCOL,
+                tags=["protocol", "synthetic"],
+            ),
+        )
+        materials = list_materials("api-workspace-001")
+        material_verification = verify_material("api-workspace-001", "api-material-001")
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
         self.assertEqual(loaded["manifest"]["case_id"], "case-001")
         self.assertTrue(allowed["allowed"])
         self.assertFalse(denied["allowed"])
         self.assertFalse(encryption_status["available"])
+        self.assertEqual(material["id"], "api-material-001")
+        self.assertEqual(material["source_type"], "case_protocol")
+        self.assertEqual(len(materials["materials"]), 1)
+        self.assertTrue(material_verification["verified"])
 
         with self.assertRaises(HTTPException) as caught:
             create_workspace(

@@ -96,6 +96,11 @@ from interigaition.security.case_workspace import (
     WorkspaceError,
 )
 from interigaition.storage.json_case_loader import load_case_from_json
+from interigaition.storage.material_registry import (
+    MaterialRegistry,
+    MaterialRegistryError,
+    MaterialSourceType,
+)
 from interigaition.storage.session_store import SessionStore
 from interigaition.storage.sqlite_session_store import SQLiteSessionStore
 
@@ -131,6 +136,21 @@ class CreateWorkspaceRequest:
     data_sensitivity: DataSensitivity = DataSensitivity.SYNTHETIC
     storage_mode: StorageMode = StorageMode.PLAIN_SQLITE_PROTOTYPE
     workspace_id: str | None = None
+
+
+@dataclass(frozen=True)
+class RegisterMaterialRequest:
+    id: str
+    title: str
+    content: str
+    created_by: str
+    source_type: MaterialSourceType = MaterialSourceType.TEXT_NOTE
+    data_sensitivity: DataSensitivity = DataSensitivity.SYNTHETIC
+    description: str = ""
+    tags: list[str] = field(default_factory=list)
+    mime_type: str = "text/plain"
+    original_name: str | None = None
+    role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
 
 
 def create_app(
@@ -222,6 +242,66 @@ def create_app(
                 manifest=workspace.manifest,
             )
         )
+
+    @app.get("/workspaces/{workspace_id}/materials")
+    def list_workspace_materials(workspace_id: str) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            materials = MaterialRegistry(workspace).list_materials()
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return {"materials": _to_jsonable(materials)}
+
+    @app.post("/workspaces/{workspace_id}/materials")
+    def register_workspace_material(
+        workspace_id: str,
+        request: RegisterMaterialRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.IMPORT_MATERIAL,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        try:
+            record = MaterialRegistry(workspace).register_text_material(
+                material_id=request.id,
+                title=request.title,
+                content=request.content,
+                created_by=request.created_by,
+                source_type=request.source_type,
+                data_sensitivity=request.data_sensitivity,
+                description=request.description,
+                tags=tuple(request.tags),
+                mime_type=request.mime_type,
+                original_name=request.original_name,
+            )
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return _to_jsonable(record)
+
+    @app.get("/workspaces/{workspace_id}/materials/{material_id}/verification")
+    def verify_workspace_material(workspace_id: str, material_id: str) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            verification = MaterialRegistry(workspace).verify_material(material_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return _to_jsonable(verification)
 
     @app.get("/cases/{case_id}")
     def get_case(case_id: str, locale: str = Query(default="en")) -> dict[str, Any]:

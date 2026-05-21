@@ -113,6 +113,18 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Workspace material register has reached its first review point.
+
+The project owner should evaluate:
+
+- whether the initial material metadata is sufficient for thesis and product needs,
+- whether text-only registration is enough for the next prototype step,
+- whether material ids should be human-authored, generated, or both,
+- whether non-synthetic material should remain blocked until encrypted storage is actually active,
+- whether the next step should be a UI import screen, material-to-question linking, or local model prompts grounded in registered material.
+
+## Current STOP
+
 Milestone 6: Export integrity manifests have reached their first review point.
 
 The project owner should evaluate:

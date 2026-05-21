@@ -141,6 +141,28 @@ export type WorkspaceAccessDecision = {
   reason: string;
 };
 
+export type MaterialRecord = {
+  id: string;
+  workspace_id: string;
+  case_id: string;
+  title: string;
+  description: string;
+  source_type: string;
+  data_sensitivity: "synthetic" | "anonymized" | "sensitive";
+  mime_type: string;
+  original_name: string;
+  relative_path: string;
+  sha256: string;
+  size_bytes: number;
+  tags: string[];
+  created_by: string;
+  created_at: string;
+};
+
+export type MaterialListResponse = {
+  materials: MaterialRecord[];
+};
+
 export type QuestionView = {
   id: string;
   text: LocalizedText;

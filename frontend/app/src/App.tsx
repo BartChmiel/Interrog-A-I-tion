@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Database,
   FileCheck2,
+  FolderArchive,
   KeyRound,
   Languages,
   ListChecks,
@@ -21,6 +22,7 @@ import {
   loadEncryptionStatus,
   loadSessionReview,
   loadWorkspaceAccess,
+  loadWorkspaceMaterials,
   startSession,
   type ApiError,
 } from "./api";
@@ -34,6 +36,7 @@ import type {
   Indicator,
   InterviewSession,
   Locale,
+  MaterialRecord,
   QuestionView,
   ReviewFinding,
   RuntimeConfig,
@@ -61,6 +64,7 @@ export function App() {
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
+  const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
@@ -132,15 +136,20 @@ export function App() {
         loadEncryptionStatus(config),
         ensureWorkspace(config),
       ]);
-      const access = await loadWorkspaceAccess(config);
+      const [access, materialList] = await Promise.all([
+        loadWorkspaceAccess(config),
+        loadWorkspaceMaterials(config),
+      ]);
       setEncryptionStatus(security);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
+      setWorkspaceMaterials(materialList.materials);
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
+      setWorkspaceMaterials([]);
     }
   }
 
@@ -352,6 +361,7 @@ export function App() {
             accessDecision={workspaceAccess}
             encryptionStatus={encryptionStatus}
             locale={locale}
+            materials={workspaceMaterials}
             workspace={workspace}
           />
 
@@ -404,11 +414,13 @@ function SecurityPanel({
   accessDecision,
   encryptionStatus,
   locale,
+  materials,
   workspace,
 }: {
   accessDecision: WorkspaceAccessDecision | null;
   encryptionStatus: EncryptionStatus | null;
   locale: Locale;
+  materials: MaterialRecord[];
   workspace: WorkspaceResponse | null;
 }) {
   const manifest = workspace?.manifest;
@@ -423,6 +435,7 @@ function SecurityPanel({
   const encryptionState = encryptionStatus ? (encryptionReady ? "ready" : "warning") : "unknown";
   const accessState = accessDecision ? (accessReady ? "ready" : "blocked") : "unknown";
   const exportState = manifest ? "ready" : "unknown";
+  const materialsState = manifest ? "ready" : "unknown";
   const storageDetail = manifest
     ? text(locale, manifest.storage_mode === "encrypted_required" ? "encryptionRequired" : "prototypeMode")
     : text(locale, "unknown");
@@ -433,6 +446,7 @@ function SecurityPanel({
     ? text(locale, accessReady ? "allowed" : "blocked")
     : text(locale, "unknown");
   const exportDetail = manifest ? text(locale, "manifestReady") : text(locale, "unknown");
+  const materialsDetail = manifest ? text(locale, "registered") : text(locale, "unknown");
 
   return (
     <section>
@@ -448,6 +462,13 @@ function SecurityPanel({
           state={workspaceState}
           title={text(locale, "workspaceLabel")}
           value={manifest?.workspace_id ?? config.workspaceId}
+        />
+        <SecurityItem
+          detail={materialsDetail}
+          icon={<FolderArchive size={15} />}
+          state={materialsState}
+          title={text(locale, "sourceMaterials")}
+          value={String(materials.length)}
         />
         <SecurityItem
           detail={storageDetail}

@@ -105,3 +105,11 @@ POST /workspaces
 GET /workspaces/{workspace_id}
 GET /workspaces/{workspace_id}/access
 ```
+
+Workspace source materials can also be registered as controlled text records. The prototype stores each material under the workspace `imports/` directory, records metadata in `imports/materials.json`, and verifies SHA-256 plus file size:
+
+```text
+GET /workspaces/{workspace_id}/materials
+POST /workspaces/{workspace_id}/materials
+GET /workspaces/{workspace_id}/materials/{material_id}/verification
+```

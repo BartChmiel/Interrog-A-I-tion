@@ -2,6 +2,7 @@ import type {
   CaseReviewResponse,
   EncryptionStatus,
   InterviewSession,
+  MaterialListResponse,
   RuntimeConfig,
   SessionReviewResponse,
   WorkspaceAccessDecision,
@@ -100,6 +101,10 @@ export async function loadWorkspaceAccess(
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({ role, action });
   return fetchJson(config, `/workspaces/${workspaceId}/access?${query.toString()}`);
+}
+
+export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`);
 }
 
 async function fetchJson<T>(

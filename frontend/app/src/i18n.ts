@@ -43,6 +43,7 @@ export const copy = {
     security: "Bezpieczeństwo",
     workspaceLabel: "Workspace",
     storageMode: "Tryb danych",
+    sourceMaterials: "Materiały",
     encryption: "Szyfrowanie",
     access: "Dostęp",
     exportIntegrity: "Integralność eksportu",
@@ -56,6 +57,7 @@ export const copy = {
     prototypeMode: "syntetyczny tryb prototypowy",
     encryptionRequired: "wymagany tryb szyfrowany",
     manifestReady: "manifest SHA-256 gotowy",
+    registered: "zarejestrowane",
   },
   en: {
     caseFallback: "Synthetic bicycle theft interview",
@@ -98,6 +100,7 @@ export const copy = {
     security: "Security",
     workspaceLabel: "Workspace",
     storageMode: "Data mode",
+    sourceMaterials: "Materials",
     encryption: "Encryption",
     access: "Access",
     exportIntegrity: "Export integrity",
@@ -111,6 +114,7 @@ export const copy = {
     prototypeMode: "synthetic prototype mode",
     encryptionRequired: "encrypted mode required",
     manifestReady: "SHA-256 manifest ready",
+    registered: "registered",
   },
 } satisfies Record<Locale, Record<string, string>>;
 
