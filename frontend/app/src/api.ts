@@ -1,6 +1,8 @@
 import type {
   CaseReviewResponse,
   EncryptionStatus,
+  GroundedSuggestionDecision,
+  GroundedSuggestionDecisionResponse,
   EvidenceMapResponse,
   GroundedSuggestionsResponse,
   InterviewSession,
@@ -32,6 +34,23 @@ export type RegisterMaterialPayload = {
   content: string;
   source_type: MaterialSourceType;
   tags: string[];
+};
+
+export type GroundedSuggestionDecisionPayload = {
+  decision: GroundedSuggestionDecision;
+  original_text: string;
+  final_text: string;
+  suggestion_type: string;
+  reason: string;
+  linked_topics: string[];
+  linked_evidence: string[];
+  risk_flags: string[];
+  confidence: number | null;
+  model: string;
+  prompt_version: string;
+  context_hash: string;
+  output_hash: string;
+  question_id: string;
 };
 
 export async function loadCaseReview(config: RuntimeConfig, locale: string): Promise<CaseReviewResponse> {
@@ -158,6 +177,27 @@ export async function loadGroundedSuggestions(
   return fetchJson(config, `/workspaces/${workspaceId}/grounded-suggestions?${query.toString()}`, {
     method: "POST",
   });
+}
+
+export async function recordGroundedSuggestionDecision(
+  config: RuntimeConfig,
+  suggestionId: string,
+  payload: GroundedSuggestionDecisionPayload,
+): Promise<GroundedSuggestionDecisionResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  return fetchJson(
+    config,
+    `/workspaces/${workspaceId}/grounded-suggestions/${encodeURIComponent(suggestionId)}/decision`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        actor_id: "local-ui",
+        case_id: config.caseId,
+        session_id: config.sessionId,
+      }),
+    },
+  );
 }
 
 export async function registerWorkspaceMaterial(

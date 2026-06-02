@@ -34,6 +34,7 @@ import {
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceMaterials,
+  recordGroundedSuggestionDecision,
   registerWorkspaceMaterial,
   startSession,
   verifyWorkspaceMaterial,
@@ -48,6 +49,7 @@ import type {
   EncryptionStatus,
   EvidenceMap,
   EvidenceTopicStatus,
+  GroundedSuggestionDecision,
   GroundedSuggestion,
   GroundedSuggestionWarning,
   Indicator,
@@ -114,9 +116,11 @@ export function App() {
   const [groundedSuggestionMeta, setGroundedSuggestionMeta] = useState<{
     model: string;
     promptVersion: string;
+    contextHash: string;
+    outputHash: string;
   } | null>(null);
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
-  const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, "used" | "rejected">>({});
+  const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, GroundedSuggestionDecision>>({});
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
@@ -252,6 +256,8 @@ export function App() {
     warnings: GroundedSuggestionWarning[];
     model: string;
     prompt_version: string;
+    context_hash: string;
+    output_hash: string;
   } | null> {
     try {
       return await loadGroundedSuggestions(config, nextLocale, questionId);
@@ -267,11 +273,22 @@ export function App() {
       warnings: GroundedSuggestionWarning[];
       model: string;
       prompt_version: string;
+      context_hash: string;
+      output_hash: string;
     } | null,
   ) {
     setGroundedSuggestions(response?.suggestions ?? []);
     setGroundedSuggestionWarnings(response?.warnings ?? []);
-    setGroundedSuggestionMeta(response ? { model: response.model, promptVersion: response.prompt_version } : null);
+    setGroundedSuggestionMeta(
+      response
+        ? {
+            model: response.model,
+            promptVersion: response.prompt_version,
+            contextHash: response.context_hash,
+            outputHash: response.output_hash,
+          }
+        : null,
+    );
     setSuggestionDrafts({});
     setSuggestionDecisions({});
   }
@@ -456,12 +473,7 @@ export function App() {
     }
   }
 
-  function useSuggestion(suggestionId: string) {
-    setSuggestionDecisions((current) => ({ ...current, [suggestionId]: "used" }));
-    setStatusKey("suggestionUsed");
-  }
-
-  function editSuggestion(suggestion: GroundedSuggestion) {
+  function startEditingSuggestion(suggestion: GroundedSuggestion) {
     setSuggestionDrafts((current) => ({
       ...current,
       [suggestion.id]: current[suggestion.id] ?? suggestion.text,
@@ -469,9 +481,61 @@ export function App() {
     setStatusKey("suggestionEdit");
   }
 
-  function rejectSuggestion(suggestionId: string) {
-    setSuggestionDecisions((current) => ({ ...current, [suggestionId]: "rejected" }));
-    setStatusKey("suggestionRejected");
+  async function useSuggestion(suggestion: GroundedSuggestion) {
+    const finalText = suggestionDrafts[suggestion.id]?.trim() || suggestion.text;
+    await recordSuggestionDecision(suggestion, "accepted", finalText, "suggestionUsed");
+  }
+
+  async function saveEditedSuggestion(suggestion: GroundedSuggestion) {
+    const finalText = suggestionDrafts[suggestion.id]?.trim();
+    if (!finalText) {
+      setStatusKey("answerRequired");
+      return;
+    }
+    await recordSuggestionDecision(suggestion, "edited", finalText, "suggestionEdited");
+  }
+
+  async function rejectSuggestion(suggestion: GroundedSuggestion) {
+    const finalText = suggestionDrafts[suggestion.id]?.trim() || suggestion.text;
+    await recordSuggestionDecision(suggestion, "rejected", finalText, "suggestionRejected");
+  }
+
+  async function recordSuggestionDecision(
+    suggestion: GroundedSuggestion,
+    decision: GroundedSuggestionDecision,
+    finalText: string,
+    nextStatus: CopyKey,
+  ) {
+    if (apiMode === "online") {
+      try {
+        await recordGroundedSuggestionDecision(config, suggestion.id, {
+          decision,
+          original_text: suggestion.text,
+          final_text: finalText,
+          suggestion_type: suggestion.suggestion_type,
+          reason: suggestion.reason,
+          linked_topics: suggestion.linked_topics,
+          linked_evidence: suggestion.linked_evidence,
+          risk_flags: suggestion.risk_flags,
+          confidence: suggestion.confidence,
+          model: groundedSuggestionMeta?.model ?? "",
+          prompt_version: groundedSuggestionMeta?.promptVersion ?? "",
+          context_hash: groundedSuggestionMeta?.contextHash ?? "",
+          output_hash: groundedSuggestionMeta?.outputHash ?? "",
+          question_id: activeQuestionId,
+        });
+      } catch (error) {
+        console.error("Could not audit grounded suggestion decision.", error);
+        setStatusKey("saveFailed");
+        return;
+      }
+    }
+
+    setSuggestionDecisions((current) => ({ ...current, [suggestion.id]: decision }));
+    if (decision === "accepted" || decision === "edited") {
+      setSuggestionDrafts((current) => ({ ...current, [suggestion.id]: finalText }));
+    }
+    setStatusKey(nextStatus);
   }
 
   function changeLocale(nextLocale: Locale) {
@@ -615,8 +679,9 @@ export function App() {
             onDraftChange={(suggestionId, value) =>
               setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
             }
-            onEdit={editSuggestion}
+            onEdit={startEditingSuggestion}
             onReject={rejectSuggestion}
+            onSaveEdit={saveEditedSuggestion}
             onUse={useSuggestion}
           />
 
@@ -814,9 +879,10 @@ function GroundedSuggestionsPanel({
   onDraftChange,
   onEdit,
   onReject,
+  onSaveEdit,
   onUse,
 }: {
-  decisions: Record<string, "used" | "rejected">;
+  decisions: Record<string, GroundedSuggestionDecision>;
   drafts: Record<string, string>;
   locale: Locale;
   meta: { model: string; promptVersion: string } | null;
@@ -824,8 +890,9 @@ function GroundedSuggestionsPanel({
   warnings: GroundedSuggestionWarning[];
   onDraftChange: (suggestionId: string, value: string) => void;
   onEdit: (suggestion: GroundedSuggestion) => void;
-  onReject: (suggestionId: string) => void;
-  onUse: (suggestionId: string) => void;
+  onReject: (suggestion: GroundedSuggestion) => void;
+  onSaveEdit: (suggestion: GroundedSuggestion) => void;
+  onUse: (suggestion: GroundedSuggestion) => void;
 }) {
   const warningsBySuggestion = useMemo(() => {
     const grouped = new Map<string, GroundedSuggestionWarning[]>();
@@ -861,6 +928,7 @@ function GroundedSuggestionsPanel({
               onDraftChange={onDraftChange}
               onEdit={onEdit}
               onReject={onReject}
+              onSaveEdit={onSaveEdit}
               onUse={onUse}
             />
           ))
@@ -881,17 +949,19 @@ function GroundedSuggestionCard({
   onDraftChange,
   onEdit,
   onReject,
+  onSaveEdit,
   onUse,
 }: {
-  decision?: "used" | "rejected";
+  decision?: GroundedSuggestionDecision;
   draft?: string;
   locale: Locale;
   suggestion: GroundedSuggestion;
   warnings: GroundedSuggestionWarning[];
   onDraftChange: (suggestionId: string, value: string) => void;
   onEdit: (suggestion: GroundedSuggestion) => void;
-  onReject: (suggestionId: string) => void;
-  onUse: (suggestionId: string) => void;
+  onReject: (suggestion: GroundedSuggestion) => void;
+  onSaveEdit: (suggestion: GroundedSuggestion) => void;
+  onUse: (suggestion: GroundedSuggestion) => void;
 }) {
   const visibleText = draft ?? suggestion.text;
 
@@ -902,7 +972,7 @@ function GroundedSuggestionCard({
           <Sparkles size={13} />
           {suggestion.suggestion_type}
         </span>
-        {decision ? <span className="meta">{text(locale, decision === "used" ? "usedSuggestion" : "rejectedSuggestion")}</span> : null}
+        {decision ? <span className="meta">{suggestionDecisionLabel(decision, locale)}</span> : null}
       </div>
       {draft !== undefined ? (
         <textarea
@@ -927,21 +997,37 @@ function GroundedSuggestionCard({
         </div>
       ) : null}
       <div className="grounded-suggestion-actions">
-        <button type="button" onClick={() => onUse(suggestion.id)}>
+        <button type="button" onClick={() => onUse(suggestion)}>
           <Check size={14} />
           {text(locale, "useSuggestion")}
         </button>
-        <button type="button" onClick={() => onEdit(suggestion)}>
-          <Pencil size={14} />
-          {text(locale, "editSuggestion")}
-        </button>
-        <button type="button" onClick={() => onReject(suggestion.id)}>
+        {draft !== undefined ? (
+          <button type="button" onClick={() => onSaveEdit(suggestion)}>
+            <Check size={14} />
+            {text(locale, "saveEditSuggestion")}
+          </button>
+        ) : (
+          <button type="button" onClick={() => onEdit(suggestion)}>
+            <Pencil size={14} />
+            {text(locale, "editSuggestion")}
+          </button>
+        )}
+        <button type="button" onClick={() => onReject(suggestion)}>
           <X size={14} />
           {text(locale, "rejectSuggestion")}
         </button>
       </div>
     </article>
   );
+}
+
+function suggestionDecisionLabel(decision: GroundedSuggestionDecision, locale: Locale): string {
+  const keys: Record<GroundedSuggestionDecision, CopyKey> = {
+    accepted: "usedSuggestion",
+    edited: "editedSuggestion",
+    rejected: "rejectedSuggestion",
+  };
+  return text(locale, keys[decision]);
 }
 
 function MaterialsPanel({

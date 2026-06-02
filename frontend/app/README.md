@@ -49,8 +49,10 @@ The same rail includes a grounded AI panel. It calls the local
 `/grounded-suggestions` endpoint for the active question and shows suggested
 follow-up questions, topic gaps, potential inconsistencies, and summaries with
 their reasons, source ids, model id, prompt version, and citation warnings.
-Each suggestion has local `use`, `edit`, and `reject` controls; these are UI
-decisions only in the current prototype and do not override the human operator.
+Each suggestion has `use`, `edit`, and `reject` controls. Online decisions are
+recorded through the backend append-only audit chain with the original text,
+final operator text, source ids, model id, prompt version, and context/output
+hashes. Offline decisions remain local demo state only.
 
 The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
 

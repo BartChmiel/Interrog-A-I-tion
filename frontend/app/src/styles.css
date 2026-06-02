@@ -571,8 +571,12 @@ h2 {
   background: var(--surface-strong);
 }
 
-.grounded-suggestion-card[data-state="used"] {
+.grounded-suggestion-card[data-state="accepted"] {
   border-color: #b9dccb;
+}
+
+.grounded-suggestion-card[data-state="edited"] {
+  border-color: #c7c2e8;
 }
 
 .grounded-suggestion-card[data-state="rejected"] {

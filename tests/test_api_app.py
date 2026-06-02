@@ -5,11 +5,13 @@ from pathlib import Path
 from interigaition.api.app import (
     AddAnswerRequest,
     CreateWorkspaceRequest,
+    GroundedSuggestionDecisionRequest,
     HTTPException,
     RegisterMaterialRequest,
     StartSessionRequest,
     create_app,
 )
+from interigaition.domain.models import SuggestionStatus
 from interigaition.domain.session import ParticipantRole
 from interigaition.security.access_policy import WorkspaceAction, WorkspaceRole
 from interigaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
@@ -61,6 +63,8 @@ class ApiAppTest(unittest.TestCase):
         get_evidence_map = endpoint(app, "get_workspace_evidence_map")
         get_grounding_pack = endpoint(app, "get_workspace_grounding_pack")
         generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
+        record_suggestion_decision = endpoint(app, "record_workspace_grounded_suggestion_decision")
+        get_workspace_audit = endpoint(app, "get_workspace_audit")
         verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
@@ -117,6 +121,29 @@ class ApiAppTest(unittest.TestCase):
             question_id="q-001",
             locale="en",
         )
+        first_suggestion = grounded_suggestions["suggestions"][0]
+        decision = record_suggestion_decision(
+            "api-workspace-001",
+            first_suggestion["id"],
+            GroundedSuggestionDecisionRequest(
+                decision=SuggestionStatus.ACCEPTED,
+                original_text=first_suggestion["text"],
+                final_text=first_suggestion["text"],
+                suggestion_type=first_suggestion["suggestion_type"],
+                reason=first_suggestion["reason"],
+                linked_topics=first_suggestion["linked_topics"],
+                linked_evidence=first_suggestion["linked_evidence"],
+                risk_flags=first_suggestion["risk_flags"],
+                confidence=first_suggestion["confidence"],
+                model=grounded_suggestions["model"],
+                prompt_version=grounded_suggestions["prompt_version"],
+                context_hash=grounded_suggestions["context_hash"],
+                output_hash=grounded_suggestions["output_hash"],
+                case_id="case-001",
+                question_id="q-001",
+            ),
+        )
+        workspace_audit = get_workspace_audit("api-workspace-001")
         material_verification = verify_material("api-workspace-001", "api-material-001")
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
@@ -160,6 +187,15 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(len(grounded_suggestions["output_hash"]), 64)
         self.assertEqual(grounded_suggestions["warnings"], [])
         self.assertTrue(grounded_suggestions["suggestions"])
+        self.assertEqual(decision["decision"], "accepted")
+        self.assertTrue(decision["chain_valid"])
+        self.assertEqual(decision["audit_event"]["action"], "grounded_suggestion_accepted")
+        self.assertEqual(decision["audit_event"]["details"]["context_hash"], grounded_suggestions["context_hash"])
+        self.assertTrue(workspace_audit["chain_valid"])
+        self.assertEqual(
+            [event["action"] for event in workspace_audit["events"]],
+            ["grounded_suggestions_generated", "grounded_suggestion_accepted"],
+        )
         self.assertTrue(material_verification["verified"])
 
         with self.assertRaises(HTTPException) as caught:

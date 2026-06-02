@@ -260,6 +260,20 @@ export type GroundedSuggestionWarning = {
   detail: string;
 };
 
+export type GroundedSuggestionDecision = "accepted" | "edited" | "rejected";
+
+export type GroundedSuggestionDecisionResponse = {
+  decision: GroundedSuggestionDecision;
+  chain_valid: boolean;
+  audit_event: {
+    id: string;
+    action: string;
+    object_type: string;
+    object_id: string;
+    event_hash: string;
+  };
+};
+
 export type GroundedSuggestionsResponse = {
   suggestions: GroundedSuggestion[];
   model: string;

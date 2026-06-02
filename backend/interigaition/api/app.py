@@ -83,7 +83,7 @@ from interigaition.analysis.material_grounding import (
 )
 from interigaition.ai.grounded_suggestion_service import generate_grounded_suggestions
 from interigaition.ai.model_client import DeterministicGroundedModelClient, ModelClient
-from interigaition.domain.models import Actor, Answer, AuditEvent, Claim, Case
+from interigaition.domain.models import Actor, Answer, AuditEvent, Claim, Case, SuggestionStatus
 from interigaition.domain.session import (
     InterviewSession,
     ParticipantRole,
@@ -159,6 +159,28 @@ class RegisterMaterialRequest:
     tags: list[str] = field(default_factory=list)
     mime_type: str = "text/plain"
     original_name: str | None = None
+    role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
+@dataclass(frozen=True)
+class GroundedSuggestionDecisionRequest:
+    decision: SuggestionStatus
+    original_text: str
+    final_text: str = ""
+    suggestion_type: str = ""
+    reason: str = ""
+    linked_topics: list[str] = field(default_factory=list)
+    linked_evidence: list[str] = field(default_factory=list)
+    risk_flags: list[str] = field(default_factory=list)
+    confidence: float | None = None
+    model: str = ""
+    prompt_version: str = ""
+    context_hash: str = ""
+    output_hash: str = ""
+    actor_id: str = "local-ui"
+    case_id: str | None = None
+    session_id: str | None = None
+    question_id: str | None = None
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
 
 
@@ -457,6 +479,76 @@ def create_app(
             "warnings": _to_jsonable(result.warnings),
         }
 
+    @app.post("/workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision")
+    def record_workspace_grounded_suggestion_decision(
+        workspace_id: str,
+        suggestion_id: str,
+        request: GroundedSuggestionDecisionRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.WRITE_INTERVIEW,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        _validate_grounded_suggestion_decision(suggestion_id, request)
+        final_text = request.final_text.strip() or request.original_text.strip()
+        audit_event = store.append_audit_event(
+            actor=Actor.HUMAN,
+            action=f"grounded_suggestion_{request.decision.value}",
+            object_type="ai_suggestion",
+            object_id=suggestion_id,
+            details={
+                "workspace_id": workspace_id,
+                "case_id": request.case_id,
+                "session_id": request.session_id,
+                "question_id": request.question_id,
+                "suggestion_id": suggestion_id,
+                "decision": request.decision.value,
+                "actor_id": request.actor_id,
+                "suggestion_type": request.suggestion_type,
+                "original_text": request.original_text.strip(),
+                "final_text": final_text,
+                "edited": request.decision == SuggestionStatus.EDITED
+                or final_text != request.original_text.strip(),
+                "reason": request.reason,
+                "linked_topics": list(request.linked_topics),
+                "linked_evidence": list(request.linked_evidence),
+                "risk_flags": list(request.risk_flags),
+                "confidence": request.confidence,
+                "model": request.model,
+                "prompt_version": request.prompt_version,
+                "context_hash": request.context_hash,
+                "output_hash": request.output_hash,
+            },
+        )
+        return {
+            "decision": request.decision.value,
+            "audit_event": _to_jsonable(audit_event),
+            "chain_valid": store.verify_audit_chain(),
+        }
+
+    @app.get("/workspaces/{workspace_id}/audit")
+    def get_workspace_audit(workspace_id: str) -> dict[str, Any]:
+        try:
+            workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        events = _workspace_audit_events(store.list_audit_events(), workspace_id)
+        return {
+            "workspace_id": workspace_id,
+            "chain_valid": store.verify_audit_chain(),
+            "events": _to_jsonable(events),
+        }
+
     @app.get("/workspaces/{workspace_id}/materials/{material_id}/verification")
     def verify_workspace_material(workspace_id: str, material_id: str) -> dict[str, Any]:
         try:
@@ -680,6 +772,21 @@ def _session_audit_events(
     )
 
 
+def _workspace_audit_events(
+    events: tuple[AuditEvent, ...],
+    workspace_id: str,
+) -> tuple[AuditEvent, ...]:
+    return tuple(
+        event
+        for event in events
+        if (
+            event.object_type == "workspace"
+            and event.object_id == workspace_id
+        )
+        or event.details.get("workspace_id") == workspace_id
+    )
+
+
 def _workspace_response(workspace: CaseWorkspace) -> dict[str, Any]:
     return {
         "root_path": str(workspace.root_path),
@@ -761,6 +868,24 @@ def _validate_answer_request(case: Case, request: AddAnswerRequest) -> None:
             )
 
 
+def _validate_grounded_suggestion_decision(
+    suggestion_id: str,
+    request: GroundedSuggestionDecisionRequest,
+) -> None:
+    _require_non_empty("suggestion_id", suggestion_id)
+    _require_non_empty("original_text", request.original_text)
+    if request.decision not in {
+        SuggestionStatus.ACCEPTED,
+        SuggestionStatus.EDITED,
+        SuggestionStatus.REJECTED,
+    }:
+        raise HTTPException(status_code=400, detail="Unsupported grounded suggestion decision.")
+    if request.decision in {SuggestionStatus.ACCEPTED, SuggestionStatus.EDITED}:
+        _require_non_empty("final_text", request.final_text or request.original_text)
+    _validate_optional_sha256("context_hash", request.context_hash)
+    _validate_optional_sha256("output_hash", request.output_hash)
+
+
 def _require_non_empty(field_name: str, value: str) -> None:
     if not str(value).strip():
         raise HTTPException(status_code=400, detail=f"{field_name} cannot be empty.")
@@ -769,6 +894,13 @@ def _require_non_empty(field_name: str, value: str) -> None:
 def _require_known_id(field_name: str, value: str, allowed_values: set[str]) -> None:
     if value not in allowed_values:
         raise HTTPException(status_code=400, detail=f"Unknown {field_name}: {value}.")
+
+
+def _validate_optional_sha256(field_name: str, value: str) -> None:
+    if not value:
+        return
+    if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise HTTPException(status_code=400, detail=f"{field_name} must be a lowercase SHA-256 hex digest.")
 
 
 def _to_jsonable(value: Any) -> Any:

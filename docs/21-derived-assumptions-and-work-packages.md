@@ -58,11 +58,11 @@ Implemented:
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
 - audit metadata for prompt version, model id, context hash, and output hash,
-- React right-rail display with source ids and `use`, `edit`, and `reject` controls.
+- React right-rail display with source ids and `use`, `edit`, and `reject` controls,
+- backend audit events for grounded suggestion `accepted`, `edited`, and `rejected` decisions.
 
 Next:
 
-- persist `use`, `edit`, and `reject` decisions in the backend audit trail,
 - connect Ollama behind the same grounded service in controlled test mode,
 - block institutional live use of real model output until a STOP review,
 - add a local model configuration panel or config file.
@@ -224,14 +224,14 @@ Design rule:
 
 ## Recommended Next Implementation Order
 
-1. Add backend audit events for grounded suggestion `use`, `edit`, and `reject` decisions.
-2. Add human accept/reject controls for material-question links.
-3. Add evidence alignment indicator based on registered materials.
-4. Add local model configuration and Ollama smoke mode behind deterministic tests.
-5. STOP before trusting real model-generated suggestions in institutional live mode.
-6. Add SQLCipher installation route and encrypted workspace creation.
-7. Add model artifact isolation and environment health checks.
-8. Add richer synthetic evaluation scenarios for thesis measurements.
+1. Add human accept/reject controls for material-question links.
+2. Add evidence alignment indicator based on registered materials.
+3. Add local model configuration and Ollama smoke mode behind deterministic tests.
+4. STOP before trusting real model-generated suggestions in institutional live mode.
+5. Add SQLCipher installation route and encrypted workspace creation.
+6. Add model artifact isolation and environment health checks.
+7. Add richer synthetic evaluation scenarios for thesis measurements.
+8. Add audit viewer and exportable audit summaries after legal/UX wording review.
 
 ## STOP Questions Before Live AI Output
 

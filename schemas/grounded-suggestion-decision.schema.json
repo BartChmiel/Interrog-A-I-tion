@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interigaition.local/schemas/grounded-suggestion-decision.schema.json",
+  "title": "GroundedSuggestionDecisionRequest",
+  "type": "object",
+  "required": ["decision", "original_text"],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["accepted", "edited", "rejected"]
+    },
+    "original_text": { "type": "string", "minLength": 1 },
+    "final_text": { "type": "string" },
+    "suggestion_type": {
+      "type": "string",
+      "enum": ["interview_plan", "follow_up_question", "gap", "potential_inconsistency", "neutrality_rewrite", "summary"]
+    },
+    "reason": { "type": "string" },
+    "linked_topics": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "linked_evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "model": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "context_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "output_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "actor_id": { "type": "string" },
+    "case_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "question_id": { "type": ["string", "null"] },
+    "role": {
+      "type": "string",
+      "enum": ["investigator", "prosecutor", "defense_counsel", "observer", "admin"]
+    }
+  }
+}

@@ -31,10 +31,13 @@ The first implementation:
 - validates `linked_evidence` against `allowed_source_ids`,
 - returns warnings for invalid citations instead of rejecting the whole response,
 - appends an audit event for generated grounded suggestions,
+- records human `accepted`, `edited`, and `rejected` decisions as append-only audit events,
 - exposes the workflow through:
 
 ```text
 POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=demo-session&question_id=q-001
+POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
+GET /workspaces/{workspace_id}/audit
 ```
 
 The React UI displays grounded suggestions under the case map in the right insight rail.
@@ -44,5 +47,6 @@ The React UI displays grounded suggestions under the case map in the right insig
 - The live UI can now show AI-style suggestions without depending on a real model runtime.
 - Future Ollama integration can reuse the same service and validation path.
 - Citation warnings are visible but not blocking in this prototype stage.
+- Human decisions are traceable, but they are still prototype audit records rather than official procedural records.
 - A stricter production mode should reject suggestions with missing or invalid citations.
 - A STOP review remains required before trusting real model output in institutional use.

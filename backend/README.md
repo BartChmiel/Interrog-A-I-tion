@@ -116,6 +116,8 @@ GET /workspaces/{workspace_id}/materials/{material_id}/verification
 GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=demo-session
 GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-session&question_id=q-001
 POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=demo-session&question_id=q-001
+POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
+GET /workspaces/{workspace_id}/audit
 ```
 
 The grounded suggestions endpoint is the first live-visible AI workflow. It uses
@@ -124,3 +126,8 @@ entry against `allowed_source_ids`, returns citation warnings, and writes an
 audit event containing model id, prompt version, context hash, and output hash.
 The default runtime is a deterministic fake model so the live workflow can be
 tested before connecting a real local model.
+
+The grounded suggestion decision endpoint records human `accepted`, `edited`,
+or `rejected` decisions as append-only audit events. Decision records preserve
+the original suggestion text, final operator text, linked source ids, model id,
+prompt version, and context/output hashes.

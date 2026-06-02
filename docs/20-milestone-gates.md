@@ -113,6 +113,19 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Audited grounded suggestion decisions has reached its first review point.
+
+The project owner should evaluate:
+
+- whether `accepted`, `edited`, and `rejected` are sufficient decision states for operator handling of AI suggestions,
+- whether edited suggestion text should be stored exactly as typed or additionally normalized,
+- whether suggestion decision audit events should remain workspace-level records or also attach to session audit views,
+- whether model id, prompt version, context hash, output hash, source ids, and final text are sufficient audit metadata,
+- whether offline/local-demo decisions should remain non-audited,
+- whether these records can be used in thesis evaluation before they are treated as official procedural records.
+
+## Current STOP
+
 Milestone 6: Live-visible grounded suggestions has reached its first review point.
 
 The project owner should evaluate:
@@ -220,7 +233,7 @@ The project owner should evaluate:
 
 ## Next Expected STOP
 
-The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, before turning UI suggestion decisions into official audit actions, or before introducing export formats intended to look official.
+The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, before treating audited suggestion decisions as official procedural records, or before introducing export formats intended to look official.
 
 ## Decision Note
 
