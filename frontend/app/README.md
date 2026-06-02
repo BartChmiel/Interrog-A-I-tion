@@ -43,6 +43,8 @@ Supported runtime query parameters:
 
 The right insight rail includes a compact security panel backed by the local API. It shows the current workspace, storage mode, encryption runtime status, workspace access decision, and export manifest readiness.
 
+The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
+
 ## Scripts
 
 - `npm run dev` - local Vite server,

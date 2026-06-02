@@ -141,13 +141,20 @@ export type WorkspaceAccessDecision = {
   reason: string;
 };
 
+export type MaterialSourceType =
+  | "text_note"
+  | "case_protocol"
+  | "audio_transcript"
+  | "external_document"
+  | "user_note";
+
 export type MaterialRecord = {
   id: string;
   workspace_id: string;
   case_id: string;
   title: string;
   description: string;
-  source_type: string;
+  source_type: MaterialSourceType;
   data_sensitivity: "synthetic" | "anonymized" | "sensitive";
   mime_type: string;
   original_name: string;
@@ -161,6 +168,18 @@ export type MaterialRecord = {
 
 export type MaterialListResponse = {
   materials: MaterialRecord[];
+};
+
+export type MaterialVerification = {
+  material_id: string;
+  verified: boolean;
+  exists: boolean;
+  sha256_matches: boolean;
+  size_matches: boolean;
+  expected_sha256: string;
+  actual_sha256: string | null;
+  expected_size_bytes: number;
+  actual_size_bytes: number | null;
 };
 
 export type QuestionView = {

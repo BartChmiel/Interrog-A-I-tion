@@ -3,6 +3,9 @@ import type {
   EncryptionStatus,
   InterviewSession,
   MaterialListResponse,
+  MaterialRecord,
+  MaterialSourceType,
+  MaterialVerification,
   RuntimeConfig,
   SessionReviewResponse,
   WorkspaceAccessDecision,
@@ -18,6 +21,14 @@ export type AddAnswerPayload = {
   event_id: string;
   topic_ids: string[];
   claims: [];
+};
+
+export type RegisterMaterialPayload = {
+  id: string;
+  title: string;
+  content: string;
+  source_type: MaterialSourceType;
+  tags: string[];
 };
 
 export async function loadCaseReview(config: RuntimeConfig, locale: string): Promise<CaseReviewResponse> {
@@ -105,6 +116,31 @@ export async function loadWorkspaceAccess(
 
 export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`);
+}
+
+export async function registerWorkspaceMaterial(
+  config: RuntimeConfig,
+  payload: RegisterMaterialPayload,
+): Promise<MaterialRecord> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      created_by: "local-ui",
+      data_sensitivity: "synthetic",
+      mime_type: "text/plain",
+    }),
+  });
+}
+
+export async function verifyWorkspaceMaterial(
+  config: RuntimeConfig,
+  materialId: string,
+): Promise<MaterialVerification> {
+  return fetchJson(
+    config,
+    `/workspaces/${encodeURIComponent(config.workspaceId)}/materials/${encodeURIComponent(materialId)}/verification`,
+  );
 }
 
 async function fetchJson<T>(

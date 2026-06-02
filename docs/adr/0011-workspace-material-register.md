@@ -40,6 +40,8 @@ POST /workspaces/{workspace_id}/materials
 GET /workspaces/{workspace_id}/materials/{material_id}/verification
 ```
 
+The React prototype exposes the first operator workflow for synthetic text materials: create, list, view metadata, and verify integrity.
+
 Non-synthetic material remains blocked in `plain_sqlite_prototype` storage.
 
 ## Consequences

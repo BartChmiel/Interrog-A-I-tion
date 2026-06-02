@@ -5,13 +5,16 @@ import {
   CheckCircle2,
   Database,
   FileCheck2,
+  FileText,
   FolderArchive,
   KeyRound,
   Languages,
   ListChecks,
+  Plus,
   RefreshCw,
   Send,
   ShieldCheck,
+  ShieldQuestion,
   Wifi,
   WifiOff,
 } from "lucide-react";
@@ -23,7 +26,9 @@ import {
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceMaterials,
+  registerWorkspaceMaterial,
   startSession,
+  verifyWorkspaceMaterial,
   type ApiError,
 } from "./api";
 import { seedAnswers, seedFindings, seedIndicators, seedQuestions } from "./demoData";
@@ -37,6 +42,8 @@ import type {
   InterviewSession,
   Locale,
   MaterialRecord,
+  MaterialSourceType,
+  MaterialVerification,
   QuestionView,
   ReviewFinding,
   RuntimeConfig,
@@ -50,6 +57,28 @@ import {
   toAnswerView,
   toQuestionView,
 } from "./utils";
+
+type MaterialDraft = {
+  title: string;
+  content: string;
+  tags: string;
+  sourceType: MaterialSourceType;
+};
+
+const emptyMaterialDraft: MaterialDraft = {
+  title: "",
+  content: "",
+  tags: "",
+  sourceType: "case_protocol",
+};
+
+const materialSourceTypes: MaterialSourceType[] = [
+  "case_protocol",
+  "text_note",
+  "user_note",
+  "audio_transcript",
+  "external_document",
+];
 
 const config = runtimeConfig();
 
@@ -65,10 +94,13 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
+  const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
+  const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isMaterialSubmitting, setIsMaterialSubmitting] = useState(false);
   const didInitializeApi = useRef(false);
 
   const questions = useMemo<QuestionView[]>(() => {
@@ -143,13 +175,14 @@ export function App() {
       setEncryptionStatus(security);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
-      setWorkspaceMaterials(materialList.materials);
+      setWorkspaceMaterials(sortMaterials(materialList.materials));
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
       setWorkspaceMaterials([]);
+      setMaterialVerifications({});
     }
   }
 
@@ -238,6 +271,63 @@ export function App() {
       setStatusKey("saveFailed");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function registerMaterial() {
+    const title = materialDraft.title.trim();
+    const content = materialDraft.content.trim();
+
+    if (!title) {
+      setStatusKey("materialTitleRequired");
+      return;
+    }
+    if (!content) {
+      setStatusKey("materialContentRequired");
+      return;
+    }
+    if (apiMode !== "online" || !workspace) {
+      setStatusKey("offline");
+      return;
+    }
+
+    setIsMaterialSubmitting(true);
+    try {
+      const record = await registerWorkspaceMaterial(config, {
+        id: createMaterialId(),
+        title,
+        content,
+        source_type: materialDraft.sourceType,
+        tags: parseTags(materialDraft.tags),
+      });
+      const verification = await verifyWorkspaceMaterial(config, record.id);
+      setWorkspaceMaterials((current) => sortMaterials([...current, record]));
+      setMaterialVerifications((current) => ({ ...current, [record.id]: verification }));
+      setMaterialDraft(emptyMaterialDraft);
+      setStatusKey("materialSaved");
+    } catch (error) {
+      console.error("Could not register material.", error);
+      setStatusKey("materialFailed");
+    } finally {
+      setIsMaterialSubmitting(false);
+    }
+  }
+
+  async function verifyMaterial(materialId: string) {
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    try {
+      const verification = await verifyWorkspaceMaterial(config, materialId);
+      setMaterialVerifications((current) => ({ ...current, [materialId]: verification }));
+      setStatusKey(
+        verification.verified ? "verified" : verification.exists ? "changed" : "missing",
+      );
+    } catch (error) {
+      console.error("Could not verify material.", error);
+      setStatusKey("materialFailed");
     }
   }
 
@@ -365,6 +455,18 @@ export function App() {
             workspace={workspace}
           />
 
+          <MaterialsPanel
+            apiMode={apiMode}
+            draft={materialDraft}
+            isSubmitting={isMaterialSubmitting}
+            locale={locale}
+            materials={workspaceMaterials}
+            verifications={materialVerifications}
+            onDraftChange={setMaterialDraft}
+            onSubmit={() => void registerMaterial()}
+            onVerify={(materialId) => void verifyMaterial(materialId)}
+          />
+
           <section>
             <PanelHeader title={text(locale, "indicators")} meta={text(locale, "visible")} compact />
             <div className="indicator-list">
@@ -407,6 +509,168 @@ export function App() {
         </aside>
       </main>
     </div>
+  );
+}
+
+function MaterialsPanel({
+  apiMode,
+  draft,
+  isSubmitting,
+  locale,
+  materials,
+  onDraftChange,
+  onSubmit,
+  onVerify,
+  verifications,
+}: {
+  apiMode: ApiMode;
+  draft: MaterialDraft;
+  isSubmitting: boolean;
+  locale: Locale;
+  materials: MaterialRecord[];
+  onDraftChange: (draft: MaterialDraft) => void;
+  onSubmit: () => void;
+  onVerify: (materialId: string) => void;
+  verifications: Record<string, MaterialVerification>;
+}) {
+  const disabled = apiMode !== "online" || isSubmitting;
+
+  return (
+    <section>
+      <PanelHeader
+        title={text(locale, "materialRegister")}
+        meta={`${materials.length} ${text(locale, "registered")}`}
+        compact
+      />
+      <form
+        className="material-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+      >
+        <label>
+          <span>{text(locale, "materialTitle")}</span>
+          <input
+            disabled={disabled}
+            placeholder={text(locale, "materialTitlePlaceholder")}
+            value={draft.title}
+            onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
+          />
+        </label>
+        <label>
+          <span>{text(locale, "materialType")}</span>
+          <select
+            disabled={disabled}
+            value={draft.sourceType}
+            onChange={(event) =>
+              onDraftChange({ ...draft, sourceType: event.target.value as MaterialSourceType })
+            }
+          >
+            {materialSourceTypes.map((sourceType) => (
+              <option key={sourceType} value={sourceType}>
+                {materialSourceLabel(sourceType, locale)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="material-form-wide">
+          <span>{text(locale, "materialContent")}</span>
+          <textarea
+            disabled={disabled}
+            placeholder={text(locale, "materialContentPlaceholder")}
+            rows={4}
+            value={draft.content}
+            onChange={(event) => onDraftChange({ ...draft, content: event.target.value })}
+          />
+        </label>
+        <label className="material-form-wide">
+          <span>{text(locale, "materialTags")}</span>
+          <input
+            disabled={disabled}
+            placeholder={text(locale, "materialTagsPlaceholder")}
+            value={draft.tags}
+            onChange={(event) => onDraftChange({ ...draft, tags: event.target.value })}
+          />
+        </label>
+        <button disabled={disabled} type="submit">
+          <Plus size={15} />
+          {isSubmitting ? "..." : text(locale, "addMaterial")}
+        </button>
+        <span className="material-mode">{text(locale, "syntheticTextOnly")}</span>
+      </form>
+
+      <div className="material-list">
+        {materials.length ? (
+          materials.map((material) => (
+            <MaterialCard
+              key={material.id}
+              locale={locale}
+              material={material}
+              onVerify={onVerify}
+              verification={verifications[material.id]}
+            />
+          ))
+        ) : (
+          <p className="empty-state">{text(locale, "noMaterials")}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MaterialCard({
+  locale,
+  material,
+  onVerify,
+  verification,
+}: {
+  locale: Locale;
+  material: MaterialRecord;
+  onVerify: (materialId: string) => void;
+  verification: MaterialVerification | undefined;
+}) {
+  const state = materialVerificationState(verification);
+
+  return (
+    <article className="material-card" data-state={state}>
+      <div className="material-card-header">
+        <span className="security-icon">
+          <FileText size={15} />
+        </span>
+        <div>
+          <strong>{material.title}</strong>
+          <span className="material-meta">
+            {material.id} / {materialSourceLabel(material.source_type, locale)}
+          </span>
+        </div>
+      </div>
+      <div className="material-facts">
+        <span>
+          {text(locale, "size")}: <strong>{formatBytes(material.size_bytes)}</strong>
+        </span>
+        <span>
+          {text(locale, "hash")}: <strong>{shortHash(material.sha256)}</strong>
+        </span>
+      </div>
+      {material.tags.length ? (
+        <div className="material-tags">
+          {material.tags.map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
+        </div>
+      ) : null}
+      <div className="material-card-footer">
+        <span className="material-verification">
+          <ShieldQuestion size={14} />
+          {materialVerificationLabel(verification, locale)}
+        </span>
+        <button type="button" onClick={() => onVerify(material.id)}>
+          <CheckCircle2 size={14} />
+          {text(locale, "verifyMaterial")}
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -539,6 +803,82 @@ function storageModeLabel(
     return text(locale, "plainPrototype");
   }
   return text(locale, "unknown");
+}
+
+function materialSourceLabel(sourceType: MaterialSourceType, locale: Locale): string {
+  const labels: Record<MaterialSourceType, CopyKey> = {
+    audio_transcript: "audioTranscript",
+    case_protocol: "caseProtocol",
+    external_document: "externalDocument",
+    text_note: "textNote",
+    user_note: "userNote",
+  };
+  return text(locale, labels[sourceType]);
+}
+
+function materialVerificationState(
+  verification: MaterialVerification | undefined,
+): "ready" | "warning" | "blocked" | "unknown" {
+  if (!verification) {
+    return "unknown";
+  }
+  if (verification.verified) {
+    return "ready";
+  }
+  if (!verification.exists) {
+    return "blocked";
+  }
+  return "warning";
+}
+
+function materialVerificationLabel(
+  verification: MaterialVerification | undefined,
+  locale: Locale,
+): string {
+  if (!verification) {
+    return text(locale, "unknown");
+  }
+  if (verification.verified) {
+    return text(locale, "verified");
+  }
+  if (!verification.exists) {
+    return text(locale, "missing");
+  }
+  return text(locale, "changed");
+}
+
+function parseTags(value: string): string[] {
+  const tags = value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return Array.from(new Set(tags));
+}
+
+function createMaterialId(): string {
+  return `material-${Date.now()}`;
+}
+
+function sortMaterials(materials: MaterialRecord[]): MaterialRecord[] {
+  return [...materials].sort((left, right) => {
+    const rightTime = Date.parse(right.created_at);
+    const leftTime = Date.parse(left.created_at);
+    if (rightTime !== leftTime) {
+      return rightTime - leftTime;
+    }
+    return left.id.localeCompare(right.id);
+  });
+}
+
+function shortHash(value: string): string {
+  return value.length > 12 ? `${value.slice(0, 12)}...` : value;
+}
+
+function formatBytes(value: number): string {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  return `${(value / 1024).toFixed(1)} KB`;
 }
 
 function StatusStrip({
