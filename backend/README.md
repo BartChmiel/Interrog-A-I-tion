@@ -112,6 +112,7 @@ Workspace source materials can also be registered as controlled text records. Th
 GET /workspaces/{workspace_id}/materials
 POST /workspaces/{workspace_id}/materials
 GET /workspaces/{workspace_id}/materials/links?case_id=case-001
+POST /workspaces/{workspace_id}/materials/{material_id}/questions/{question_id}/decision
 GET /workspaces/{workspace_id}/materials/{material_id}/verification
 GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=demo-session
 GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-session&question_id=q-001
@@ -131,3 +132,8 @@ The grounded suggestion decision endpoint records human `accepted`, `edited`,
 or `rejected` decisions as append-only audit events. Decision records preserve
 the original suggestion text, final operator text, linked source ids, model id,
 prompt version, and context/output hashes.
+
+The material-question link decision endpoint records human `accepted` or
+`rejected` decisions for deterministic material-question grounding links. These
+records are audit events only; the deterministic link algorithm remains
+unchanged in the prototype.

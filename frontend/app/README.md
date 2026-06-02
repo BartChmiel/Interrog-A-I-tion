@@ -58,6 +58,10 @@ The same rail includes a case-material register for synthetic text materials. It
 
 Registered materials are also linked deterministically to interview questions through shared topic signals. The active question shows linked materials, and each material card shows linked question ids with confidence values.
 
+Material cards also expose compact accept/reject controls for each
+material-question link. Online decisions are recorded through the backend audit
+chain; offline decisions remain local demo state.
+
 ## Scripts
 
 - `npm run dev` - local Vite server,

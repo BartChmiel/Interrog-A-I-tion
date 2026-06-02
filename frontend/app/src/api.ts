@@ -6,6 +6,9 @@ import type {
   EvidenceMapResponse,
   GroundedSuggestionsResponse,
   InterviewSession,
+  MaterialQuestionLink,
+  MaterialQuestionLinkDecision,
+  MaterialQuestionLinkDecisionResponse,
   MaterialLinksResponse,
   MaterialListResponse,
   MaterialRecord,
@@ -51,6 +54,11 @@ export type GroundedSuggestionDecisionPayload = {
   context_hash: string;
   output_hash: string;
   question_id: string;
+};
+
+export type MaterialQuestionLinkDecisionPayload = {
+  decision: MaterialQuestionLinkDecision;
+  link: MaterialQuestionLink;
 };
 
 export async function loadCaseReview(config: RuntimeConfig, locale: string): Promise<CaseReviewResponse> {
@@ -147,6 +155,33 @@ export async function loadMaterialQuestionLinks(
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({ case_id: config.caseId, locale });
   return fetchJson(config, `/workspaces/${workspaceId}/materials/links?${query.toString()}`);
+}
+
+export async function recordMaterialQuestionLinkDecision(
+  config: RuntimeConfig,
+  payload: MaterialQuestionLinkDecisionPayload,
+): Promise<MaterialQuestionLinkDecisionResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const materialId = encodeURIComponent(payload.link.material_id);
+  const questionId = encodeURIComponent(payload.link.question_id);
+  return fetchJson(
+    config,
+    `/workspaces/${workspaceId}/materials/${materialId}/questions/${questionId}/decision`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        decision: payload.decision,
+        case_id: config.caseId,
+        session_id: config.sessionId,
+        actor_id: "local-ui",
+        question_id: payload.link.question_id,
+        topic_ids: payload.link.topic_ids,
+        matched_terms: payload.link.matched_terms,
+        confidence: payload.link.confidence,
+        rationale: payload.link.rationale,
+      }),
+    },
+  );
 }
 
 export async function loadEvidenceMap(

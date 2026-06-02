@@ -184,6 +184,20 @@ class GroundedSuggestionDecisionRequest:
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
 
 
+@dataclass(frozen=True)
+class MaterialQuestionLinkDecisionRequest:
+    decision: str
+    case_id: str
+    question_id: str
+    topic_ids: list[str] = field(default_factory=list)
+    matched_terms: list[str] = field(default_factory=list)
+    confidence: float | None = None
+    rationale: str = ""
+    actor_id: str = "local-ui"
+    session_id: str | None = None
+    role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
 def create_app(
     store: SessionStore | None = None,
     workspace_manager: CaseWorkspaceManager | None = None,
@@ -342,6 +356,68 @@ def create_app(
         case = _load_synthetic_case(case_id, locale=locale)
         links = link_materials_to_questions(case, material_texts)
         return {"links": _to_jsonable(links)}
+
+    @app.post("/workspaces/{workspace_id}/materials/{material_id}/questions/{question_id}/decision")
+    def record_material_question_link_decision(
+        workspace_id: str,
+        material_id: str,
+        question_id: str,
+        request: MaterialQuestionLinkDecisionRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            registry = MaterialRegistry(workspace)
+            material_ids = {material.id for material in registry.list_materials()}
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.WRITE_INTERVIEW,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        case_id = request.case_id or workspace.manifest.case_id
+        if case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+        case = _load_synthetic_case(case_id, locale="en")
+        _validate_material_question_link_decision(
+            material_id=material_id,
+            question_id=question_id,
+            request=request,
+            material_ids=material_ids,
+            question_ids={question.id for question in case.questions},
+            topic_ids={topic.id for topic in case.topics},
+        )
+
+        audit_event = store.append_audit_event(
+            actor=Actor.HUMAN,
+            action=f"material_question_link_{request.decision}",
+            object_type="material_question_link",
+            object_id=f"{material_id}:{question_id}",
+            details={
+                "workspace_id": workspace_id,
+                "case_id": case_id,
+                "session_id": request.session_id,
+                "material_id": material_id,
+                "question_id": question_id,
+                "decision": request.decision,
+                "actor_id": request.actor_id,
+                "topic_ids": list(request.topic_ids),
+                "matched_terms": list(request.matched_terms),
+                "confidence": request.confidence,
+                "rationale": request.rationale,
+            },
+        )
+        return {
+            "decision": request.decision,
+            "audit_event": _to_jsonable(audit_event),
+            "chain_valid": store.verify_audit_chain(),
+        }
 
     @app.get("/workspaces/{workspace_id}/evidence-map")
     def get_workspace_evidence_map(
@@ -884,6 +960,29 @@ def _validate_grounded_suggestion_decision(
         _require_non_empty("final_text", request.final_text or request.original_text)
     _validate_optional_sha256("context_hash", request.context_hash)
     _validate_optional_sha256("output_hash", request.output_hash)
+
+
+def _validate_material_question_link_decision(
+    *,
+    material_id: str,
+    question_id: str,
+    request: MaterialQuestionLinkDecisionRequest,
+    material_ids: set[str],
+    question_ids: set[str],
+    topic_ids: set[str],
+) -> None:
+    _require_non_empty("material_id", material_id)
+    _require_non_empty("question_id", question_id)
+    if request.question_id and request.question_id != question_id:
+        raise HTTPException(status_code=400, detail="question_id does not match path.")
+    _require_known_id("material_id", material_id, material_ids)
+    _require_known_id("question_id", question_id, question_ids)
+    if request.decision not in {"accepted", "rejected"}:
+        raise HTTPException(status_code=400, detail="Unsupported material-question link decision.")
+    for topic_id in request.topic_ids:
+        _require_known_id("topic_id", topic_id, topic_ids)
+    if request.confidence is not None and not 0 <= request.confidence <= 1:
+        raise HTTPException(status_code=400, detail="confidence must be between 0 and 1.")
 
 
 def _require_non_empty(field_name: str, value: str) -> None:

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interigaition.local/schemas/material-question-link-decision.schema.json",
+  "title": "MaterialQuestionLinkDecisionRequest",
+  "type": "object",
+  "required": ["decision", "case_id", "question_id"],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    },
+    "case_id": { "type": "string", "minLength": 1 },
+    "question_id": { "type": "string", "minLength": 1 },
+    "topic_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "matched_terms": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "rationale": { "type": "string" },
+    "actor_id": { "type": "string" },
+    "session_id": { "type": ["string", "null"] },
+    "role": {
+      "type": "string",
+      "enum": ["investigator", "prosecutor", "defense_counsel", "observer", "admin"]
+    }
+  }
+}

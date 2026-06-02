@@ -7,6 +7,7 @@ from interigaition.api.app import (
     CreateWorkspaceRequest,
     GroundedSuggestionDecisionRequest,
     HTTPException,
+    MaterialQuestionLinkDecisionRequest,
     RegisterMaterialRequest,
     StartSessionRequest,
     create_app,
@@ -60,6 +61,7 @@ class ApiAppTest(unittest.TestCase):
         register_material = endpoint(app, "register_workspace_material")
         list_materials = endpoint(app, "list_workspace_materials")
         link_materials = endpoint(app, "link_workspace_materials_to_questions")
+        record_link_decision = endpoint(app, "record_material_question_link_decision")
         get_evidence_map = endpoint(app, "get_workspace_evidence_map")
         get_grounding_pack = endpoint(app, "get_workspace_grounding_pack")
         generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
@@ -101,6 +103,21 @@ class ApiAppTest(unittest.TestCase):
         )
         materials = list_materials("api-workspace-001")
         material_links = link_materials("api-workspace-001", case_id="case-001", locale="en")
+        first_link = material_links["links"][0]
+        link_decision = record_link_decision(
+            "api-workspace-001",
+            first_link["material_id"],
+            first_link["question_id"],
+            MaterialQuestionLinkDecisionRequest(
+                decision="accepted",
+                case_id="case-001",
+                question_id=first_link["question_id"],
+                topic_ids=first_link["topic_ids"],
+                matched_terms=first_link["matched_terms"],
+                confidence=first_link["confidence"],
+                rationale=first_link["rationale"],
+            ),
+        )
         evidence_map = get_evidence_map(
             "api-workspace-001",
             case_id="case-001",
@@ -158,6 +175,10 @@ class ApiAppTest(unittest.TestCase):
             "q-001",
             {link["question_id"] for link in material_links["links"]},
         )
+        self.assertEqual(link_decision["decision"], "accepted")
+        self.assertTrue(link_decision["chain_valid"])
+        self.assertEqual(link_decision["audit_event"]["action"], "material_question_link_accepted")
+        self.assertEqual(link_decision["audit_event"]["details"]["material_id"], first_link["material_id"])
         self.assertEqual(evidence_map["evidence_map"]["case_id"], "case-001")
         self.assertEqual(evidence_map["evidence_map"]["summary"]["total_materials"], 1)
         self.assertIn(
@@ -194,7 +215,11 @@ class ApiAppTest(unittest.TestCase):
         self.assertTrue(workspace_audit["chain_valid"])
         self.assertEqual(
             [event["action"] for event in workspace_audit["events"]],
-            ["grounded_suggestions_generated", "grounded_suggestion_accepted"],
+            [
+                "material_question_link_accepted",
+                "grounded_suggestions_generated",
+                "grounded_suggestion_accepted",
+            ],
         )
         self.assertTrue(material_verification["verified"])
 

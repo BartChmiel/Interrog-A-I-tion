@@ -337,10 +337,37 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.material-question-chips span[data-state="accepted"] {
+  border: 1px solid #b9dccb;
+}
+
+.material-question-chips span[data-state="rejected"] {
+  border: 1px solid #e5b6ad;
+  opacity: 0.78;
+}
+
 .linked-material-list em,
-.material-question-chips em {
+.material-question-chips em,
+.material-question-chips strong {
   color: var(--muted);
   font-style: normal;
+}
+
+.material-question-chips strong {
+  font-size: 11px;
+}
+
+.material-question-chips button {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  cursor: pointer;
 }
 
 .answer-stream {

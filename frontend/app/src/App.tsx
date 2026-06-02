@@ -35,6 +35,7 @@ import {
   loadWorkspaceAccess,
   loadWorkspaceMaterials,
   recordGroundedSuggestionDecision,
+  recordMaterialQuestionLinkDecision,
   registerWorkspaceMaterial,
   startSession,
   verifyWorkspaceMaterial,
@@ -56,6 +57,7 @@ import type {
   InterviewSession,
   Locale,
   MaterialQuestionLink,
+  MaterialQuestionLinkDecision,
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
@@ -110,6 +112,7 @@ export function App() {
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
+  const [materialQuestionLinkDecisions, setMaterialQuestionLinkDecisions] = useState<Record<string, MaterialQuestionLinkDecision>>({});
   const [evidenceMap, setEvidenceMap] = useState<EvidenceMap | null>(null);
   const [groundedSuggestions, setGroundedSuggestions] = useState<GroundedSuggestion[]>([]);
   const [groundedSuggestionWarnings, setGroundedSuggestionWarnings] = useState<GroundedSuggestionWarning[]>([]);
@@ -222,6 +225,7 @@ export function App() {
       setWorkspaceAccess(null);
       setWorkspaceMaterials([]);
       setMaterialQuestionLinks([]);
+      setMaterialQuestionLinkDecisions({});
       setEvidenceMap(null);
       applyGroundedSuggestions(null);
       setMaterialVerifications({});
@@ -466,6 +470,27 @@ export function App() {
     }
   }
 
+  async function decideMaterialQuestionLink(
+    link: MaterialQuestionLink,
+    decision: MaterialQuestionLinkDecision,
+  ) {
+    if (apiMode === "online") {
+      try {
+        await recordMaterialQuestionLinkDecision(config, { decision, link });
+      } catch (error) {
+        console.error("Could not audit material-question link decision.", error);
+        setStatusKey("saveFailed");
+        return;
+      }
+    }
+
+    setMaterialQuestionLinkDecisions((current) => ({
+      ...current,
+      [materialQuestionLinkKey(link)]: decision,
+    }));
+    setStatusKey(decision === "accepted" ? "linkAccepted" : "linkRejected");
+  }
+
   function selectActiveQuestion(questionId: string) {
     setActiveQuestionId(questionId);
     if (apiMode === "online") {
@@ -687,12 +712,14 @@ export function App() {
 
           <MaterialsPanel
             apiMode={apiMode}
+            decisions={materialQuestionLinkDecisions}
             draft={materialDraft}
             isSubmitting={isMaterialSubmitting}
             locale={locale}
             links={materialQuestionLinks}
             materials={workspaceMaterials}
             verifications={materialVerifications}
+            onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
             onDraftChange={setMaterialDraft}
             onSubmit={() => void registerMaterial()}
             onVerify={(materialId) => void verifyMaterial(materialId)}
@@ -1032,22 +1059,26 @@ function suggestionDecisionLabel(decision: GroundedSuggestionDecision, locale: L
 
 function MaterialsPanel({
   apiMode,
+  decisions,
   draft,
   isSubmitting,
   links,
   locale,
   materials,
+  onDecideLink,
   onDraftChange,
   onSubmit,
   onVerify,
   verifications,
 }: {
   apiMode: ApiMode;
+  decisions: Record<string, MaterialQuestionLinkDecision>;
   draft: MaterialDraft;
   isSubmitting: boolean;
   links: MaterialQuestionLink[];
   locale: Locale;
   materials: MaterialRecord[];
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
   onDraftChange: (draft: MaterialDraft) => void;
   onSubmit: () => void;
   onVerify: (materialId: string) => void;
@@ -1124,10 +1155,12 @@ function MaterialsPanel({
         {materials.length ? (
           materials.map((material) => (
             <MaterialCard
+              decisions={decisions}
               key={material.id}
               links={links.filter((link) => link.material_id === material.id)}
               locale={locale}
               material={material}
+              onDecideLink={onDecideLink}
               onVerify={onVerify}
               verification={verifications[material.id]}
             />
@@ -1141,15 +1174,19 @@ function MaterialsPanel({
 }
 
 function MaterialCard({
+  decisions,
   links,
   locale,
   material,
+  onDecideLink,
   onVerify,
   verification,
 }: {
+  decisions: Record<string, MaterialQuestionLinkDecision>;
   links: MaterialQuestionLink[];
   locale: Locale;
   material: MaterialRecord;
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
   onVerify: (materialId: string) => void;
   verification: MaterialVerification | undefined;
 }) {
@@ -1183,7 +1220,12 @@ function MaterialCard({
           ))}
         </div>
       ) : null}
-      <MaterialQuestionChips links={links} locale={locale} />
+      <MaterialQuestionChips
+        decisions={decisions}
+        links={links}
+        locale={locale}
+        onDecideLink={onDecideLink}
+      />
       <div className="material-card-footer">
         <span className="material-verification">
           <ShieldQuestion size={14} />
@@ -1199,11 +1241,15 @@ function MaterialCard({
 }
 
 function MaterialQuestionChips({
+  decisions,
   links,
   locale,
+  onDecideLink,
 }: {
+  decisions: Record<string, MaterialQuestionLinkDecision>;
   links: MaterialQuestionLink[];
   locale: Locale;
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
 }) {
   if (!links.length) {
     return (
@@ -1218,17 +1264,46 @@ function MaterialQuestionChips({
     <div className="material-grounding">
       <span>{text(locale, "groundedQuestions")}</span>
       <div className="material-question-chips">
-        {links.map((link) => (
-          <span key={`${link.material_id}-${link.question_id}`}>
-            {link.question_id}
-            <em>
-              {text(locale, "confidenceShort")} {link.confidence.toFixed(2)}
-            </em>
-          </span>
-        ))}
+        {links.map((link) => {
+          const decision = decisions[materialQuestionLinkKey(link)];
+          return (
+            <span data-state={decision ?? "proposed"} key={materialQuestionLinkKey(link)}>
+              {link.question_id}
+              <em>
+                {text(locale, "confidenceShort")} {link.confidence.toFixed(2)}
+              </em>
+              {decision ? <strong>{materialQuestionLinkDecisionLabel(decision, locale)}</strong> : null}
+              <button
+                aria-label={`${text(locale, "acceptLink")} ${link.question_id}`}
+                type="button"
+                onClick={() => onDecideLink(link, "accepted")}
+              >
+                <Check size={12} />
+              </button>
+              <button
+                aria-label={`${text(locale, "rejectLink")} ${link.question_id}`}
+                type="button"
+                onClick={() => onDecideLink(link, "rejected")}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          );
+        })}
       </div>
     </div>
   );
+}
+
+function materialQuestionLinkKey(link: MaterialQuestionLink): string {
+  return `${link.material_id}:${link.question_id}`;
+}
+
+function materialQuestionLinkDecisionLabel(
+  decision: MaterialQuestionLinkDecision,
+  locale: Locale,
+): string {
+  return text(locale, decision === "accepted" ? "linkAcceptedLabel" : "linkRejectedLabel");
 }
 
 function SecurityPanel({

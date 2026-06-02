@@ -22,12 +22,12 @@ Implemented:
 - workspace material register,
 - material verification by hash and size,
 - material-question grounding links,
+- audited accepted/rejected material-question link decisions,
 - topic-level case evidence map,
 - grounding context pack.
 
 Next:
 
-- human accept/reject controls for material-question links,
 - material preview and matched-term audit view,
 - evidence graph nodes for materials, answers, claims, questions, and findings,
 - stronger distinction between official evidence, working notes, and synthetic training material,
@@ -224,8 +224,8 @@ Design rule:
 
 ## Recommended Next Implementation Order
 
-1. Add human accept/reject controls for material-question links.
-2. Add evidence alignment indicator based on registered materials.
+1. Add evidence alignment indicator based on registered materials and reviewed links.
+2. Add material preview and matched-term audit view.
 3. Add local model configuration and Ollama smoke mode behind deterministic tests.
 4. STOP before trusting real model-generated suggestions in institutional live mode.
 5. Add SQLCipher installation route and encrypted workspace creation.

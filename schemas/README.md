@@ -14,3 +14,4 @@ Current schemas:
 - `grounded-suggestion-decision.schema.json`
 - `grounded-suggestions.schema.json`
 - `indicator.schema.json`
+- `material-question-link-decision.schema.json`

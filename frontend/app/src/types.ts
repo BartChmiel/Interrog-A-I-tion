@@ -191,6 +191,20 @@ export type MaterialQuestionLink = {
   rationale: string;
 };
 
+export type MaterialQuestionLinkDecision = "accepted" | "rejected";
+
+export type MaterialQuestionLinkDecisionResponse = {
+  decision: MaterialQuestionLinkDecision;
+  chain_valid: boolean;
+  audit_event: {
+    id: string;
+    action: string;
+    object_type: string;
+    object_id: string;
+    event_hash: string;
+  };
+};
+
 export type MaterialLinksResponse = {
   links: MaterialQuestionLink[];
 };

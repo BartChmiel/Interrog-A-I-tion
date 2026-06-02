@@ -113,6 +113,19 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Audited material-question link decisions has reached its first review point.
+
+The project owner should evaluate:
+
+- whether `accepted` and `rejected` are sufficient states for reviewing deterministic material-question links,
+- whether rejected links should remain visible as rejected or be hidden from operator workflows,
+- whether accepted links should affect evidence alignment indicators immediately,
+- whether matched terms should be visible before accepting a link,
+- whether link decisions should be shown in the active-question strip as well as material cards,
+- whether reviewed link decisions can be used in thesis evaluation before real case data is available.
+
+## Current STOP
+
 Milestone 6: Audited grounded suggestion decisions has reached its first review point.
 
 The project owner should evaluate:
