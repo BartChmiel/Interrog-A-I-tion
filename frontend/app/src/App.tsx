@@ -577,7 +577,7 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-block">
-          <div className="brand-mark">IA</div>
+          <img className="brand-mark" src="/brand/logo-mark.svg" alt="InterrogA(I)tion" width={44} height={44} />
           <div>
             <h1>InterrogA(I)tion</h1>
             <p>{caseData?.title ?? text(locale, "caseFallback")}</p>

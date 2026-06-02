@@ -85,13 +85,9 @@ p {
 .brand-mark {
   width: 44px;
   height: 44px;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: #fff;
-  font-weight: 800;
-  border-radius: 8px;
-  letter-spacing: 0;
+  display: block;
+  border-radius: 11px;
+  flex: none;
 }
 
 h1 {
