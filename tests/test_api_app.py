@@ -60,6 +60,7 @@ class ApiAppTest(unittest.TestCase):
         link_materials = endpoint(app, "link_workspace_materials_to_questions")
         get_evidence_map = endpoint(app, "get_workspace_evidence_map")
         get_grounding_pack = endpoint(app, "get_workspace_grounding_pack")
+        generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
         verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
@@ -109,6 +110,13 @@ class ApiAppTest(unittest.TestCase):
             question_id="q-001",
             locale="en",
         )
+        grounded_suggestions = generate_grounded_suggestions(
+            "api-workspace-001",
+            case_id="case-001",
+            session_id=None,
+            question_id="q-001",
+            locale="en",
+        )
         material_verification = verify_material("api-workspace-001", "api-material-001")
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
@@ -146,6 +154,12 @@ class ApiAppTest(unittest.TestCase):
                 for reference in grounding_pack["grounding_pack"]["material_references"]
             },
         )
+        self.assertIn("suggestions", grounded_suggestions)
+        self.assertEqual(grounded_suggestions["model"], "deterministic-grounded-fake")
+        self.assertEqual(len(grounded_suggestions["context_hash"]), 64)
+        self.assertEqual(len(grounded_suggestions["output_hash"]), 64)
+        self.assertEqual(grounded_suggestions["warnings"], [])
+        self.assertTrue(grounded_suggestions["suggestions"])
         self.assertTrue(material_verification["verified"])
 
         with self.assertRaises(HTTPException) as caught:

@@ -53,15 +53,18 @@ Implemented:
 - guarded JSON parsing,
 - forbidden truthfulness-verdict checks,
 - grounded follow-up prompt draft,
-- `GroundingContextPack` API contract.
+- `GroundingContextPack` API contract,
+- grounded prompt rendering from `GroundingContextPack`,
+- live-visible grounded suggestions endpoint,
+- citation validation against `allowed_source_ids`,
+- audit metadata for prompt version, model id, context hash, and output hash,
+- React right-rail display with source ids and `use`, `edit`, and `reject` controls.
 
 Next:
 
-- render grounded user prompts from `GroundingContextPack`,
-- generate follow-up suggestions from the grounding pack in offline review mode first,
-- block live-mode model output until a STOP review,
-- add output validation requiring linked evidence ids from `allowed_source_ids`,
-- add audit events for prompt version, model id, context hash, and output hash,
+- persist `use`, `edit`, and `reject` decisions in the backend audit trail,
+- connect Ollama behind the same grounded service in controlled test mode,
+- block institutional live use of real model output until a STOP review,
 - add a local model configuration panel or config file.
 
 Strategic risk:
@@ -221,14 +224,14 @@ Design rule:
 
 ## Recommended Next Implementation Order
 
-1. Add prompt rendering from `GroundingContextPack`.
-2. Add output validation requiring cited ids to exist in `allowed_source_ids`.
-3. Add offline-only grounded follow-up suggestion endpoint.
-4. Add UI display for grounded suggestions with source ids and "use / ignore" controls.
-5. STOP before enabling model-generated suggestions in live mode.
-6. Add human accept/reject controls for material-question links.
-7. Add evidence alignment indicator based on registered materials.
-8. Add SQLCipher installation route and encrypted workspace creation.
+1. Add backend audit events for grounded suggestion `use`, `edit`, and `reject` decisions.
+2. Add human accept/reject controls for material-question links.
+3. Add evidence alignment indicator based on registered materials.
+4. Add local model configuration and Ollama smoke mode behind deterministic tests.
+5. STOP before trusting real model-generated suggestions in institutional live mode.
+6. Add SQLCipher installation route and encrypted workspace creation.
+7. Add model artifact isolation and environment health checks.
+8. Add richer synthetic evaluation scenarios for thesis measurements.
 
 ## STOP Questions Before Live AI Output
 

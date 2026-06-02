@@ -11,4 +11,5 @@ Current schemas:
 - `ai-suggestion.schema.json`
 - `audit-event.schema.json`
 - `grounding-pack.schema.json`
+- `grounded-suggestions.schema.json`
 - `indicator.schema.json`

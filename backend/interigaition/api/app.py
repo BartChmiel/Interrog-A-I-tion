@@ -81,6 +81,8 @@ from interigaition.analysis.material_grounding import (
     infer_material_topic_signals,
     link_materials_to_questions,
 )
+from interigaition.ai.grounded_suggestion_service import generate_grounded_suggestions
+from interigaition.ai.model_client import DeterministicGroundedModelClient, ModelClient
 from interigaition.domain.models import Actor, Answer, AuditEvent, Claim, Case
 from interigaition.domain.session import (
     InterviewSession,
@@ -163,6 +165,7 @@ class RegisterMaterialRequest:
 def create_app(
     store: SessionStore | None = None,
     workspace_manager: CaseWorkspaceManager | None = None,
+    model_client: ModelClient | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="InterigA(I)tion Local API",
@@ -194,6 +197,7 @@ def create_app(
 
     store = store or SQLiteSessionStore.in_memory()
     workspace_manager = workspace_manager or CaseWorkspaceManager(DEFAULT_WORKSPACE_ROOT)
+    model_client = model_client or DeterministicGroundedModelClient()
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -381,6 +385,77 @@ def create_app(
             focus_question_id=question_id,
         )
         return {"grounding_pack": _to_jsonable(grounding_pack)}
+
+    @app.post("/workspaces/{workspace_id}/grounded-suggestions")
+    def generate_workspace_grounded_suggestions(
+        workspace_id: str,
+        case_id: str,
+        session_id: str | None = Query(default=None),
+        question_id: str | None = Query(default=None),
+        locale: str = Query(default="en"),
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            registry = MaterialRegistry(workspace)
+            material_texts = _read_workspace_material_texts(registry)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        context = _build_evidence_context(
+            case_id=case_id,
+            locale=locale,
+            session_id=session_id,
+            store=store,
+            material_texts=material_texts,
+        )
+        case_view = context["case"]
+        if question_id:
+            _require_known_id(
+                "question_id",
+                question_id,
+                {question.id for question in case_view.questions},
+            )
+        grounding_pack = build_grounding_context_pack(
+            case=case_view,
+            evidence_map=context["evidence_map"],
+            materials=context["materials"],
+            material_links=context["material_links"],
+            focus_question_id=question_id,
+        )
+        result = generate_grounded_suggestions(
+            grounding_pack=grounding_pack,
+            model_client=model_client,
+            locale=locale,
+            citation_policy="warn",
+        )
+        store.append_audit_event(
+            actor=Actor.AI,
+            action="grounded_suggestions_generated",
+            object_type="workspace",
+            object_id=workspace_id,
+            details={
+                "case_id": case_id,
+                "session_id": session_id,
+                "question_id": question_id,
+                "model": result.batch.model,
+                "prompt_version": result.prompt_version,
+                "context_hash": result.context_hash,
+                "output_hash": result.output_hash,
+                "suggestion_count": len(result.batch.suggestions),
+                "warning_count": len(result.warnings),
+            },
+        )
+        return {
+            "grounding_pack": _to_jsonable(grounding_pack),
+            "suggestions": _to_jsonable(result.batch.suggestions),
+            "model": result.batch.model,
+            "prompt_version": result.prompt_version,
+            "context_hash": result.context_hash,
+            "output_hash": result.output_hash,
+            "warnings": _to_jsonable(result.warnings),
+        }
 
     @app.get("/workspaces/{workspace_id}/materials/{material_id}/verification")
     def verify_workspace_material(workspace_id: str, material_id: str) -> dict[str, Any]:

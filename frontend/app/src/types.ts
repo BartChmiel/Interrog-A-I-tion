@@ -241,6 +241,34 @@ export type EvidenceMapResponse = {
   evidence_map: EvidenceMap;
 };
 
+export type GroundedSuggestion = {
+  id: string;
+  suggestion_type: string;
+  text: string;
+  reason: string;
+  linked_topics: string[];
+  linked_evidence: string[];
+  risk_flags: string[];
+  confidence: number | null;
+  status: string;
+  created_at: string;
+};
+
+export type GroundedSuggestionWarning = {
+  suggestion_id: string;
+  warning_type: string;
+  detail: string;
+};
+
+export type GroundedSuggestionsResponse = {
+  suggestions: GroundedSuggestion[];
+  model: string;
+  prompt_version: string;
+  context_hash: string;
+  output_hash: string;
+  warnings: GroundedSuggestionWarning[];
+};
+
 export type QuestionView = {
   id: string;
   text: LocalizedText;

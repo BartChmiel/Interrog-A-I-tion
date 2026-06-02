@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interigaition.local/schemas/grounded-suggestions.schema.json",
+  "title": "GroundedSuggestionsResponse",
+  "type": "object",
+  "required": [
+    "grounding_pack",
+    "suggestions",
+    "model",
+    "prompt_version",
+    "context_hash",
+    "output_hash",
+    "warnings"
+  ],
+  "properties": {
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "suggestion_type", "text", "reason", "status", "created_at"],
+        "properties": {
+          "id": { "type": "string" },
+          "suggestion_type": {
+            "type": "string",
+            "enum": ["interview_plan", "follow_up_question", "gap", "potential_inconsistency", "neutrality_rewrite", "summary"]
+          },
+          "text": { "type": "string" },
+          "reason": { "type": "string" },
+          "linked_topics": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "linked_evidence": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "risk_flags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "confidence": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": ["proposed", "accepted", "edited", "rejected"]
+          },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "grounding_pack": {
+      "$ref": "grounding-pack.schema.json"
+    },
+    "model": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "context_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "output_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["suggestion_id", "warning_type", "detail"],
+        "properties": {
+          "suggestion_id": { "type": "string" },
+          "warning_type": {
+            "type": "string",
+            "enum": ["missing_linked_evidence", "unknown_source_id"]
+          },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  }
+}

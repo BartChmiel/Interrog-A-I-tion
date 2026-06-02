@@ -45,6 +45,13 @@ The right insight rail includes a compact security panel backed by the local API
 
 The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
 
+The same rail includes a grounded AI panel. It calls the local
+`/grounded-suggestions` endpoint for the active question and shows suggested
+follow-up questions, topic gaps, potential inconsistencies, and summaries with
+their reasons, source ids, model id, prompt version, and citation warnings.
+Each suggestion has local `use`, `edit`, and `reject` controls; these are UI
+decisions only in the current prototype and do not override the human operator.
+
 The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
 
 Registered materials are also linked deterministically to interview questions through shared topic signals. The active question shows linked materials, and each material card shows linked question ids with confidence values.

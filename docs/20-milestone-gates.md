@@ -113,6 +113,19 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Live-visible grounded suggestions has reached its first review point.
+
+The project owner should evaluate:
+
+- whether the right-rail AI panel is acceptable during a live interview workflow,
+- whether suggestion types `follow_up_question`, `gap`, `potential_inconsistency`, and `summary` match the intended operator support model,
+- whether the UI should continue showing model id, prompt version, source ids, and citation warnings to the operator,
+- whether invalid or missing citations should remain warnings in prototype mode or become hard rejections before real model trials,
+- whether firm clarification wording for potential inconsistencies remains ethically and procedurally acceptable,
+- whether `use`, `edit`, and `reject` should become audited backend decisions in the next iteration.
+
+## Current STOP
+
 Milestone 6: Grounding context pack has reached its first review point.
 
 The project owner should evaluate:
@@ -207,7 +220,7 @@ The project owner should evaluate:
 
 ## Next Expected STOP
 
-The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, or before introducing export formats intended to look official.
+The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, before turning UI suggestion decisions into official audit actions, or before introducing export formats intended to look official.
 
 ## Decision Note
 

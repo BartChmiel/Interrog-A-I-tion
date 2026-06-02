@@ -33,4 +33,4 @@ GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-s
 - Future local AI prompts can be grounded without relying on broad UI state.
 - Guardrails become part of the input contract, not only output validation.
 - The current pack is still deterministic context; it is not model output and not an evidentiary conclusion.
-- The next STOP remains before model-generated grounded suggestions are shown in live mode.
+- The follow-up STOP is now attached to live-visible grounded suggestions and remains before trusting real local model output in institutional live use.

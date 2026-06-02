@@ -7,6 +7,7 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
+from interigaition.analysis.grounding_context import GroundingContextPack
 from interigaition.domain.models import Case
 
 
@@ -60,9 +61,35 @@ def render_followup_user_prompt(case: Case) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
+def render_grounded_followup_user_prompt(
+    grounding_pack: GroundingContextPack,
+    *,
+    locale: str,
+) -> str:
+    """Render grounded AI context from the bounded context pack."""
+
+    payload = {
+        "task": grounding_pack.task,
+        "locale": locale,
+        "grounding_pack": _to_jsonable(grounding_pack),
+    }
+
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
 def _to_jsonable(value: Any) -> Any:
     if is_dataclass(value):
-        return asdict(value)
+        return {
+            key: _to_jsonable(item)
+            for key, item in asdict(value).items()
+        }
+    if isinstance(value, tuple):
+        return [_to_jsonable(item) for item in value]
+    if isinstance(value, list):
+        return [_to_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _to_jsonable(item) for key, item in value.items()}
+    if hasattr(value, "value"):
+        return value.value
 
     return value
-

@@ -115,4 +115,12 @@ GET /workspaces/{workspace_id}/materials/links?case_id=case-001
 GET /workspaces/{workspace_id}/materials/{material_id}/verification
 GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=demo-session
 GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-session&question_id=q-001
+POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=demo-session&question_id=q-001
 ```
+
+The grounded suggestions endpoint is the first live-visible AI workflow. It uses
+the current grounding context pack, validates every suggested `linked_evidence`
+entry against `allowed_source_ids`, returns citation warnings, and writes an
+audit event containing model id, prompt version, context hash, and output hash.
+The default runtime is a deterministic fake model so the live workflow can be
+tested before connecting a real local model.

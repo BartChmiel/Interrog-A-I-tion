@@ -2,6 +2,7 @@ import type {
   CaseReviewResponse,
   EncryptionStatus,
   EvidenceMapResponse,
+  GroundedSuggestionsResponse,
   InterviewSession,
   MaterialLinksResponse,
   MaterialListResponse,
@@ -140,6 +141,23 @@ export async function loadEvidenceMap(
     locale,
   });
   return fetchJson(config, `/workspaces/${workspaceId}/evidence-map?${query.toString()}`);
+}
+
+export async function loadGroundedSuggestions(
+  config: RuntimeConfig,
+  locale: string,
+  questionId: string,
+): Promise<GroundedSuggestionsResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({
+    case_id: config.caseId,
+    session_id: config.sessionId,
+    question_id: questionId,
+    locale,
+  });
+  return fetchJson(config, `/workspaces/${workspaceId}/grounded-suggestions?${query.toString()}`, {
+    method: "POST",
+  });
 }
 
 export async function registerWorkspaceMaterial(

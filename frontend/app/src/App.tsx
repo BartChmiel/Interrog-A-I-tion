@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
+  Check,
   CheckCircle2,
   Database,
   FileCheck2,
@@ -11,13 +12,16 @@ import {
   Languages,
   ListChecks,
   Network,
+  Pencil,
   Plus,
   RefreshCw,
   Send,
   ShieldCheck,
   ShieldQuestion,
+  Sparkles,
   Wifi,
   WifiOff,
+  X,
 } from "lucide-react";
 import {
   addAnswer,
@@ -25,6 +29,7 @@ import {
   loadCaseReview,
   loadEncryptionStatus,
   loadEvidenceMap,
+  loadGroundedSuggestions,
   loadMaterialQuestionLinks,
   loadSessionReview,
   loadWorkspaceAccess,
@@ -43,6 +48,8 @@ import type {
   EncryptionStatus,
   EvidenceMap,
   EvidenceTopicStatus,
+  GroundedSuggestion,
+  GroundedSuggestionWarning,
   Indicator,
   InterviewSession,
   Locale,
@@ -102,6 +109,14 @@ export function App() {
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
   const [evidenceMap, setEvidenceMap] = useState<EvidenceMap | null>(null);
+  const [groundedSuggestions, setGroundedSuggestions] = useState<GroundedSuggestion[]>([]);
+  const [groundedSuggestionWarnings, setGroundedSuggestionWarnings] = useState<GroundedSuggestionWarning[]>([]);
+  const [groundedSuggestionMeta, setGroundedSuggestionMeta] = useState<{
+    model: string;
+    promptVersion: string;
+  } | null>(null);
+  const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
+  const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, "used" | "rejected">>({});
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
@@ -182,11 +197,12 @@ export function App() {
         loadEncryptionStatus(config),
         ensureWorkspace(config),
       ]);
-      const [access, materialList, materialLinks, nextEvidenceMap] = await Promise.all([
+      const [access, materialList, materialLinks, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
         loadWorkspaceAccess(config),
         loadWorkspaceMaterials(config),
         loadMaterialQuestionLinksOrEmpty(locale),
         loadEvidenceMapOrNull(locale),
+        loadGroundedSuggestionsOrEmpty(locale, activeQuestionId),
       ]);
       setEncryptionStatus(security);
       setWorkspace(ensuredWorkspace);
@@ -194,6 +210,7 @@ export function App() {
       setWorkspaceMaterials(sortMaterials(materialList.materials));
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
+      applyGroundedSuggestions(nextGroundedSuggestions);
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
@@ -202,6 +219,7 @@ export function App() {
       setWorkspaceMaterials([]);
       setMaterialQuestionLinks([]);
       setEvidenceMap(null);
+      applyGroundedSuggestions(null);
       setMaterialVerifications({});
     }
   }
@@ -226,6 +244,38 @@ export function App() {
     }
   }
 
+  async function loadGroundedSuggestionsOrEmpty(
+    nextLocale: Locale,
+    questionId: string,
+  ): Promise<{
+    suggestions: GroundedSuggestion[];
+    warnings: GroundedSuggestionWarning[];
+    model: string;
+    prompt_version: string;
+  } | null> {
+    try {
+      return await loadGroundedSuggestions(config, nextLocale, questionId);
+    } catch (error) {
+      console.warn("Could not refresh grounded suggestions.", error);
+      return null;
+    }
+  }
+
+  function applyGroundedSuggestions(
+    response: {
+      suggestions: GroundedSuggestion[];
+      warnings: GroundedSuggestionWarning[];
+      model: string;
+      prompt_version: string;
+    } | null,
+  ) {
+    setGroundedSuggestions(response?.suggestions ?? []);
+    setGroundedSuggestionWarnings(response?.warnings ?? []);
+    setGroundedSuggestionMeta(response ? { model: response.model, promptVersion: response.prompt_version } : null);
+    setSuggestionDrafts({});
+    setSuggestionDecisions({});
+  }
+
   async function startOrResumeSession(runtime: RuntimeConfig) {
     try {
       const started = await startSession(runtime);
@@ -248,11 +298,18 @@ export function App() {
     setStatusKey("connecting");
 
     try {
-      const [caseReview, sessionReview, materialLinks, nextEvidenceMap] = await Promise.all([
+      const [
+        caseReview,
+        sessionReview,
+        materialLinks,
+        nextEvidenceMap,
+        nextGroundedSuggestions,
+      ] = await Promise.all([
         loadCaseReview(config, nextLocale),
         loadSessionReview(config, nextLocale),
         loadMaterialQuestionLinksOrEmpty(nextLocale),
         loadEvidenceMapOrNull(nextLocale),
+        loadGroundedSuggestionsOrEmpty(nextLocale, activeQuestionId),
       ]);
       setCaseData(caseReview.case);
       setSession(sessionReview.session);
@@ -260,6 +317,7 @@ export function App() {
       setFindings(sessionReview.snapshot.review.findings);
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
+      applyGroundedSuggestions(nextGroundedSuggestions);
       setApiMode("online");
       setStatusKey("reviewUpdated");
     } catch (error) {
@@ -305,14 +363,16 @@ export function App() {
         topic_ids: activeQuestion.topicIds,
         claims: [],
       });
-      const [sessionReview, nextEvidenceMap] = await Promise.all([
+      const [sessionReview, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
         loadSessionReview(config, locale),
         loadEvidenceMapOrNull(locale),
+        loadGroundedSuggestionsOrEmpty(locale, activeQuestion.id),
       ]);
       setSession(sessionReview.session);
       setIndicators(sessionReview.indicators);
       setFindings(sessionReview.snapshot.review.findings);
       setEvidenceMap(nextEvidenceMap);
+      applyGroundedSuggestions(nextGroundedSuggestions);
       setAnswerText("");
       setStatusKey("reviewUpdated");
     } catch (error) {
@@ -351,14 +411,16 @@ export function App() {
         tags: parseTags(materialDraft.tags),
       });
       const verification = await verifyWorkspaceMaterial(config, record.id);
-      const [materialLinks, nextEvidenceMap] = await Promise.all([
+      const [materialLinks, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
         loadMaterialQuestionLinksOrEmpty(locale),
         loadEvidenceMapOrNull(locale),
+        loadGroundedSuggestionsOrEmpty(locale, activeQuestionId),
       ]);
       setWorkspaceMaterials((current) => sortMaterials([...current, record]));
       setMaterialVerifications((current) => ({ ...current, [record.id]: verification }));
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
+      applyGroundedSuggestions(nextGroundedSuggestions);
       setMaterialDraft(emptyMaterialDraft);
       setStatusKey("materialSaved");
     } catch (error) {
@@ -385,6 +447,31 @@ export function App() {
       console.error("Could not verify material.", error);
       setStatusKey("materialFailed");
     }
+  }
+
+  function selectActiveQuestion(questionId: string) {
+    setActiveQuestionId(questionId);
+    if (apiMode === "online") {
+      void loadGroundedSuggestionsOrEmpty(locale, questionId).then(applyGroundedSuggestions);
+    }
+  }
+
+  function useSuggestion(suggestionId: string) {
+    setSuggestionDecisions((current) => ({ ...current, [suggestionId]: "used" }));
+    setStatusKey("suggestionUsed");
+  }
+
+  function editSuggestion(suggestion: GroundedSuggestion) {
+    setSuggestionDrafts((current) => ({
+      ...current,
+      [suggestion.id]: current[suggestion.id] ?? suggestion.text,
+    }));
+    setStatusKey("suggestionEdit");
+  }
+
+  function rejectSuggestion(suggestionId: string) {
+    setSuggestionDecisions((current) => ({ ...current, [suggestionId]: "rejected" }));
+    setStatusKey("suggestionRejected");
   }
 
   function changeLocale(nextLocale: Locale) {
@@ -447,7 +534,7 @@ export function App() {
                 className={`question-item ${question.id === activeQuestionId ? "is-active" : ""}`}
                 key={question.id}
                 type="button"
-                onClick={() => setActiveQuestionId(question.id)}
+                onClick={() => selectActiveQuestion(question.id)}
               >
                 <span className="question-type">{localize(question.type, locale)}</span>
                 <strong>{localize(question.text, locale)}</strong>
@@ -517,6 +604,21 @@ export function App() {
           />
 
           <EvidenceMapPanel evidenceMap={evidenceMap} locale={locale} />
+
+          <GroundedSuggestionsPanel
+            decisions={suggestionDecisions}
+            drafts={suggestionDrafts}
+            locale={locale}
+            meta={groundedSuggestionMeta}
+            suggestions={groundedSuggestions}
+            warnings={groundedSuggestionWarnings}
+            onDraftChange={(suggestionId, value) =>
+              setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
+            }
+            onEdit={editSuggestion}
+            onReject={rejectSuggestion}
+            onUse={useSuggestion}
+          />
 
           <MaterialsPanel
             apiMode={apiMode}
@@ -700,6 +802,146 @@ function evidenceStatusLabel(status: EvidenceTopicStatus, locale: Locale): strin
   };
 
   return text(locale, keys[status]);
+}
+
+function GroundedSuggestionsPanel({
+  decisions,
+  drafts,
+  locale,
+  meta,
+  suggestions,
+  warnings,
+  onDraftChange,
+  onEdit,
+  onReject,
+  onUse,
+}: {
+  decisions: Record<string, "used" | "rejected">;
+  drafts: Record<string, string>;
+  locale: Locale;
+  meta: { model: string; promptVersion: string } | null;
+  suggestions: GroundedSuggestion[];
+  warnings: GroundedSuggestionWarning[];
+  onDraftChange: (suggestionId: string, value: string) => void;
+  onEdit: (suggestion: GroundedSuggestion) => void;
+  onReject: (suggestionId: string) => void;
+  onUse: (suggestionId: string) => void;
+}) {
+  const warningsBySuggestion = useMemo(() => {
+    const grouped = new Map<string, GroundedSuggestionWarning[]>();
+    for (const warning of warnings) {
+      grouped.set(warning.suggestion_id, [...(grouped.get(warning.suggestion_id) ?? []), warning]);
+    }
+    return grouped;
+  }, [warnings]);
+
+  return (
+    <section>
+      <PanelHeader
+        title={text(locale, "groundedAi")}
+        meta={meta?.model ?? text(locale, "localOnly")}
+        compact
+      />
+      <div className="grounded-suggestion-list">
+        {meta ? (
+          <div className="grounded-ai-meta">
+            <span>{text(locale, "modelLabel")}: {meta.model}</span>
+            <span>{text(locale, "promptVersion")}: {meta.promptVersion}</span>
+          </div>
+        ) : null}
+        {suggestions.length ? (
+          suggestions.map((suggestion) => (
+            <GroundedSuggestionCard
+              decision={decisions[suggestion.id]}
+              draft={drafts[suggestion.id]}
+              key={suggestion.id}
+              locale={locale}
+              suggestion={suggestion}
+              warnings={warningsBySuggestion.get(suggestion.id) ?? []}
+              onDraftChange={onDraftChange}
+              onEdit={onEdit}
+              onReject={onReject}
+              onUse={onUse}
+            />
+          ))
+        ) : (
+          <p className="empty-state">{text(locale, "noGroundedSuggestions")}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function GroundedSuggestionCard({
+  decision,
+  draft,
+  locale,
+  suggestion,
+  warnings,
+  onDraftChange,
+  onEdit,
+  onReject,
+  onUse,
+}: {
+  decision?: "used" | "rejected";
+  draft?: string;
+  locale: Locale;
+  suggestion: GroundedSuggestion;
+  warnings: GroundedSuggestionWarning[];
+  onDraftChange: (suggestionId: string, value: string) => void;
+  onEdit: (suggestion: GroundedSuggestion) => void;
+  onReject: (suggestionId: string) => void;
+  onUse: (suggestionId: string) => void;
+}) {
+  const visibleText = draft ?? suggestion.text;
+
+  return (
+    <article className="grounded-suggestion-card" data-state={decision ?? "proposed"}>
+      <div className="grounded-suggestion-header">
+        <span className="grounded-suggestion-type">
+          <Sparkles size={13} />
+          {suggestion.suggestion_type}
+        </span>
+        {decision ? <span className="meta">{text(locale, decision === "used" ? "usedSuggestion" : "rejectedSuggestion")}</span> : null}
+      </div>
+      {draft !== undefined ? (
+        <textarea
+          rows={3}
+          value={visibleText}
+          onChange={(event) => onDraftChange(suggestion.id, event.target.value)}
+        />
+      ) : (
+        <strong>{visibleText}</strong>
+      )}
+      <p>{suggestion.reason}</p>
+      <div className="grounded-source-list">
+        <span>{text(locale, "sourceIds")}</span>
+        {suggestion.linked_evidence.map((sourceId) => (
+          <em key={sourceId}>{sourceId}</em>
+        ))}
+      </div>
+      {warnings.length ? (
+        <div className="grounded-warning">
+          <AlertTriangle size={14} />
+          <span>{text(locale, "citationsWarning")}</span>
+        </div>
+      ) : null}
+      <div className="grounded-suggestion-actions">
+        <button type="button" onClick={() => onUse(suggestion.id)}>
+          <Check size={14} />
+          {text(locale, "useSuggestion")}
+        </button>
+        <button type="button" onClick={() => onEdit(suggestion)}>
+          <Pencil size={14} />
+          {text(locale, "editSuggestion")}
+        </button>
+        <button type="button" onClick={() => onReject(suggestion.id)}>
+          <X size={14} />
+          {text(locale, "rejectSuggestion")}
+        </button>
+      </div>
+    </article>
+  );
 }
 
 function MaterialsPanel({
