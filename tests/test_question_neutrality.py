@@ -1,6 +1,6 @@
 import unittest
 
-from interigaition.analysis.question_neutrality import is_neutral_enough, neutrality_flags
+from interrogaition.analysis.question_neutrality import is_neutral_enough, neutrality_flags
 
 
 class QuestionNeutralityTest(unittest.TestCase):

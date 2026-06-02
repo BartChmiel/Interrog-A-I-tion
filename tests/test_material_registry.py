@@ -3,13 +3,13 @@ import unittest
 import uuid
 from pathlib import Path
 
-from interigaition.security.case_workspace import (
+from interrogaition.security.case_workspace import (
     CaseWorkspaceManager,
     DataSensitivity,
     StorageMode,
 )
-from interigaition.security.encryption_status import EncryptionBackend, EncryptionStatus
-from interigaition.storage.material_registry import (
+from interrogaition.security.encryption_status import EncryptionBackend, EncryptionStatus
+from interrogaition.storage.material_registry import (
     MaterialRegistry,
     MaterialRegistryError,
     MaterialSourceType,

@@ -1,6 +1,6 @@
 # Backend
 
-Lokalny backend aplikacji InterigA(I)tion.
+Lokalny backend aplikacji InterrogA(I)tion.
 
 Docelowo odpowiada za:
 
@@ -18,20 +18,20 @@ Pierwszy prototyp powinien pozostac prosty: Python, lokalne API i testowalna log
 Z katalogu `backend/`:
 
 ```powershell
-python -m interigaition.cli review ..\data\synthetic\case-001\case.json
+python -m interrogaition.cli review ..\data\synthetic\case-001\case.json
 ```
 
 Polish report:
 
 ```powershell
-python -m interigaition.cli review ..\data\synthetic\case-001\case.json --locale pl
+python -m interrogaition.cli review ..\data\synthetic\case-001\case.json --locale pl
 ```
 
 Report export with an integrity manifest:
 
 ```powershell
-python -m interigaition.cli review ..\data\synthetic\case-001\case.json --output ..\test-output\report.md --manifest ..\test-output\manifest.json --created-by investigator-001
-python -m interigaition.cli verify-export ..\test-output\manifest.json --root ..\test-output
+python -m interrogaition.cli review ..\data\synthetic\case-001\case.json --output ..\test-output\report.md --manifest ..\test-output\manifest.json --created-by investigator-001
+python -m interrogaition.cli verify-export ..\test-output\manifest.json --root ..\test-output
 ```
 
 Pipeline:
@@ -62,14 +62,14 @@ python -m pip install --user fastapi==0.115.12 uvicorn==0.30.6
 From `backend/`:
 
 ```powershell
-python -m interigaition.api.app --help
-python -m interigaition.api.app
+python -m interrogaition.api.app --help
+python -m interrogaition.api.app
 ```
 
 Enable reload explicitly when developing the API:
 
 ```powershell
-python -m interigaition.api.app --reload
+python -m interrogaition.api.app --reload
 ```
 
 The prototype validates live answer payloads before adding them to a session. Empty answers, unknown question ids, unknown topic ids, malformed claims, and duplicate session ids return explicit HTTP errors instead of being accepted silently.
@@ -79,7 +79,7 @@ The API also returns `Access-Control-Allow-Private-Network: true` so local brows
 Live sessions are persisted in a local SQLite database when the API app is run normally. The default prototype database path is ignored by git:
 
 ```text
-backend/local-data/interigaition.sqlite3
+backend/local-data/interrogaition.sqlite3
 ```
 
 Session start, answer creation, and review refresh events are also written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage. The storage boundary is designed so a later SQLCipher or encrypted-workspace adapter can replace the plain SQLite file.

@@ -2,7 +2,7 @@ import unittest
 import uuid
 from pathlib import Path
 
-from interigaition.api.app import (
+from interrogaition.api.app import (
     AddAnswerRequest,
     CreateWorkspaceRequest,
     GroundedSuggestionDecisionRequest,
@@ -12,12 +12,12 @@ from interigaition.api.app import (
     StartSessionRequest,
     create_app,
 )
-from interigaition.domain.models import SuggestionStatus
-from interigaition.domain.session import ParticipantRole
-from interigaition.security.access_policy import WorkspaceAction, WorkspaceRole
-from interigaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
-from interigaition.security.encryption_status import EncryptionBackend, EncryptionStatus
-from interigaition.storage.material_registry import MaterialSourceType
+from interrogaition.domain.models import SuggestionStatus
+from interrogaition.domain.session import ParticipantRole
+from interrogaition.security.access_policy import WorkspaceAction, WorkspaceRole
+from interrogaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
+from interrogaition.security.encryption_status import EncryptionBackend, EncryptionStatus
+from interrogaition.storage.material_registry import MaterialSourceType
 
 
 TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "api"

@@ -1,4 +1,4 @@
-# InterigA(I)tion Frontend App
+# InterrogA(I)tion Frontend App
 
 React + TypeScript + Vite application shell for the local investigative interviewing assistant.
 
@@ -22,7 +22,7 @@ http://127.0.0.1:5173
 Start the backend from `backend/`:
 
 ```powershell
-python -m interigaition.api.app
+python -m interrogaition.api.app
 ```
 
 The app uses `http://127.0.0.1:8000` by default. You can override it with:

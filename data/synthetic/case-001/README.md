@@ -24,5 +24,5 @@ Scenariusz zawiera celowo:
 Z katalogu `backend/`:
 
 ```powershell
-python -m interigaition.cli review ..\data\synthetic\case-001\case.json
+python -m interrogaition.cli review ..\data\synthetic\case-001\case.json
 ```

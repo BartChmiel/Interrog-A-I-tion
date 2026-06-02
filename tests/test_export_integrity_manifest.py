@@ -3,7 +3,7 @@ import uuid
 from dataclasses import replace
 from pathlib import Path
 
-from interigaition.export.integrity_manifest import (
+from interrogaition.export.integrity_manifest import (
     ExportIntegrityError,
     create_export_manifest,
     read_export_manifest,

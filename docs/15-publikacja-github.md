@@ -43,13 +43,13 @@ Potem tworzymy puste repo na GitHubie. Najbezpieczniej:
 Po utworzeniu repo GitHub poda adres, np.:
 
 ```text
-https://github.com/TWOJ-LOGIN/interigaition.git
+https://github.com/TWOJ-LOGIN/interrogaition.git
 ```
 
 Wtedy:
 
 ```powershell
-git remote add origin https://github.com/TWOJ-LOGIN/interigaition.git
+git remote add origin https://github.com/TWOJ-LOGIN/interrogaition.git
 git remote -v
 git push -u origin main
 ```
@@ -62,7 +62,7 @@ Jesli `gh` jest zalogowane:
 git init -b main
 git add .
 git commit -m "Initial project structure"
-gh repo create interigaition --private --source=. --remote=origin --push
+gh repo create interrogaition --private --source=. --remote=origin --push
 ```
 
 ## Co moge zrobic automatycznie
@@ -73,5 +73,5 @@ Moge przygotowac lokalny commit i push przez GitHub, ale potrzebuje:
 - decyzji: prywatne czy publiczne,
 - informacji, czy repo ma byc na Twoim koncie czy w organizacji.
 
-Na ten moment rekomendacja: repo prywatne, nazwa `interigaition` albo `interig-ai-tion`.
+Na ten moment rekomendacja: repo prywatne, nazwa `interrogaition` albo `interrog-ai-tion`.
 

@@ -25,13 +25,13 @@ Repozytorium ma obslugiwac jednoczesnie:
 
 Proponowany podzial:
 
-- `interigaition/domain` - encje i logika domenowa,
-- `interigaition/ai` - adaptery modeli i guardrails,
-- `interigaition/analysis` - analiza tematow, luk i spojnosci,
-- `interigaition/storage` - zapis i odczyt spraw,
-- `interigaition/security` - szyfrowanie i integralnosc,
-- `interigaition/export` - raporty,
-- `interigaition/api` - lokalne endpointy.
+- `interrogaition/domain` - encje i logika domenowa,
+- `interrogaition/ai` - adaptery modeli i guardrails,
+- `interrogaition/analysis` - analiza tematow, luk i spojnosci,
+- `interrogaition/storage` - zapis i odczyt spraw,
+- `interrogaition/security` - szyfrowanie i integralnosc,
+- `interrogaition/export` - raporty,
+- `interrogaition/api` - lokalne endpointy.
 
 ## Dane
 

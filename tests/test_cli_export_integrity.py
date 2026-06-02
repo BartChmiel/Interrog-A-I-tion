@@ -6,8 +6,8 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from interigaition.cli import main
-from interigaition.export.integrity_manifest import read_export_manifest, verify_export_manifest
+from interrogaition.cli import main
+from interrogaition.export.integrity_manifest import read_export_manifest, verify_export_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,7 +25,7 @@ class CliExportIntegrityTest(unittest.TestCase):
             sys,
             "argv",
             [
-                "interigaition",
+                "interrogaition",
                 "review",
                 str(CASE_PATH),
                 "--output",
@@ -53,7 +53,7 @@ class CliExportIntegrityTest(unittest.TestCase):
             sys,
             "argv",
             [
-                "interigaition",
+                "interrogaition",
                 "review",
                 str(CASE_PATH),
                 "--manifest",
@@ -72,7 +72,7 @@ class CliExportIntegrityTest(unittest.TestCase):
         manifest_path = export_root / "manifest.json"
         _write_cli_export(report_path, manifest_path)
 
-        with patch.object(sys, "argv", ["interigaition", "verify-export", str(manifest_path)]):
+        with patch.object(sys, "argv", ["interrogaition", "verify-export", str(manifest_path)]):
             with redirect_stdout(StringIO()):
                 exit_code = main()
 
@@ -85,7 +85,7 @@ class CliExportIntegrityTest(unittest.TestCase):
         _write_cli_export(report_path, manifest_path)
         report_path.write_text("changed\n", encoding="utf-8")
 
-        with patch.object(sys, "argv", ["interigaition", "verify-export", str(manifest_path)]):
+        with patch.object(sys, "argv", ["interrogaition", "verify-export", str(manifest_path)]):
             with redirect_stdout(StringIO()):
                 exit_code = main()
 
@@ -97,7 +97,7 @@ def _write_cli_export(report_path: Path, manifest_path: Path) -> None:
         sys,
         "argv",
         [
-            "interigaition",
+            "interrogaition",
             "review",
             str(CASE_PATH),
             "--output",

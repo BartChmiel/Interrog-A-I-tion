@@ -574,7 +574,7 @@ export function App() {
         <div className="brand-block">
           <div className="brand-mark">IA</div>
           <div>
-            <h1>InterigA(I)tion</h1>
+            <h1>InterrogA(I)tion</h1>
             <p>{caseData?.title ?? text(locale, "caseFallback")}</p>
           </div>
         </div>

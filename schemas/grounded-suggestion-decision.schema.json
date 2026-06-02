@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://interigaition.local/schemas/grounded-suggestion-decision.schema.json",
+  "$id": "https://interrogaition.local/schemas/grounded-suggestion-decision.schema.json",
   "title": "GroundedSuggestionDecisionRequest",
   "type": "object",
   "required": ["decision", "original_text"],

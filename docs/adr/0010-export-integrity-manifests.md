@@ -28,13 +28,13 @@ The manifest records:
 The CLI can now write a Markdown report and a manifest with:
 
 ```text
-python -m interigaition.cli review <case_path> --output <report.md> --manifest <manifest.json>
+python -m interrogaition.cli review <case_path> --output <report.md> --manifest <manifest.json>
 ```
 
 It can verify the manifest with:
 
 ```text
-python -m interigaition.cli verify-export <manifest.json> --root <export_root>
+python -m interrogaition.cli verify-export <manifest.json> --root <export_root>
 ```
 
 ## Consequences

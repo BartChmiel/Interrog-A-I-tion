@@ -1,6 +1,6 @@
 import unittest
 
-from interigaition.ai.guardrails import find_forbidden_claims, is_ai_output_allowed
+from interrogaition.ai.guardrails import find_forbidden_claims, is_ai_output_allowed
 
 
 class GuardrailsTest(unittest.TestCase):

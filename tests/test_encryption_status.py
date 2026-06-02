@@ -1,6 +1,6 @@
 import unittest
 
-from interigaition.security.encryption_status import (
+from interrogaition.security.encryption_status import (
     EncryptionBackend,
     inspect_sqlcipher_status,
 )

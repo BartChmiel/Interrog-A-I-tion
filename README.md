@@ -1,4 +1,4 @@
-# InterigA(I)tion
+# InterrogA(I)tion
 
 Local, air-gapped, auditable AI-assisted investigative interviewing prototype for police and prosecution workflows, focused on live interview support, narrative consistency, topic coverage, credibility indicators, question quality, and human oversight.
 

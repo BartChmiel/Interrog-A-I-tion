@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://interigaition.local/schemas/grounding-pack.schema.json",
+  "$id": "https://interrogaition.local/schemas/grounding-pack.schema.json",
   "title": "GroundingContextPack",
   "type": "object",
   "required": [
