@@ -1,20 +1,12 @@
-<svg width="392" height="72" viewBox="0 0 392 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="InterrogA(I)tion">
-  <defs>
-    <linearGradient id="iaLockTile" x1="8" y1="12" x2="56" y2="60" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#103154"/>
-      <stop offset="1" stop-color="#0A1B30"/>
-    </linearGradient>
-  </defs>
-  <g>
-    <rect x="9" y="13" width="46" height="46" rx="12" fill="url(#iaLockTile)" stroke="#1C4A6E" stroke-width="1.2"/>
-    <circle cx="29.5" cy="33" r="11.5" stroke="#2BB6A8" stroke-width="2.6"/>
-    <line x1="38" y1="41.5" x2="46" y2="49.5" stroke="#2BB6A8" stroke-width="3.4" stroke-linecap="round"/>
-    <path d="M24.3 26.5c-2 1.6-2 11.4 0 13" stroke="#EAF6F4" stroke-width="2" stroke-linecap="round"/>
-    <path d="M34.3 26.5c2 1.6 2 11.4 0 13" stroke="#EAF6F4" stroke-width="2" stroke-linecap="round"/>
-    <circle cx="29.5" cy="28" r="1.7" fill="#2BB6A8"/>
-    <rect x="28.4" y="30.7" width="2.3" height="7.6" rx="1.15" fill="#EAF6F4"/>
+<svg width="292" height="64" viewBox="0 0 292 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="InterrogA(I)tion">
+  <g transform="translate(5,8) scale(0.72)">
+    <circle cx="31" cy="29" r="20.5" fill="none" stroke="#0F1E33" stroke-width="5.5"/>
+    <path d="M43 44 L55 55 L46 37 Z" fill="#0F1E33"/>
+    <path d="M18 24 H33 M18 30 H33 M18 36 H27" stroke="#0F1E33" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M34 26 C34 21.5 44 21.5 44 27 C44 31.5 38 31.5 38 37" stroke="#0F1E33" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="38" cy="44" r="3.4" fill="#4A78B7"/>
   </g>
-  <text x="70" y="46" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="27" font-weight="700" letter-spacing="-0.4">
-    <tspan fill="#103154">Interrog</tspan><tspan fill="#0E8C82">A(I)</tspan><tspan fill="#103154">tion</tspan>
+  <text x="64" y="41" font-family="Inter, 'Segoe UI', system-ui, sans-serif" font-size="30" font-weight="500" letter-spacing="-0.5" dominant-baseline="middle">
+    <tspan fill="#0F1E33">Interrog</tspan><tspan fill="#4A78B7">A(I)</tspan><tspan fill="#0F1E33">tion</tspan>
   </text>
 </svg>

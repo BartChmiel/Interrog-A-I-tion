@@ -1,15 +1,7 @@
 <svg width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="InterrogA(I)tion">
-  <defs>
-    <linearGradient id="favTile" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#103154"/>
-      <stop offset="1" stop-color="#0A1B30"/>
-    </linearGradient>
-  </defs>
-  <rect x="0" y="0" width="64" height="64" rx="14" fill="url(#favTile)"/>
-  <circle cx="28" cy="28" r="15" stroke="#2BB6A8" stroke-width="3.6"/>
-  <line x1="39" y1="39" x2="50" y2="50" stroke="#2BB6A8" stroke-width="5" stroke-linecap="round"/>
-  <path d="M21.5 19.5c-2.6 2.1-2.6 14.9 0 17" stroke="#EAF6F4" stroke-width="2.8" stroke-linecap="round"/>
-  <path d="M34.5 19.5c2.6 2.1 2.6 14.9 0 17" stroke="#EAF6F4" stroke-width="2.8" stroke-linecap="round"/>
-  <circle cx="28" cy="21.4" r="2.4" fill="#2BB6A8"/>
-  <rect x="26.4" y="25" width="3.2" height="10" rx="1.6" fill="#EAF6F4"/>
+  <circle cx="31" cy="29" r="20.5" fill="none" stroke="#0F1E33" stroke-width="6"/>
+  <path d="M43 44 L55 55 L46 37 Z" fill="#0F1E33"/>
+  <path d="M18 24 H33 M18 30 H33 M18 36 H27" stroke="#0F1E33" stroke-width="4.6" stroke-linecap="round"/>
+  <path d="M34 26 C34 21.5 44 21.5 44 27 C44 31.5 38 31.5 38 37" stroke="#0F1E33" stroke-width="4.8" stroke-linecap="round"/>
+  <circle cx="38" cy="44" r="3.6" fill="#4A78B7"/>
 </svg>
