@@ -251,8 +251,41 @@ export type EvidenceMap = {
   topic_nodes: EvidenceTopicNode[];
 };
 
+export type AlignmentBand = "insufficient_review" | "low" | "medium" | "high";
+
+export type AlignmentTopicNode = {
+  topic_id: string;
+  label: string;
+  priority: string;
+  weight: number;
+  in_scope: boolean;
+  supported: boolean;
+  accepted_link_count: number;
+  rejected_link_count: number;
+  pending_link_count: number;
+};
+
+export type EvidenceAlignment = {
+  case_id: string;
+  band: AlignmentBand;
+  score: number | null;
+  confidence: number;
+  total_proposed_links: number;
+  reviewed_links: number;
+  accepted_links: number;
+  rejected_links: number;
+  pending_links: number;
+  in_scope_topics: number;
+  supported_topics: number;
+  rejection_rate: number;
+  topic_nodes: AlignmentTopicNode[];
+  explanation: string[];
+  indicator: Indicator;
+};
+
 export type EvidenceMapResponse = {
   evidence_map: EvidenceMap;
+  evidence_alignment: EvidenceAlignment;
 };
 
 export type GroundedSuggestion = {

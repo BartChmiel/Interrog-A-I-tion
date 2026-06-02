@@ -72,6 +72,7 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
         return default
 
 from interrogaition.analysis.credibility_indicators import generate_indicators
+from interrogaition.analysis.evidence_alignment import build_evidence_alignment
 from interrogaition.analysis.evidence_map import build_evidence_map
 from interrogaition.analysis.grounding_context import build_grounding_context_pack
 from interrogaition.analysis.interview_review import review_case
@@ -80,6 +81,10 @@ from interrogaition.analysis.material_grounding import (
     MaterialText,
     infer_material_topic_signals,
     link_materials_to_questions,
+)
+from interrogaition.analysis.material_link_decisions import (
+    MaterialLinkDecisionLog,
+    derive_material_link_decisions,
 )
 from interrogaition.ai.grounded_suggestion_service import generate_grounded_suggestions
 from interrogaition.ai.model_client import DeterministicGroundedModelClient, ModelClient
@@ -435,14 +440,21 @@ def create_app(
         except MaterialRegistryError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        decisions = derive_material_link_decisions(
+            _workspace_audit_events(store.list_audit_events(), workspace_id)
+        )
         context = _build_evidence_context(
             case_id=case_id,
             locale=locale,
             session_id=session_id,
             store=store,
             material_texts=material_texts,
+            material_link_decisions=decisions,
         )
-        return {"evidence_map": _to_jsonable(context["evidence_map"])}
+        return {
+            "evidence_map": _to_jsonable(context["evidence_map"]),
+            "evidence_alignment": _to_jsonable(context["evidence_alignment"]),
+        }
 
     @app.get("/workspaces/{workspace_id}/grounding-pack")
     def get_workspace_grounding_pack(
@@ -884,6 +896,7 @@ def _build_evidence_context(
     session_id: str | None,
     store: SessionStore,
     material_texts: tuple[MaterialText, ...],
+    material_link_decisions: MaterialLinkDecisionLog | None = None,
 ) -> dict[str, Any]:
     case = _load_synthetic_case(case_id, locale=locale)
     session = store.get_session(session_id) if session_id else None
@@ -905,6 +918,11 @@ def _build_evidence_context(
         material_links=material_links,
         material_topic_signals=material_topic_signals,
     )
+    evidence_alignment = build_evidence_alignment(
+        case=case_view,
+        proposed_links=material_links,
+        decisions=material_link_decisions or MaterialLinkDecisionLog(),
+    )
     return {
         "case": case_view,
         "review": review,
@@ -913,6 +931,7 @@ def _build_evidence_context(
         "material_links": material_links,
         "material_topic_signals": material_topic_signals,
         "evidence_map": evidence_map,
+        "evidence_alignment": evidence_alignment,
     }
 
 

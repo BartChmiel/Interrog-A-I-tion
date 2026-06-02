@@ -45,6 +45,8 @@ The right insight rail includes a compact security panel backed by the local API
 
 The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
 
+The case map also shows an advisory Evidence Alignment Indicator as a gradient bar with a numeric value, band (`insufficient review`, `low`, `medium`, `high`), reviewed/confidence meta, and explanation bullets. It is derived only from human-reviewed material-question links and does not assert truth, guilt, or credibility (see ADR 0017).
+
 The same rail includes a grounded AI panel. It calls the local
 `/grounded-suggestions` endpoint for the active question and shows suggested
 follow-up questions, topic gaps, potential inconsistencies, and summaries with

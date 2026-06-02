@@ -121,6 +121,14 @@ POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
 GET /workspaces/{workspace_id}/audit
 ```
 
+The `evidence-map` endpoint also returns an `evidence_alignment` block: an advisory
+Evidence Alignment Indicator derived only from human-reviewed material-question links
+(see ADR 0017). It reports a priority-weighted alignment score, a confidence value based
+on review completeness (reduced by the rejection rate), and a band of `insufficient_review`,
+`low`, `medium`, or `high`, with explanation bullets. Rejected links never count as support,
+and with no reviewed links the band is `insufficient_review`. The indicator is advisory and
+does not assert truth, guilt, or credibility.
+
 The grounded suggestions endpoint is the first live-visible AI workflow. It uses
 the current grounding context pack, validates every suggested `linked_evidence`
 entry against `allowed_source_ids`, returns citation warnings, and writes an

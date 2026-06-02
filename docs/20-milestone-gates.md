@@ -244,6 +244,19 @@ The project owner should evaluate:
 - whether the next storage step should be per-case workspaces, export integrity, or SQLCipher research,
 - whether real or anonymized data must remain blocked until encryption and access controls are designed.
 
+## Current STOP
+
+Milestone 7: Evidence Alignment Indicator has reached its first review point.
+
+The project owner should evaluate:
+
+- whether priority-weighted topic alignment is the right basis, or whether per-link or per-material aggregation is preferred,
+- whether the band thresholds (`low` < 0.34, `medium` 0.34-0.66, `high` >= 0.67) are acceptable for operator interpretation,
+- whether confidence should be lowered by the rejection rate (current hybrid behavior) or kept as pure review completeness,
+- whether the explanation bullets should be fully localized (PL/EN) before any thesis demo,
+- whether the indicator should also appear in the markdown export and live-session review, not only the case-map panel,
+- whether reviewed-link alignment can be used in thesis evaluation before real case data is available.
+
 ## Next Expected STOP
 
 The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, before treating audited suggestion decisions as official procedural records, or before introducing export formats intended to look official.

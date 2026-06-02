@@ -48,6 +48,7 @@ import type {
   ApiMode,
   CaseData,
   EncryptionStatus,
+  EvidenceAlignment,
   EvidenceMap,
   EvidenceTopicStatus,
   GroundedSuggestionDecision,
@@ -114,6 +115,7 @@ export function App() {
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
   const [materialQuestionLinkDecisions, setMaterialQuestionLinkDecisions] = useState<Record<string, MaterialQuestionLinkDecision>>({});
   const [evidenceMap, setEvidenceMap] = useState<EvidenceMap | null>(null);
+  const [evidenceAlignment, setEvidenceAlignment] = useState<EvidenceAlignment | null>(null);
   const [groundedSuggestions, setGroundedSuggestions] = useState<GroundedSuggestion[]>([]);
   const [groundedSuggestionWarnings, setGroundedSuggestionWarnings] = useState<GroundedSuggestionWarning[]>([]);
   const [groundedSuggestionMeta, setGroundedSuggestionMeta] = useState<{
@@ -227,6 +229,7 @@ export function App() {
       setMaterialQuestionLinks([]);
       setMaterialQuestionLinkDecisions({});
       setEvidenceMap(null);
+      setEvidenceAlignment(null);
       applyGroundedSuggestions(null);
       setMaterialVerifications({});
     }
@@ -245,9 +248,11 @@ export function App() {
   async function loadEvidenceMapOrNull(nextLocale: Locale): Promise<EvidenceMap | null> {
     try {
       const response = await loadEvidenceMap(config, nextLocale);
+      setEvidenceAlignment(response.evidence_alignment ?? null);
       return response.evidence_map;
     } catch (error) {
       console.warn("Could not refresh evidence map.", error);
+      setEvidenceAlignment(null);
       return null;
     }
   }
@@ -692,7 +697,11 @@ export function App() {
             workspace={workspace}
           />
 
-          <EvidenceMapPanel evidenceMap={evidenceMap} locale={locale} />
+          <EvidenceMapPanel
+            evidenceMap={evidenceMap}
+            alignment={evidenceAlignment}
+            locale={locale}
+          />
 
           <GroundedSuggestionsPanel
             decisions={suggestionDecisions}
@@ -808,9 +817,11 @@ function LinkedMaterialStrip({
 
 function EvidenceMapPanel({
   evidenceMap,
+  alignment,
   locale,
 }: {
   evidenceMap: EvidenceMap | null;
+  alignment: EvidenceAlignment | null;
   locale: Locale;
 }) {
   if (!evidenceMap) {
@@ -831,6 +842,7 @@ function EvidenceMapPanel({
         meta={`${summary.covered_topics}/${summary.total_topics} ${text(locale, "topicsShort")}`}
         compact
       />
+      <EvidenceAlignmentBar alignment={alignment} locale={locale} />
       <div className="evidence-map">
         <div className="evidence-map-summary">
           <EvidenceMapMetric
@@ -882,6 +894,64 @@ function EvidenceMapMetric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
     </div>
   );
+}
+
+function EvidenceAlignmentBar({
+  alignment,
+  locale,
+}: {
+  alignment: EvidenceAlignment | null;
+  locale: Locale;
+}) {
+  if (!alignment) {
+    return null;
+  }
+
+  const insufficient = alignment.band === "insufficient_review";
+  const percent = insufficient || alignment.score === null
+    ? 0
+    : Math.round(alignment.score * 100);
+  const valueLabel = insufficient || alignment.score === null
+    ? text(locale, "alignmentNotAvailable")
+    : `${percent}%`;
+
+  return (
+    <div className="evidence-alignment" data-band={alignment.band}>
+      <div className="evidence-alignment-header">
+        <span className="evidence-alignment-title">{text(locale, "evidenceAlignment")}</span>
+        <span className="evidence-alignment-band">{alignmentBandLabel(alignment.band, locale)}</span>
+      </div>
+      <div className="evidence-alignment-track" role="img" aria-label={valueLabel}>
+        <div className="evidence-alignment-fill" style={{ width: `${percent}%` }} />
+        <span className="evidence-alignment-value">{valueLabel}</span>
+      </div>
+      <div className="evidence-alignment-meta">
+        <span>
+          {text(locale, "alignmentReviewed")}: {alignment.reviewed_links}/{alignment.total_proposed_links}
+        </span>
+        <span>
+          {text(locale, "alignmentConfidence")}: {alignment.confidence.toFixed(2)}
+        </span>
+      </div>
+      <ul className="evidence-alignment-explanation">
+        {alignment.explanation.map((bullet, index) => (
+          <li key={index}>{bullet}</li>
+        ))}
+      </ul>
+      <p className="evidence-alignment-disclaimer">{text(locale, "alignmentAdvisory")}</p>
+    </div>
+  );
+}
+
+function alignmentBandLabel(band: EvidenceAlignment["band"], locale: Locale): string {
+  const keys: Record<EvidenceAlignment["band"], CopyKey> = {
+    insufficient_review: "alignmentInsufficient",
+    low: "alignmentLow",
+    medium: "alignmentMedium",
+    high: "alignmentHigh",
+  };
+
+  return text(locale, keys[band]);
 }
 
 function evidenceStatusLabel(status: EvidenceTopicStatus, locale: Locale): string {

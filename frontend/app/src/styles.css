@@ -468,6 +468,109 @@ h2 {
   padding: 12px;
 }
 
+.evidence-alignment {
+  display: grid;
+  gap: 8px;
+  margin: 12px 12px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+}
+
+.evidence-alignment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.evidence-alignment-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.evidence-alignment-band {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.evidence-alignment[data-band="low"] .evidence-alignment-band {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.evidence-alignment[data-band="medium"] .evidence-alignment-band {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.evidence-alignment[data-band="high"] .evidence-alignment-band {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.evidence-alignment-track {
+  position: relative;
+  height: 18px;
+  border-radius: 999px;
+  background: #e7ece9;
+  overflow: hidden;
+}
+
+.evidence-alignment-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--danger), var(--warning) 55%, var(--ok));
+  transition: width 0.3s ease;
+}
+
+.evidence-alignment[data-band="insufficient_review"] .evidence-alignment-fill {
+  background: var(--muted);
+}
+
+.evidence-alignment-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0c1714;
+}
+
+.evidence-alignment-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.evidence-alignment-explanation {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.evidence-alignment-disclaimer {
+  margin: 0;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .evidence-topic-list {
   display: grid;
   gap: 8px;
