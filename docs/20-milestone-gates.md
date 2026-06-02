@@ -113,6 +113,18 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Material-question grounding links have reached their first review point.
+
+The project owner should evaluate:
+
+- whether deterministic topic-based links are acceptable as the first grounding layer,
+- whether link confidence should remain visible to operators,
+- whether matched terms should be shown in the UI now or kept for audit/debug views,
+- whether future AI suggestions must cite material ids and question ids,
+- whether the next step should be human accept/reject controls for links or AI prompts grounded in these links.
+
+## Current STOP
+
 Milestone 6: Workspace material register has reached its first review point.
 
 The project owner should evaluate:

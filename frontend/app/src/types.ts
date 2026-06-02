@@ -182,6 +182,19 @@ export type MaterialVerification = {
   actual_size_bytes: number | null;
 };
 
+export type MaterialQuestionLink = {
+  material_id: string;
+  question_id: string;
+  topic_ids: string[];
+  matched_terms: string[];
+  confidence: number;
+  rationale: string;
+};
+
+export type MaterialLinksResponse = {
+  links: MaterialQuestionLink[];
+};
+
 export type QuestionView = {
   id: string;
   text: LocalizedText;

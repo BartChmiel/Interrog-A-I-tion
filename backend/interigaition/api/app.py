@@ -74,6 +74,7 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
 from interigaition.analysis.credibility_indicators import generate_indicators
 from interigaition.analysis.interview_review import review_case
 from interigaition.analysis.live_review import review_live_session
+from interigaition.analysis.material_grounding import MaterialText, link_materials_to_questions
 from interigaition.domain.models import Actor, Answer, AuditEvent, Claim, Case
 from interigaition.domain.session import (
     InterviewSession,
@@ -290,6 +291,28 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         return _to_jsonable(record)
+
+    @app.get("/workspaces/{workspace_id}/materials/links")
+    def link_workspace_materials_to_questions(
+        workspace_id: str,
+        case_id: str,
+        locale: str = Query(default="en"),
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            registry = MaterialRegistry(workspace)
+            material_texts = tuple(
+                MaterialText(record=record, text=registry.read_material_text(record.id))
+                for record in registry.list_materials()
+            )
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        case = _load_synthetic_case(case_id, locale=locale)
+        links = link_materials_to_questions(case, material_texts)
+        return {"links": _to_jsonable(links)}
 
     @app.get("/workspaces/{workspace_id}/materials/{material_id}/verification")
     def verify_workspace_material(workspace_id: str, material_id: str) -> dict[str, Any]:

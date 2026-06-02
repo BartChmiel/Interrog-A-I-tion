@@ -45,6 +45,8 @@ The right insight rail includes a compact security panel backed by the local API
 
 The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
 
+Registered materials are also linked deterministically to interview questions through shared topic signals. The active question shows linked materials, and each material card shows linked question ids with confidence values.
+
 ## Scripts
 
 - `npm run dev` - local Vite server,

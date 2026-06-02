@@ -111,5 +111,6 @@ Workspace source materials can also be registered as controlled text records. Th
 ```text
 GET /workspaces/{workspace_id}/materials
 POST /workspaces/{workspace_id}/materials
+GET /workspaces/{workspace_id}/materials/links?case_id=case-001
 GET /workspaces/{workspace_id}/materials/{material_id}/verification
 ```

@@ -301,6 +301,48 @@ h2 {
   line-height: 1.45;
 }
 
+.linked-material-strip {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.linked-material-strip > span,
+.linked-material-strip > strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.linked-material-list,
+.material-question-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.linked-material-list span,
+.material-question-chips span {
+  max-width: 100%;
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e7f5ee;
+  color: var(--accent-strong);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.linked-material-list em,
+.material-question-chips em {
+  color: var(--muted);
+  font-style: normal;
+}
+
 .answer-stream {
   display: grid;
   gap: 12px;
@@ -510,6 +552,21 @@ h2 {
   background: #e8eeec;
   color: var(--muted);
   font-size: 11px;
+}
+
+.material-grounding {
+  display: grid;
+  gap: 7px;
+}
+
+.material-grounding > span,
+.material-grounding > strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.material-grounding.is-empty {
+  padding-top: 2px;
 }
 
 .material-card-footer {

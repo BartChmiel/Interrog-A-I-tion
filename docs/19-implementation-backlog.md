@@ -112,7 +112,7 @@ Success criteria:
 
 ## Milestone 6: Security Path
 
-Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, export integrity manifests, and a workspace material register are implemented. Encryption is not implemented yet.
+Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, export integrity manifests, a workspace material register, and deterministic material-question grounding links are implemented. Encryption is not implemented yet.
 
 Tasks:
 
@@ -120,6 +120,7 @@ Tasks:
 - append-only audit log,
 - export hash,
 - workspace material register,
+- material-question grounding links,
 - SQLite storage,
 - SQLCipher research spike,
 - air-gapped mode policy.

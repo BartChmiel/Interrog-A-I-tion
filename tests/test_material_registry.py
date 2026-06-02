@@ -46,6 +46,7 @@ class MaterialRegistryTest(unittest.TestCase):
         self.assertEqual(record.sha256, hashlib.sha256(content.encode("utf-8")).hexdigest())
         self.assertEqual(record.size_bytes, len(content.encode("utf-8")))
         self.assertEqual(registry.list_materials()[0].id, "protocol-001")
+        self.assertEqual(registry.read_material_text("protocol-001"), content)
 
         verification = registry.verify_material("protocol-001")
         self.assertTrue(verification.verified)

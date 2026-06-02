@@ -165,6 +165,20 @@ class MaterialRegistry:
             actual_size_bytes=actual_size,
         )
 
+    def read_material_text(self, material_id: str) -> str:
+        """Read registered text material through the workspace boundary."""
+
+        _require_safe_identifier("material_id", material_id)
+        record = self._find_material(material_id)
+        if record.mime_type != "text/plain":
+            raise MaterialRegistryError(f"Material is not text/plain: {material_id}.")
+
+        path = _safe_workspace_path(self.workspace.root_path, record.relative_path)
+        if not path.exists():
+            raise MaterialRegistryError(f"Material file is missing: {material_id}.")
+
+        return path.read_text(encoding="utf-8")
+
     def _find_material(self, material_id: str) -> MaterialRecord:
         for record in self._read_registry():
             if record.id == material_id:

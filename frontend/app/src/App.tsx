@@ -23,6 +23,7 @@ import {
   ensureWorkspace,
   loadCaseReview,
   loadEncryptionStatus,
+  loadMaterialQuestionLinks,
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceMaterials,
@@ -41,6 +42,7 @@ import type {
   Indicator,
   InterviewSession,
   Locale,
+  MaterialQuestionLink,
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
@@ -94,6 +96,7 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
+  const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
@@ -108,6 +111,12 @@ export function App() {
   }, [caseData]);
 
   const activeQuestion = questions.find((question) => question.id === activeQuestionId) ?? questions[0];
+  const materialsById = useMemo(() => {
+    return new Map(workspaceMaterials.map((material) => [material.id, material]));
+  }, [workspaceMaterials]);
+  const activeQuestionLinks = useMemo(() => {
+    return materialQuestionLinks.filter((link) => link.question_id === activeQuestion?.id);
+  }, [activeQuestion?.id, materialQuestionLinks]);
 
   const answerViews = useMemo(() => {
     const base = caseData?.answers.length
@@ -168,21 +177,34 @@ export function App() {
         loadEncryptionStatus(config),
         ensureWorkspace(config),
       ]);
-      const [access, materialList] = await Promise.all([
+      const [access, materialList, materialLinks] = await Promise.all([
         loadWorkspaceAccess(config),
         loadWorkspaceMaterials(config),
+        loadMaterialQuestionLinksOrEmpty(locale),
       ]);
       setEncryptionStatus(security);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
       setWorkspaceMaterials(sortMaterials(materialList.materials));
+      setMaterialQuestionLinks(materialLinks);
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
       setWorkspaceMaterials([]);
+      setMaterialQuestionLinks([]);
       setMaterialVerifications({});
+    }
+  }
+
+  async function loadMaterialQuestionLinksOrEmpty(nextLocale: Locale): Promise<MaterialQuestionLink[]> {
+    try {
+      const materialLinks = await loadMaterialQuestionLinks(config, nextLocale);
+      return materialLinks.links;
+    } catch (error) {
+      console.warn("Could not refresh material-question links.", error);
+      return [];
     }
   }
 
@@ -208,12 +230,16 @@ export function App() {
     setStatusKey("connecting");
 
     try {
-      const caseReview = await loadCaseReview(config, nextLocale);
-      const sessionReview = await loadSessionReview(config, nextLocale);
+      const [caseReview, sessionReview, materialLinks] = await Promise.all([
+        loadCaseReview(config, nextLocale),
+        loadSessionReview(config, nextLocale),
+        loadMaterialQuestionLinksOrEmpty(nextLocale),
+      ]);
       setCaseData(caseReview.case);
       setSession(sessionReview.session);
       setIndicators(sessionReview.indicators);
       setFindings(sessionReview.snapshot.review.findings);
+      setMaterialQuestionLinks(materialLinks);
       setApiMode("online");
       setStatusKey("reviewUpdated");
     } catch (error) {
@@ -301,8 +327,10 @@ export function App() {
         tags: parseTags(materialDraft.tags),
       });
       const verification = await verifyWorkspaceMaterial(config, record.id);
+      const materialLinks = await loadMaterialQuestionLinksOrEmpty(locale);
       setWorkspaceMaterials((current) => sortMaterials([...current, record]));
       setMaterialVerifications((current) => ({ ...current, [record.id]: verification }));
+      setMaterialQuestionLinks(materialLinks);
       setMaterialDraft(emptyMaterialDraft);
       setStatusKey("materialSaved");
     } catch (error) {
@@ -409,6 +437,11 @@ export function App() {
           <section className="active-question">
             <strong>{text(locale, "activeQuestion")}</strong>
             <p>{localize(activeQuestion?.text, locale)}</p>
+            <LinkedMaterialStrip
+              links={activeQuestionLinks}
+              locale={locale}
+              materialsById={materialsById}
+            />
           </section>
 
           <section className="answer-stream">
@@ -460,6 +493,7 @@ export function App() {
             draft={materialDraft}
             isSubmitting={isMaterialSubmitting}
             locale={locale}
+            links={materialQuestionLinks}
             materials={workspaceMaterials}
             verifications={materialVerifications}
             onDraftChange={setMaterialDraft}
@@ -512,10 +546,47 @@ export function App() {
   );
 }
 
+function LinkedMaterialStrip({
+  links,
+  locale,
+  materialsById,
+}: {
+  links: MaterialQuestionLink[];
+  locale: Locale;
+  materialsById: Map<string, MaterialRecord>;
+}) {
+  if (!links.length) {
+    return (
+      <div className="linked-material-strip">
+        <span>{text(locale, "groundedMaterials")}</span>
+        <strong>{text(locale, "noGrounding")}</strong>
+      </div>
+    );
+  }
+
+  return (
+    <div className="linked-material-strip">
+      <span>{text(locale, "groundedMaterials")}</span>
+      <div className="linked-material-list">
+        {links.map((link) => {
+          const material = materialsById.get(link.material_id);
+          return (
+            <span key={`${link.material_id}-${link.question_id}`}>
+              {material?.title ?? link.material_id}
+              <em>{link.confidence.toFixed(2)}</em>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MaterialsPanel({
   apiMode,
   draft,
   isSubmitting,
+  links,
   locale,
   materials,
   onDraftChange,
@@ -526,6 +597,7 @@ function MaterialsPanel({
   apiMode: ApiMode;
   draft: MaterialDraft;
   isSubmitting: boolean;
+  links: MaterialQuestionLink[];
   locale: Locale;
   materials: MaterialRecord[];
   onDraftChange: (draft: MaterialDraft) => void;
@@ -605,6 +677,7 @@ function MaterialsPanel({
           materials.map((material) => (
             <MaterialCard
               key={material.id}
+              links={links.filter((link) => link.material_id === material.id)}
               locale={locale}
               material={material}
               onVerify={onVerify}
@@ -620,11 +693,13 @@ function MaterialsPanel({
 }
 
 function MaterialCard({
+  links,
   locale,
   material,
   onVerify,
   verification,
 }: {
+  links: MaterialQuestionLink[];
   locale: Locale;
   material: MaterialRecord;
   onVerify: (materialId: string) => void;
@@ -660,6 +735,7 @@ function MaterialCard({
           ))}
         </div>
       ) : null}
+      <MaterialQuestionChips links={links} locale={locale} />
       <div className="material-card-footer">
         <span className="material-verification">
           <ShieldQuestion size={14} />
@@ -671,6 +747,39 @@ function MaterialCard({
         </button>
       </div>
     </article>
+  );
+}
+
+function MaterialQuestionChips({
+  links,
+  locale,
+}: {
+  links: MaterialQuestionLink[];
+  locale: Locale;
+}) {
+  if (!links.length) {
+    return (
+      <div className="material-grounding is-empty">
+        <span>{text(locale, "grounding")}</span>
+        <strong>{text(locale, "noGrounding")}</strong>
+      </div>
+    );
+  }
+
+  return (
+    <div className="material-grounding">
+      <span>{text(locale, "groundedQuestions")}</span>
+      <div className="material-question-chips">
+        {links.map((link) => (
+          <span key={`${link.material_id}-${link.question_id}`}>
+            {link.question_id}
+            <em>
+              {text(locale, "confidenceShort")} {link.confidence.toFixed(2)}
+            </em>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 

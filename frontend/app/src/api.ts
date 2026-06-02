@@ -2,6 +2,7 @@ import type {
   CaseReviewResponse,
   EncryptionStatus,
   InterviewSession,
+  MaterialLinksResponse,
   MaterialListResponse,
   MaterialRecord,
   MaterialSourceType,
@@ -116,6 +117,15 @@ export async function loadWorkspaceAccess(
 
 export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`);
+}
+
+export async function loadMaterialQuestionLinks(
+  config: RuntimeConfig,
+  locale: string,
+): Promise<MaterialLinksResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({ case_id: config.caseId, locale });
+  return fetchJson(config, `/workspaces/${workspaceId}/materials/links?${query.toString()}`);
 }
 
 export async function registerWorkspaceMaterial(

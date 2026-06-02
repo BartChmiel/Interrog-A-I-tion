@@ -57,6 +57,7 @@ class ApiAppTest(unittest.TestCase):
         get_access = endpoint(app, "get_workspace_access")
         register_material = endpoint(app, "register_workspace_material")
         list_materials = endpoint(app, "list_workspace_materials")
+        link_materials = endpoint(app, "link_workspace_materials_to_questions")
         verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
@@ -92,6 +93,7 @@ class ApiAppTest(unittest.TestCase):
             ),
         )
         materials = list_materials("api-workspace-001")
+        material_links = link_materials("api-workspace-001", case_id="case-001", locale="en")
         material_verification = verify_material("api-workspace-001", "api-material-001")
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
@@ -102,6 +104,10 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(material["id"], "api-material-001")
         self.assertEqual(material["source_type"], "case_protocol")
         self.assertEqual(len(materials["materials"]), 1)
+        self.assertIn(
+            "q-001",
+            {link["question_id"] for link in material_links["links"]},
+        )
         self.assertTrue(material_verification["verified"])
 
         with self.assertRaises(HTTPException) as caught:
