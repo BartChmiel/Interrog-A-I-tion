@@ -195,6 +195,52 @@ export type MaterialLinksResponse = {
   links: MaterialQuestionLink[];
 };
 
+export type EvidenceTopicStatus =
+  | "covered"
+  | "grounded"
+  | "material_only"
+  | "contested"
+  | "missing";
+
+export type EvidenceMapSummary = {
+  total_topics: number;
+  covered_topics: number;
+  grounded_topics: number;
+  material_only_topics: number;
+  contested_topics: number;
+  missing_topics: number;
+  total_questions: number;
+  answered_questions: number;
+  total_answers: number;
+  total_claims: number;
+  total_materials: number;
+  total_material_question_links: number;
+  total_findings: number;
+};
+
+export type EvidenceTopicNode = {
+  topic_id: string;
+  label: string;
+  priority: string;
+  status: EvidenceTopicStatus;
+  question_ids: string[];
+  answer_ids: string[];
+  claim_ids: string[];
+  material_ids: string[];
+  finding_ids: string[];
+  indicator_ids: string[];
+};
+
+export type EvidenceMap = {
+  case_id: string;
+  summary: EvidenceMapSummary;
+  topic_nodes: EvidenceTopicNode[];
+};
+
+export type EvidenceMapResponse = {
+  evidence_map: EvidenceMap;
+};
+
 export type QuestionView = {
   id: string;
   text: LocalizedText;

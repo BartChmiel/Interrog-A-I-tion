@@ -1,6 +1,7 @@
 import type {
   CaseReviewResponse,
   EncryptionStatus,
+  EvidenceMapResponse,
   InterviewSession,
   MaterialLinksResponse,
   MaterialListResponse,
@@ -126,6 +127,19 @@ export async function loadMaterialQuestionLinks(
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({ case_id: config.caseId, locale });
   return fetchJson(config, `/workspaces/${workspaceId}/materials/links?${query.toString()}`);
+}
+
+export async function loadEvidenceMap(
+  config: RuntimeConfig,
+  locale: string,
+): Promise<EvidenceMapResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({
+    case_id: config.caseId,
+    session_id: config.sessionId,
+    locale,
+  });
+  return fetchJson(config, `/workspaces/${workspaceId}/evidence-map?${query.toString()}`);
 }
 
 export async function registerWorkspaceMaterial(

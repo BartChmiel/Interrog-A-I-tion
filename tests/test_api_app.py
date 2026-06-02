@@ -58,6 +58,7 @@ class ApiAppTest(unittest.TestCase):
         register_material = endpoint(app, "register_workspace_material")
         list_materials = endpoint(app, "list_workspace_materials")
         link_materials = endpoint(app, "link_workspace_materials_to_questions")
+        get_evidence_map = endpoint(app, "get_workspace_evidence_map")
         verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
@@ -94,6 +95,12 @@ class ApiAppTest(unittest.TestCase):
         )
         materials = list_materials("api-workspace-001")
         material_links = link_materials("api-workspace-001", case_id="case-001", locale="en")
+        evidence_map = get_evidence_map(
+            "api-workspace-001",
+            case_id="case-001",
+            session_id=None,
+            locale="en",
+        )
         material_verification = verify_material("api-workspace-001", "api-material-001")
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
@@ -107,6 +114,17 @@ class ApiAppTest(unittest.TestCase):
         self.assertIn(
             "q-001",
             {link["question_id"] for link in material_links["links"]},
+        )
+        self.assertEqual(evidence_map["evidence_map"]["case_id"], "case-001")
+        self.assertEqual(evidence_map["evidence_map"]["summary"]["total_materials"], 1)
+        self.assertIn(
+            "api-material-001",
+            {
+                material_id
+                for node in evidence_map["evidence_map"]["topic_nodes"]
+                if node["topic_id"] == "topic-location"
+                for material_id in node["material_ids"]
+            },
         )
         self.assertTrue(material_verification["verified"])
 

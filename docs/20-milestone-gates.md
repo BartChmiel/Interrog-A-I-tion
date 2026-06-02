@@ -113,6 +113,18 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Case evidence map has reached its first review point.
+
+The project owner should evaluate:
+
+- whether topic-level grouping is enough before adding a full evidence graph,
+- whether statuses `covered`, `grounded`, `material_only`, `contested`, and `missing` are acceptable,
+- whether the UI should show only counts or also linked ids and matched terms,
+- whether the map can become grounding context for local AI prompts,
+- whether the next step should be human accept/reject controls, evidence graph expansion, or local model prompts grounded in the map.
+
+## Current STOP
+
 Milestone 6: Material-question grounding links have reached their first review point.
 
 The project owner should evaluate:

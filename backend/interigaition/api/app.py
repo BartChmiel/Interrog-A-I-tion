@@ -72,9 +72,14 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
         return default
 
 from interigaition.analysis.credibility_indicators import generate_indicators
+from interigaition.analysis.evidence_map import build_evidence_map
 from interigaition.analysis.interview_review import review_case
 from interigaition.analysis.live_review import review_live_session
-from interigaition.analysis.material_grounding import MaterialText, link_materials_to_questions
+from interigaition.analysis.material_grounding import (
+    MaterialText,
+    infer_material_topic_signals,
+    link_materials_to_questions,
+)
 from interigaition.domain.models import Actor, Answer, AuditEvent, Claim, Case
 from interigaition.domain.session import (
     InterviewSession,
@@ -301,10 +306,7 @@ def create_app(
         try:
             workspace = workspace_manager.open_workspace(workspace_id)
             registry = MaterialRegistry(workspace)
-            material_texts = tuple(
-                MaterialText(record=record, text=registry.read_material_text(record.id))
-                for record in registry.list_materials()
-            )
+            material_texts = _read_workspace_material_texts(registry)
         except WorkspaceError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except MaterialRegistryError as exc:
@@ -313,6 +315,43 @@ def create_app(
         case = _load_synthetic_case(case_id, locale=locale)
         links = link_materials_to_questions(case, material_texts)
         return {"links": _to_jsonable(links)}
+
+    @app.get("/workspaces/{workspace_id}/evidence-map")
+    def get_workspace_evidence_map(
+        workspace_id: str,
+        case_id: str,
+        session_id: str | None = Query(default=None),
+        locale: str = Query(default="en"),
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            registry = MaterialRegistry(workspace)
+            material_texts = _read_workspace_material_texts(registry)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        case = _load_synthetic_case(case_id, locale=locale)
+        session = store.get_session(session_id) if session_id else None
+        case_view = merge_session_answers(case, session) if session else case
+        review = review_case(case_view)
+        indicators = generate_indicators(case_view, review)
+        material_links = link_materials_to_questions(case_view, material_texts)
+        material_topic_signals = tuple(
+            signal
+            for material_text in material_texts
+            for signal in infer_material_topic_signals(case_view.topics, material_text)
+        )
+        evidence_map = build_evidence_map(
+            case=case_view,
+            review=review,
+            indicators=indicators,
+            materials=tuple(material_text.record for material_text in material_texts),
+            material_links=material_links,
+            material_topic_signals=material_topic_signals,
+        )
+        return {"evidence_map": _to_jsonable(evidence_map)}
 
     @app.get("/workspaces/{workspace_id}/materials/{material_id}/verification")
     def verify_workspace_material(workspace_id: str, material_id: str) -> dict[str, Any]:
@@ -542,6 +581,13 @@ def _workspace_response(workspace: CaseWorkspace) -> dict[str, Any]:
         "root_path": str(workspace.root_path),
         "manifest": _to_jsonable(workspace.manifest),
     }
+
+
+def _read_workspace_material_texts(registry: MaterialRegistry) -> tuple[MaterialText, ...]:
+    return tuple(
+        MaterialText(record=record, text=registry.read_material_text(record.id))
+        for record in registry.list_materials()
+    )
 
 
 def _validate_answer_request(case: Case, request: AddAnswerRequest) -> None:

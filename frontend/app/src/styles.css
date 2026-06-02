@@ -405,6 +405,134 @@ h2 {
   color: var(--info);
 }
 
+.evidence-map {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.evidence-map-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.evidence-map-metric {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.evidence-map-metric strong {
+  font-size: 16px;
+}
+
+.evidence-map-metric span,
+.evidence-map-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.evidence-map-empty {
+  padding: 12px;
+}
+
+.evidence-topic-list {
+  display: grid;
+  gap: 8px;
+}
+
+.evidence-topic {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.evidence-topic[data-state="grounded"] {
+  border-color: #b9dccb;
+}
+
+.evidence-topic[data-state="material_only"] {
+  border-color: #c8d8e6;
+}
+
+.evidence-topic[data-state="contested"] {
+  border-color: #ead39c;
+}
+
+.evidence-topic[data-state="missing"] {
+  border-color: #e5b6ad;
+}
+
+.evidence-topic-header,
+.evidence-topic-status,
+.evidence-topic-counts {
+  display: flex;
+  align-items: center;
+}
+
+.evidence-topic-header {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.evidence-topic-status {
+  min-height: 22px;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e8eeec;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.evidence-topic[data-state="grounded"] .evidence-topic-status {
+  background: #e7f5ee;
+  color: var(--accent-strong);
+}
+
+.evidence-topic[data-state="material_only"] .evidence-topic-status {
+  background: #edf5fb;
+  color: var(--info);
+}
+
+.evidence-topic[data-state="contested"] .evidence-topic-status {
+  background: #fff7df;
+  color: #7a5a00;
+}
+
+.evidence-topic[data-state="missing"] .evidence-topic-status {
+  background: #fff0ee;
+  color: var(--danger);
+}
+
+.evidence-topic strong {
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.evidence-topic-counts {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.evidence-topic-counts span {
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .security-item strong,
 .security-label,
 .security-detail {

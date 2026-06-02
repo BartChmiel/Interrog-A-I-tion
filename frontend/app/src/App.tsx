@@ -10,6 +10,7 @@ import {
   KeyRound,
   Languages,
   ListChecks,
+  Network,
   Plus,
   RefreshCw,
   Send,
@@ -23,6 +24,7 @@ import {
   ensureWorkspace,
   loadCaseReview,
   loadEncryptionStatus,
+  loadEvidenceMap,
   loadMaterialQuestionLinks,
   loadSessionReview,
   loadWorkspaceAccess,
@@ -39,6 +41,8 @@ import type {
   ApiMode,
   CaseData,
   EncryptionStatus,
+  EvidenceMap,
+  EvidenceTopicStatus,
   Indicator,
   InterviewSession,
   Locale,
@@ -97,6 +101,7 @@ export function App() {
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
+  const [evidenceMap, setEvidenceMap] = useState<EvidenceMap | null>(null);
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
@@ -177,16 +182,18 @@ export function App() {
         loadEncryptionStatus(config),
         ensureWorkspace(config),
       ]);
-      const [access, materialList, materialLinks] = await Promise.all([
+      const [access, materialList, materialLinks, nextEvidenceMap] = await Promise.all([
         loadWorkspaceAccess(config),
         loadWorkspaceMaterials(config),
         loadMaterialQuestionLinksOrEmpty(locale),
+        loadEvidenceMapOrNull(locale),
       ]);
       setEncryptionStatus(security);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
       setWorkspaceMaterials(sortMaterials(materialList.materials));
       setMaterialQuestionLinks(materialLinks);
+      setEvidenceMap(nextEvidenceMap);
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
@@ -194,6 +201,7 @@ export function App() {
       setWorkspaceAccess(null);
       setWorkspaceMaterials([]);
       setMaterialQuestionLinks([]);
+      setEvidenceMap(null);
       setMaterialVerifications({});
     }
   }
@@ -205,6 +213,16 @@ export function App() {
     } catch (error) {
       console.warn("Could not refresh material-question links.", error);
       return [];
+    }
+  }
+
+  async function loadEvidenceMapOrNull(nextLocale: Locale): Promise<EvidenceMap | null> {
+    try {
+      const response = await loadEvidenceMap(config, nextLocale);
+      return response.evidence_map;
+    } catch (error) {
+      console.warn("Could not refresh evidence map.", error);
+      return null;
     }
   }
 
@@ -230,16 +248,18 @@ export function App() {
     setStatusKey("connecting");
 
     try {
-      const [caseReview, sessionReview, materialLinks] = await Promise.all([
+      const [caseReview, sessionReview, materialLinks, nextEvidenceMap] = await Promise.all([
         loadCaseReview(config, nextLocale),
         loadSessionReview(config, nextLocale),
         loadMaterialQuestionLinksOrEmpty(nextLocale),
+        loadEvidenceMapOrNull(nextLocale),
       ]);
       setCaseData(caseReview.case);
       setSession(sessionReview.session);
       setIndicators(sessionReview.indicators);
       setFindings(sessionReview.snapshot.review.findings);
       setMaterialQuestionLinks(materialLinks);
+      setEvidenceMap(nextEvidenceMap);
       setApiMode("online");
       setStatusKey("reviewUpdated");
     } catch (error) {
@@ -285,10 +305,14 @@ export function App() {
         topic_ids: activeQuestion.topicIds,
         claims: [],
       });
-      const sessionReview = await loadSessionReview(config, locale);
+      const [sessionReview, nextEvidenceMap] = await Promise.all([
+        loadSessionReview(config, locale),
+        loadEvidenceMapOrNull(locale),
+      ]);
       setSession(sessionReview.session);
       setIndicators(sessionReview.indicators);
       setFindings(sessionReview.snapshot.review.findings);
+      setEvidenceMap(nextEvidenceMap);
       setAnswerText("");
       setStatusKey("reviewUpdated");
     } catch (error) {
@@ -327,10 +351,14 @@ export function App() {
         tags: parseTags(materialDraft.tags),
       });
       const verification = await verifyWorkspaceMaterial(config, record.id);
-      const materialLinks = await loadMaterialQuestionLinksOrEmpty(locale);
+      const [materialLinks, nextEvidenceMap] = await Promise.all([
+        loadMaterialQuestionLinksOrEmpty(locale),
+        loadEvidenceMapOrNull(locale),
+      ]);
       setWorkspaceMaterials((current) => sortMaterials([...current, record]));
       setMaterialVerifications((current) => ({ ...current, [record.id]: verification }));
       setMaterialQuestionLinks(materialLinks);
+      setEvidenceMap(nextEvidenceMap);
       setMaterialDraft(emptyMaterialDraft);
       setStatusKey("materialSaved");
     } catch (error) {
@@ -488,6 +516,8 @@ export function App() {
             workspace={workspace}
           />
 
+          <EvidenceMapPanel evidenceMap={evidenceMap} locale={locale} />
+
           <MaterialsPanel
             apiMode={apiMode}
             draft={materialDraft}
@@ -580,6 +610,96 @@ function LinkedMaterialStrip({
       </div>
     </div>
   );
+}
+
+function EvidenceMapPanel({
+  evidenceMap,
+  locale,
+}: {
+  evidenceMap: EvidenceMap | null;
+  locale: Locale;
+}) {
+  if (!evidenceMap) {
+    return (
+      <section>
+        <PanelHeader title={text(locale, "caseMap")} meta={text(locale, "unknown")} compact />
+        <p className="evidence-map-empty">{text(locale, "noEvidenceMap")}</p>
+      </section>
+    );
+  }
+
+  const summary = evidenceMap.summary;
+
+  return (
+    <section>
+      <PanelHeader
+        title={text(locale, "caseMap")}
+        meta={`${summary.covered_topics}/${summary.total_topics} ${text(locale, "topicsShort")}`}
+        compact
+      />
+      <div className="evidence-map">
+        <div className="evidence-map-summary">
+          <EvidenceMapMetric
+            label={text(locale, "answeredShort")}
+            value={`${summary.answered_questions}/${summary.total_questions}`}
+          />
+          <EvidenceMapMetric
+            label={text(locale, "materialsShort")}
+            value={String(summary.total_materials)}
+          />
+          <EvidenceMapMetric
+            label={text(locale, "claimsShort")}
+            value={String(summary.total_claims)}
+          />
+          <EvidenceMapMetric
+            label={text(locale, "findings")}
+            value={String(summary.total_findings)}
+          />
+        </div>
+        <div className="evidence-topic-list">
+          {evidenceMap.topic_nodes.map((node) => (
+            <article className="evidence-topic" data-state={node.status} key={node.topic_id}>
+              <div className="evidence-topic-header">
+                <span className="evidence-topic-status">
+                  <Network size={13} />
+                  {evidenceStatusLabel(node.status, locale)}
+                </span>
+                <span className="meta">{node.priority}</span>
+              </div>
+              <strong>{domainLabel(node.label, locale)}</strong>
+              <div className="evidence-topic-counts">
+                <span>Q {node.question_ids.length}</span>
+                <span>A {node.answer_ids.length}</span>
+                <span>M {node.material_ids.length}</span>
+                <span>C {node.claim_ids.length}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EvidenceMapMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="evidence-map-metric">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function evidenceStatusLabel(status: EvidenceTopicStatus, locale: Locale): string {
+  const keys: Record<EvidenceTopicStatus, CopyKey> = {
+    covered: "statusCovered",
+    grounded: "statusGrounded",
+    material_only: "statusMaterialOnly",
+    contested: "statusContested",
+    missing: "statusMissing",
+  };
+
+  return text(locale, keys[status]);
 }
 
 function MaterialsPanel({

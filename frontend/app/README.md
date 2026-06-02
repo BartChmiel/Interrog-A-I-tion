@@ -43,6 +43,8 @@ Supported runtime query parameters:
 
 The right insight rail includes a compact security panel backed by the local API. It shows the current workspace, storage mode, encryption runtime status, workspace access decision, and export manifest readiness.
 
+The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
+
 The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
 
 Registered materials are also linked deterministically to interview questions through shared topic signals. The active question shows linked materials, and each material card shows linked question ids with confidence values.
