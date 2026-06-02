@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interigaition.local/schemas/grounding-pack.schema.json",
+  "title": "GroundingContextPack",
+  "type": "object",
+  "required": [
+    "case_id",
+    "focus_question_id",
+    "task",
+    "allowed_source_ids",
+    "topic_contexts",
+    "material_references",
+    "rules",
+    "operator_review_required"
+  ],
+  "properties": {
+    "case_id": { "type": "string" },
+    "focus_question_id": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }]
+    },
+    "task": { "type": "string" },
+    "allowed_source_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "topic_contexts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "topic_id",
+          "label",
+          "status",
+          "in_focus",
+          "priority",
+          "question_ids",
+          "answer_ids",
+          "claim_ids",
+          "material_ids",
+          "finding_ids"
+        ],
+        "properties": {
+          "topic_id": { "type": "string" },
+          "label": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["covered", "grounded", "material_only", "contested", "missing"]
+          },
+          "in_focus": { "type": "boolean" },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "question_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "answer_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "claim_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "material_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "finding_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "material_references": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "material_id",
+          "title",
+          "source_type",
+          "topic_ids",
+          "linked_question_ids",
+          "max_confidence",
+          "tags"
+        ],
+        "properties": {
+          "material_id": { "type": "string" },
+          "title": { "type": "string" },
+          "source_type": { "type": "string" },
+          "topic_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "linked_question_ids": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "max_confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "instruction"],
+        "properties": {
+          "id": { "type": "string" },
+          "severity": {
+            "type": "string",
+            "enum": ["required", "recommended"]
+          },
+          "instruction": { "type": "string" }
+        }
+      }
+    },
+    "operator_review_required": { "type": "boolean" }
+  }
+}

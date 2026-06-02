@@ -59,6 +59,7 @@ class ApiAppTest(unittest.TestCase):
         list_materials = endpoint(app, "list_workspace_materials")
         link_materials = endpoint(app, "link_workspace_materials_to_questions")
         get_evidence_map = endpoint(app, "get_workspace_evidence_map")
+        get_grounding_pack = endpoint(app, "get_workspace_grounding_pack")
         verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
@@ -101,6 +102,13 @@ class ApiAppTest(unittest.TestCase):
             session_id=None,
             locale="en",
         )
+        grounding_pack = get_grounding_pack(
+            "api-workspace-001",
+            case_id="case-001",
+            session_id=None,
+            question_id="q-001",
+            locale="en",
+        )
         material_verification = verify_material("api-workspace-001", "api-material-001")
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
@@ -124,6 +132,18 @@ class ApiAppTest(unittest.TestCase):
                 for node in evidence_map["evidence_map"]["topic_nodes"]
                 if node["topic_id"] == "topic-location"
                 for material_id in node["material_ids"]
+            },
+        )
+        self.assertEqual(grounding_pack["grounding_pack"]["focus_question_id"], "q-001")
+        self.assertIn(
+            "no-truthfulness-verdict",
+            {rule["id"] for rule in grounding_pack["grounding_pack"]["rules"]},
+        )
+        self.assertIn(
+            "api-material-001",
+            {
+                reference["material_id"]
+                for reference in grounding_pack["grounding_pack"]["material_references"]
             },
         )
         self.assertTrue(material_verification["verified"])

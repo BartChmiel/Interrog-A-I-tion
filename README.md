@@ -73,6 +73,7 @@ Cases, UI labels, report templates, and future installer/startup language select
 - [Credibility Indicators Governance](docs/18-credibility-indicators-governance.md)
 - [Implementation Backlog](docs/19-implementation-backlog.md)
 - [Milestone Gates](docs/20-milestone-gates.md)
+- [Derived Assumptions and Work Packages](docs/21-derived-assumptions-and-work-packages.md)
 
 Some early planning documents still have Polish filenames and Polish content. They should be migrated to English before the first public release.
 

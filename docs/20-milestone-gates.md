@@ -113,6 +113,18 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Grounding context pack has reached its first review point.
+
+The project owner should evaluate:
+
+- whether every future model suggestion must cite `allowed_source_ids`,
+- whether the current grounding rules are strict enough,
+- whether `material_only` leads should be shown to AI before an operator accepts them,
+- whether the first grounded model endpoint should be offline review only,
+- whether audit metadata should include prompt version, model id, context hash, and output hash.
+
+## Current STOP
+
 Milestone 6: Case evidence map has reached its first review point.
 
 The project owner should evaluate:

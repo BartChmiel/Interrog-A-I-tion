@@ -96,3 +96,18 @@ Preferowany format to strukturalny JSON zgodny ze schematem, np.:
 5. Walidacja guardrails.
 6. Zapis sugestii w audycie.
 7. Decyzja uzytkownika.
+
+## Grounding context pack
+
+Przed podlaczeniem realnego modelu do trybu live kontekst AI powinien byc budowany jako `GroundingContextPack`, a nie jako nieograniczony zrzut notatek.
+
+Pakiet powinien zawierac:
+
+- `allowed_source_ids`,
+- statusy tematow z mapy sprawy,
+- referencje do zarejestrowanych materialow,
+- pytanie fokusowe, jesli sugestia dotyczy konkretnego pytania,
+- reguly wymagane dla modelu,
+- wymog decyzji czlowieka.
+
+Model moze korzystac tylko z identyfikatorow z pakietu. Jesli sugestia nie ma podstawy w `allowed_source_ids`, powinna zostac odrzucona przez walidacje.

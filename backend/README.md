@@ -114,4 +114,5 @@ POST /workspaces/{workspace_id}/materials
 GET /workspaces/{workspace_id}/materials/links?case_id=case-001
 GET /workspaces/{workspace_id}/materials/{material_id}/verification
 GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=demo-session
+GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-session&question_id=q-001
 ```

@@ -54,7 +54,7 @@ Success criteria:
 
 ## Milestone 3: Local Model Abstraction
 
-Status: implemented for interface, fake client, prompt rendering, guarded response parsing, and an Ollama adapter behind the interface. A real local model has not been connected to the user workflow yet.
+Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, and a deterministic grounding context pack for future model calls. A real local model has not been connected to the user workflow yet.
 
 Tasks:
 
@@ -63,7 +63,8 @@ Tasks:
 - add prompt renderer,
 - add response schema validation,
 - add Ollama adapter behind the interface,
-- add guardrail checks before returning suggestions.
+- add guardrail checks before returning suggestions,
+- add grounding pack prompt contract.
 
 Success criteria:
 
@@ -112,7 +113,7 @@ Success criteria:
 
 ## Milestone 6: Security Path
 
-Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, export integrity manifests, a workspace material register, deterministic material-question grounding links, and a first topic-level case evidence map are implemented. Encryption is not implemented yet.
+Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, export integrity manifests, a workspace material register, deterministic material-question grounding links, a first topic-level case evidence map, and an AI grounding context pack are implemented. Encryption is not implemented yet.
 
 Tasks:
 
@@ -122,6 +123,7 @@ Tasks:
 - workspace material register,
 - material-question grounding links,
 - topic-level case evidence map,
+- grounding context pack,
 - SQLite storage,
 - SQLCipher research spike,
 - air-gapped mode policy.
