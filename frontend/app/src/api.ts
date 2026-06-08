@@ -6,6 +6,8 @@ import type {
   EvidenceMapResponse,
   GroundedSuggestionsResponse,
   InterviewSession,
+  LocalModelConfig,
+  LocalModelSmokeResult,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
   MaterialQuestionLinkDecisionResponse,
@@ -97,6 +99,16 @@ export async function loadSessionReview(
 
 export async function loadEncryptionStatus(config: RuntimeConfig): Promise<EncryptionStatus> {
   return fetchJson(config, "/security/encryption");
+}
+
+export async function loadLocalModelConfig(config: RuntimeConfig): Promise<LocalModelConfig> {
+  return fetchJson(config, "/ai/local-model/config");
+}
+
+export async function runLocalModelSmoke(config: RuntimeConfig): Promise<LocalModelSmokeResult> {
+  return fetchJson(config, "/ai/local-model/smoke", {
+    method: "POST",
+  });
 }
 
 export async function loadWorkspace(config: RuntimeConfig): Promise<WorkspaceResponse> {

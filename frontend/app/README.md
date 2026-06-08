@@ -43,6 +43,11 @@ Supported runtime query parameters:
 
 The right insight rail includes a compact security panel backed by the local API. It shows the current workspace, storage mode, encryption runtime status, workspace access decision, and export manifest readiness.
 
+The security rail also shows local model runtime readiness. It displays the
+configured model, effective provider, live-output gate, runtime restrictions, and a
+safe smoke-test button. The smoke check is deterministic by default and does not
+send case material or interview notes to a real model.
+
 The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
 
 The case map also shows an advisory Evidence Alignment Indicator as a gradient bar with a numeric value, band (`insufficient review`, `low`, `medium`, `high`), reviewed/confidence meta, and explanation bullets. It is derived only from human-reviewed material-question links and does not assert truth, guilt, or credibility (see ADR 0017).

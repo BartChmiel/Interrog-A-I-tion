@@ -31,6 +31,7 @@ import {
   loadEncryptionStatus,
   loadEvidenceMap,
   loadGroundedSuggestions,
+  loadLocalModelConfig,
   loadMaterialQuestionLinks,
   loadWorkspaceMaterialPreview,
   loadSessionReview,
@@ -39,6 +40,7 @@ import {
   recordGroundedSuggestionDecision,
   recordMaterialQuestionLinkDecision,
   registerWorkspaceMaterial,
+  runLocalModelSmoke,
   startSession,
   verifyWorkspaceMaterial,
   type ApiError,
@@ -59,6 +61,8 @@ import type {
   Indicator,
   InterviewSession,
   Locale,
+  LocalModelConfig,
+  LocalModelSmokeResult,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
   MaterialPreview,
@@ -112,6 +116,8 @@ export function App() {
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
+  const [localModelConfig, setLocalModelConfig] = useState<LocalModelConfig | null>(null);
+  const [localModelSmoke, setLocalModelSmoke] = useState<LocalModelSmokeResult | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
@@ -138,6 +144,7 @@ export function App() {
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMaterialSubmitting, setIsMaterialSubmitting] = useState(false);
+  const [isModelSmokeRunning, setIsModelSmokeRunning] = useState(false);
   const didInitializeApi = useRef(false);
 
   const questions = useMemo<QuestionView[]>(() => {
@@ -207,8 +214,9 @@ export function App() {
 
   async function refreshSecurityState() {
     try {
-      const [security, ensuredWorkspace] = await Promise.all([
+      const [security, modelConfig, ensuredWorkspace] = await Promise.all([
         loadEncryptionStatus(config),
+        loadLocalModelConfig(config),
         ensureWorkspace(config),
       ]);
       const [access, materialList, materialLinks, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
@@ -219,6 +227,7 @@ export function App() {
         loadGroundedSuggestionsOrEmpty(locale, activeQuestionId),
       ]);
       setEncryptionStatus(security);
+      setLocalModelConfig(modelConfig);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
       setWorkspaceMaterials(sortMaterials(materialList.materials));
@@ -228,6 +237,8 @@ export function App() {
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
+      setLocalModelConfig(null);
+      setLocalModelSmoke(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
       setWorkspaceMaterials([]);
@@ -482,6 +493,25 @@ export function App() {
     }
   }
 
+  async function smokeLocalModel() {
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    setIsModelSmokeRunning(true);
+    try {
+      const result = await runLocalModelSmoke(config);
+      setLocalModelSmoke(result);
+      setStatusKey(result.ok ? "modelSmokeOk" : "modelSmokeFailed");
+    } catch (error) {
+      console.error("Could not run local model smoke check.", error);
+      setStatusKey("modelSmokeFailed");
+    } finally {
+      setIsModelSmokeRunning(false);
+    }
+  }
+
   async function toggleMaterialPreview(materialId: string) {
     if (activeMaterialPreviewId === materialId) {
       setActiveMaterialPreviewId(null);
@@ -729,8 +759,12 @@ export function App() {
           <SecurityPanel
             accessDecision={workspaceAccess}
             encryptionStatus={encryptionStatus}
+            isModelSmokeRunning={isModelSmokeRunning}
             locale={locale}
+            localModelConfig={localModelConfig}
+            localModelSmoke={localModelSmoke}
             materials={workspaceMaterials}
+            onModelSmoke={() => void smokeLocalModel()}
             workspace={workspace}
           />
 
@@ -1488,14 +1522,22 @@ function materialQuestionLinkDecisionLabel(
 function SecurityPanel({
   accessDecision,
   encryptionStatus,
+  isModelSmokeRunning,
   locale,
+  localModelConfig,
+  localModelSmoke,
   materials,
+  onModelSmoke,
   workspace,
 }: {
   accessDecision: WorkspaceAccessDecision | null;
   encryptionStatus: EncryptionStatus | null;
+  isModelSmokeRunning: boolean;
   locale: Locale;
+  localModelConfig: LocalModelConfig | null;
+  localModelSmoke: LocalModelSmokeResult | null;
   materials: MaterialRecord[];
+  onModelSmoke: () => void;
   workspace: WorkspaceResponse | null;
 }) {
   const manifest = workspace?.manifest;
@@ -1511,6 +1553,11 @@ function SecurityPanel({
   const accessState = accessDecision ? (accessReady ? "ready" : "blocked") : "unknown";
   const exportState = manifest ? "ready" : "unknown";
   const materialsState = manifest ? "ready" : "unknown";
+  const modelState = localModelConfig
+    ? localModelConfig.real_model_enabled
+      ? "warning"
+      : "ready"
+    : "unknown";
   const storageDetail = manifest
     ? text(locale, manifest.storage_mode === "encrypted_required" ? "encryptionRequired" : "prototypeMode")
     : text(locale, "unknown");
@@ -1522,6 +1569,11 @@ function SecurityPanel({
     : text(locale, "unknown");
   const exportDetail = manifest ? text(locale, "manifestReady") : text(locale, "unknown");
   const materialsDetail = manifest ? text(locale, "registered") : text(locale, "unknown");
+  const modelDetail = localModelConfig
+    ? localModelConfig.live_output_enabled
+      ? text(locale, "liveModelEnabled")
+      : text(locale, "liveModelBlocked")
+    : text(locale, "unknown");
 
   return (
     <section>
@@ -1573,6 +1625,40 @@ function SecurityPanel({
           title={text(locale, "exportIntegrity")}
           value={manifest ? text(locale, "ready") : text(locale, "unknown")}
         />
+      </div>
+      <div className="model-runtime-panel" data-state={modelState}>
+        <div className="model-runtime-header">
+          <span className="security-icon">
+            <Network size={15} />
+          </span>
+          <div>
+            <span className="security-label">{text(locale, "localModelRuntime")}</span>
+            <strong>{localModelConfig?.configured_model ?? text(locale, "unknown")}</strong>
+            <span className="security-detail">
+              {localModelConfig?.effective_provider ?? text(locale, "unknown")} / {modelDetail}
+            </span>
+          </div>
+        </div>
+        {localModelConfig?.restrictions.length ? (
+          <ul>
+            {localModelConfig.restrictions.slice(0, 3).map((restriction) => (
+              <li key={restriction}>{restriction}</li>
+            ))}
+          </ul>
+        ) : null}
+        {localModelSmoke ? (
+          <p>
+            {localModelSmoke.ok ? text(locale, "modelSmokeOk") : text(locale, "modelSmokeFailed")}
+            {" / "}
+            {localModelSmoke.model}
+            {" / "}
+            {localModelSmoke.real_model_invoked ? text(locale, "realModelInvoked") : text(locale, "noRealModel")}
+          </p>
+        ) : null}
+        <button disabled={!localModelConfig || isModelSmokeRunning} type="button" onClick={onModelSmoke}>
+          <Activity size={14} />
+          {isModelSmokeRunning ? "..." : text(locale, "runModelSmoke")}
+        </button>
       </div>
     </section>
   );

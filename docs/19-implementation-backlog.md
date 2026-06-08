@@ -54,7 +54,7 @@ Success criteria:
 
 ## Milestone 3: Local Model Abstraction
 
-Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, and a deterministic grounding context pack for future model calls. A real local model has not been connected to the user workflow yet.
+Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, and a deterministic grounding context pack for future model calls. A real local model has not been connected to live suggestions yet.
 
 Tasks:
 
@@ -63,6 +63,8 @@ Tasks:
 - add prompt renderer,
 - add response schema validation,
 - add Ollama adapter behind the interface,
+- add local model runtime config,
+- add deterministic smoke endpoint and UI control,
 - add guardrail checks before returning suggestions,
 - add grounding pack prompt contract.
 
@@ -70,6 +72,7 @@ Success criteria:
 
 - tests run without Ollama,
 - Ollama can be enabled locally,
+- model readiness is visible without sending case data to a real model,
 - model output is validated and auditable.
 
 ## Milestone 4: FastAPI Prototype

@@ -117,6 +117,29 @@ export type EncryptionStatus = {
   checked_at: string;
 };
 
+export type LocalModelConfig = {
+  provider: string;
+  effective_provider: string;
+  configured_model: string;
+  ollama_base_url: string;
+  timeout_seconds: number;
+  temperature: number;
+  real_model_enabled: boolean;
+  live_output_enabled: boolean;
+  restrictions: string[];
+};
+
+export type LocalModelSmokeResult = {
+  ok: boolean;
+  provider: string;
+  model: string;
+  real_model_invoked: boolean;
+  detail: string;
+  response_preview: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+};
+
 export type WorkspaceManifest = {
   schema_version: number;
   workspace_id: string;

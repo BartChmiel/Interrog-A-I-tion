@@ -12,6 +12,7 @@ from interrogaition.api.app import (
     StartSessionRequest,
     create_app,
 )
+from interrogaition.ai.local_model_runtime import LocalModelRuntimeConfig
 from interrogaition.domain.models import SuggestionStatus
 from interrogaition.domain.session import ParticipantRole
 from interrogaition.security.access_policy import WorkspaceAction, WorkspaceRole
@@ -37,6 +38,38 @@ class ApiAppTest(unittest.TestCase):
 
         self.assertEqual(endpoint(app, "health")(), {"status": "ok"})
         self.assertEqual(endpoint(app, "locales")(), {"locales": ["en", "pl"]})
+
+    def test_local_model_config_and_deterministic_smoke_endpoint(self) -> None:
+        app = create_app()
+
+        config = endpoint(app, "get_local_model_config")()
+        smoke = endpoint(app, "smoke_local_model")(execute_real=False)
+
+        self.assertEqual(config["provider"], "deterministic")
+        self.assertEqual(config["effective_provider"], "deterministic")
+        self.assertFalse(config["real_model_enabled"])
+        self.assertFalse(config["live_output_enabled"])
+        self.assertTrue(smoke["ok"])
+        self.assertEqual(smoke["model"], "deterministic-smoke")
+        self.assertFalse(smoke["real_model_invoked"])
+
+    def test_local_model_real_smoke_requires_explicit_enablement(self) -> None:
+        app = create_app(
+            local_model_config=LocalModelRuntimeConfig(
+                provider="ollama",
+                configured_model="llama3.1:8b",
+                real_model_enabled=False,
+            )
+        )
+
+        config = endpoint(app, "get_local_model_config")()
+        smoke = endpoint(app, "smoke_local_model")(execute_real=True)
+
+        self.assertEqual(config["provider"], "ollama")
+        self.assertEqual(config["effective_provider"], "deterministic")
+        self.assertFalse(smoke["ok"])
+        self.assertFalse(smoke["real_model_invoked"])
+        self.assertIn("disabled", smoke["detail"])
 
     def test_case_review_endpoint_returns_indicators_and_report(self) -> None:
         app = create_app()

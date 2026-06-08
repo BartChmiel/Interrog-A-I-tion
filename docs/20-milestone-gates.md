@@ -246,6 +246,19 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 3/6: Local model runtime configuration has reached its first review point.
+
+The project owner should evaluate:
+
+- whether `deterministic` should remain the default provider in every demo environment,
+- which Ollama model should be used for the first real smoke run,
+- whether `INTERROGAITION_ENABLE_REAL_MODEL=1` is a sufficient local gate for developer experiments,
+- whether live suggestions must stay deterministic until a separate legal/UX review,
+- whether model smoke results should be stored in audit or remain a runtime health check,
+- whether the UI wording around "live blocked" is clear enough for non-technical evaluators.
+
+## Current STOP
+
 Milestone 7: Evidence Alignment Indicator has reached its first review point.
 
 The project owner should evaluate:

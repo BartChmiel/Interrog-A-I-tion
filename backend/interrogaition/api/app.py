@@ -87,6 +87,11 @@ from interrogaition.analysis.material_link_decisions import (
     derive_material_link_decisions,
 )
 from interrogaition.ai.grounded_suggestion_service import generate_grounded_suggestions
+from interrogaition.ai.local_model_runtime import (
+    LocalModelRuntimeConfig,
+    load_local_model_runtime_config,
+    run_local_model_smoke,
+)
 from interrogaition.ai.model_client import DeterministicGroundedModelClient, ModelClient
 from interrogaition.domain.models import Actor, Answer, AuditEvent, Claim, Case, SuggestionStatus
 from interrogaition.domain.session import (
@@ -207,6 +212,7 @@ def create_app(
     store: SessionStore | None = None,
     workspace_manager: CaseWorkspaceManager | None = None,
     model_client: ModelClient | None = None,
+    local_model_config: LocalModelRuntimeConfig | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="InterrogA(I)tion Local API",
@@ -239,6 +245,7 @@ def create_app(
     store = store or SQLiteSessionStore.in_memory()
     workspace_manager = workspace_manager or CaseWorkspaceManager(DEFAULT_WORKSPACE_ROOT)
     model_client = model_client or DeterministicGroundedModelClient()
+    local_model_config = local_model_config or load_local_model_runtime_config()
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -251,6 +258,29 @@ def create_app(
     @app.get("/security/encryption")
     def get_encryption_status() -> dict[str, Any]:
         return _to_jsonable(workspace_manager.encryption_status())
+
+    @app.get("/ai/local-model/config")
+    def get_local_model_config() -> dict[str, Any]:
+        return {
+            "provider": local_model_config.provider,
+            "effective_provider": local_model_config.effective_provider,
+            "configured_model": local_model_config.configured_model,
+            "ollama_base_url": local_model_config.ollama_base_url,
+            "timeout_seconds": local_model_config.timeout_seconds,
+            "temperature": local_model_config.temperature,
+            "real_model_enabled": local_model_config.real_model_enabled,
+            "live_output_enabled": local_model_config.live_output_enabled,
+            "restrictions": list(local_model_config.restrictions),
+        }
+
+    @app.post("/ai/local-model/smoke")
+    def smoke_local_model(execute_real: bool = Query(default=False)) -> dict[str, Any]:
+        return _to_jsonable(
+            run_local_model_smoke(
+                local_model_config,
+                execute_real=execute_real,
+            )
+        )
 
     @app.post("/workspaces")
     def create_workspace(request: CreateWorkspaceRequest) -> dict[str, Any]:

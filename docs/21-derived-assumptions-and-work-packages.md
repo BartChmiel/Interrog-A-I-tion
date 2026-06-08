@@ -55,6 +55,8 @@ Implemented:
 - grounded follow-up prompt draft,
 - `GroundingContextPack` API contract,
 - grounded prompt rendering from `GroundingContextPack`,
+- local model runtime configuration,
+- deterministic model smoke endpoint and UI control,
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
 - audit metadata for prompt version, model id, context hash, and output hash,
@@ -63,9 +65,10 @@ Implemented:
 
 Next:
 
-- connect Ollama behind the same grounded service in controlled test mode,
+- run a real Ollama smoke check in developer mode after STOP review,
+- connect Ollama behind the same grounded service in controlled test mode after runtime approval,
 - block institutional live use of real model output until a STOP review,
-- add a local model configuration panel or config file.
+- add model selection persistence and runtime policy configuration.
 
 Strategic risk:
 
@@ -224,14 +227,14 @@ Design rule:
 
 ## Recommended Next Implementation Order
 
-1. Add local model configuration and Ollama smoke mode behind deterministic tests.
-2. STOP before trusting real model-generated suggestions in institutional live mode.
-3. Add SQLCipher installation route and encrypted workspace creation.
-4. Add model artifact isolation and environment health checks.
-5. Add richer synthetic evaluation scenarios for thesis measurements.
-6. Add audit viewer and exportable audit summaries after legal/UX wording review.
-7. Add explicit confidence/data-quality indicators and indicator provenance panel.
-8. Add evidence graph nodes for materials, answers, claims, questions, and findings.
+1. STOP before running real Ollama smoke or trusting real model-generated suggestions in live mode.
+2. Add SQLCipher installation route and encrypted workspace creation.
+3. Add model artifact isolation and environment health checks.
+4. Add richer synthetic evaluation scenarios for thesis measurements.
+5. Add audit viewer and exportable audit summaries after legal/UX wording review.
+6. Add explicit confidence/data-quality indicators and indicator provenance panel.
+7. Add evidence graph nodes for materials, answers, claims, questions, and findings.
+8. Add model selection persistence and runtime policy configuration.
 
 ## STOP Questions Before Live AI Output
 

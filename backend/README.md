@@ -98,6 +98,18 @@ Encrypted workspace creation is also blocked until the local SQLite runtime repo
 GET /security/encryption
 ```
 
+Local model runtime readiness is exposed separately from the live suggestion workflow:
+
+```text
+GET /ai/local-model/config
+POST /ai/local-model/smoke
+```
+
+The default model runtime is deterministic. Ollama can be configured through
+environment variables, but real model execution requires explicit enablement and
+live suggestions still use the explicitly injected `ModelClient`. This prevents
+real LLM output from entering live workflows by configuration drift alone.
+
 The local API exposes prototype workspace creation, manifest loading, and access-policy decisions through:
 
 ```text

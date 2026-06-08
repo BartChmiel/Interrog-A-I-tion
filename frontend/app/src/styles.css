@@ -813,6 +813,72 @@ h2 {
   font-size: 12px;
 }
 
+.model-runtime-panel {
+  display: grid;
+  gap: 9px;
+  margin: 10px 12px 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.model-runtime-panel[data-state="ready"] {
+  border-color: #b9dccb;
+}
+
+.model-runtime-panel[data-state="warning"] {
+  border-color: #ead39c;
+}
+
+.model-runtime-header {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.model-runtime-header strong {
+  display: block;
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.model-runtime-panel ul {
+  margin: 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.model-runtime-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.model-runtime-panel button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.model-runtime-panel button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
 .material-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(120px, 0.55fr);
