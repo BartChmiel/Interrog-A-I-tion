@@ -246,6 +246,19 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Model artifact write manifests has reached its first review point.
+
+The project owner should evaluate:
+
+- whether `prompt`, `context`, `output`, `cache`, and `evaluation` are sufficient artifact types,
+- whether every future local model call must persist all three prompt/context/output artifacts,
+- whether artifact manifests should become hash-chained like audit events,
+- whether artifact manifest records should be included in export integrity manifests,
+- whether metadata fields should be standardized before real Ollama experiments,
+- whether model artifact writes should require `RUN_REVIEW`, `MANAGE_WORKSPACE`, or a separate future permission.
+
+## Current STOP
+
 Milestone 6: Model artifact isolation has reached its first review point.
 
 The project owner should evaluate:

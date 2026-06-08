@@ -35,6 +35,7 @@ import {
   loadGroundedSuggestions,
   loadLocalModelConfig,
   loadMaterialQuestionLinks,
+  loadModelArtifactManifest,
   loadModelArtifactIsolation,
   loadWorkspaceMaterialPreview,
   loadSessionReview,
@@ -68,6 +69,7 @@ import type {
   Locale,
   LocalModelConfig,
   LocalModelSmokeResult,
+  ModelArtifactManifest,
   ModelArtifactIsolationStatus,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
@@ -125,6 +127,7 @@ export function App() {
   const [environmentHealth, setEnvironmentHealth] = useState<EnvironmentHealth | null>(null);
   const [localModelConfig, setLocalModelConfig] = useState<LocalModelConfig | null>(null);
   const [localModelSmoke, setLocalModelSmoke] = useState<LocalModelSmokeResult | null>(null);
+  const [modelArtifactManifest, setModelArtifactManifest] = useState<ModelArtifactManifest | null>(null);
   const [modelArtifactIsolation, setModelArtifactIsolation] = useState<ModelArtifactIsolationStatus | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
@@ -231,6 +234,7 @@ export function App() {
       ]);
       const [
         access,
+        artifactManifest,
         artifactIsolation,
         materialList,
         materialLinks,
@@ -238,6 +242,7 @@ export function App() {
         nextGroundedSuggestions,
       ] = await Promise.all([
         loadWorkspaceAccess(config),
+        loadModelArtifactManifest(config),
         loadModelArtifactIsolation(config),
         loadWorkspaceMaterials(config),
         loadMaterialQuestionLinksOrEmpty(locale),
@@ -247,6 +252,7 @@ export function App() {
       setEncryptionStatus(security);
       setEnvironmentHealth(health);
       setLocalModelConfig(modelConfig);
+      setModelArtifactManifest(artifactManifest);
       setModelArtifactIsolation(artifactIsolation);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
@@ -260,6 +266,7 @@ export function App() {
       setEnvironmentHealth(null);
       setLocalModelConfig(null);
       setLocalModelSmoke(null);
+      setModelArtifactManifest(null);
       setModelArtifactIsolation(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
@@ -543,8 +550,12 @@ export function App() {
     setIsArtifactIsolationSubmitting(true);
     try {
       const isolation = await ensureModelArtifactIsolation(config);
-      const health = await loadEnvironmentHealth(config);
+      const [health, manifest] = await Promise.all([
+        loadEnvironmentHealth(config),
+        loadModelArtifactManifest(config),
+      ]);
       setModelArtifactIsolation(isolation);
+      setModelArtifactManifest(manifest);
       setEnvironmentHealth(health);
       setStatusKey("artifactIsolationReady");
     } catch (error) {
@@ -808,6 +819,7 @@ export function App() {
             locale={locale}
             localModelConfig={localModelConfig}
             localModelSmoke={localModelSmoke}
+            modelArtifactManifest={modelArtifactManifest}
             modelArtifactIsolation={modelArtifactIsolation}
             materials={workspaceMaterials}
             onArtifactIsolation={() => void initializeModelArtifactIsolation()}
@@ -1575,6 +1587,7 @@ function SecurityPanel({
   locale,
   localModelConfig,
   localModelSmoke,
+  modelArtifactManifest,
   modelArtifactIsolation,
   materials,
   onArtifactIsolation,
@@ -1589,6 +1602,7 @@ function SecurityPanel({
   locale: Locale;
   localModelConfig: LocalModelConfig | null;
   localModelSmoke: LocalModelSmokeResult | null;
+  modelArtifactManifest: ModelArtifactManifest | null;
   modelArtifactIsolation: ModelArtifactIsolationStatus | null;
   materials: MaterialRecord[];
   onArtifactIsolation: () => void;
@@ -1718,6 +1732,7 @@ function SecurityPanel({
       </div>
       <ModelArtifactIsolationPanel
         isSubmitting={isArtifactIsolationSubmitting}
+        manifest={modelArtifactManifest}
         isolation={modelArtifactIsolation}
         locale={locale}
         onInitialize={onArtifactIsolation}
@@ -1728,16 +1743,19 @@ function SecurityPanel({
 
 function ModelArtifactIsolationPanel({
   isSubmitting,
+  manifest,
   isolation,
   locale,
   onInitialize,
 }: {
   isSubmitting: boolean;
+  manifest: ModelArtifactManifest | null;
   isolation: ModelArtifactIsolationStatus | null;
   locale: Locale;
   onInitialize: () => void;
 }) {
   const state = isolation?.state ?? "unknown";
+  const lastRecord = manifest?.records.length ? manifest.records[manifest.records.length - 1] : null;
   return (
     <div className="model-artifact-panel" data-state={state}>
       <div className="model-runtime-header">
@@ -1749,6 +1767,8 @@ function ModelArtifactIsolationPanel({
           <strong>{isolation?.policy_exists ? text(locale, "ready") : text(locale, "notReady")}</strong>
           <span className="security-detail">
             {isolation ? `${isolation.directory_count}/5 ${text(locale, "artifactDirs")}` : text(locale, "unknown")}
+            {" / "}
+            {manifest?.record_count ?? 0} {text(locale, "artifactRecords")}
           </span>
         </div>
       </div>
@@ -1765,6 +1785,11 @@ function ModelArtifactIsolationPanel({
           {isolation.missing_directories.length ? (
             <p>
               {text(locale, "missingArtifactDirs")}: {isolation.missing_directories.join(", ")}
+            </p>
+          ) : null}
+          {lastRecord ? (
+            <p>
+              {text(locale, "lastArtifact")}: {lastRecord.artifact_type} / {shortHash(lastRecord.sha256)}
             </p>
           ) : null}
         </>

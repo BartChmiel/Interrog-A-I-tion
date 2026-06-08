@@ -58,6 +58,7 @@ Implemented:
 - local model runtime configuration,
 - deterministic model smoke endpoint and UI control,
 - workspace-local model artifact isolation,
+- model artifact write manifests,
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
 - audit metadata for prompt version, model id, context hash, and output hash,
@@ -231,7 +232,7 @@ Design rule:
 
 1. STOP before running real Ollama smoke or trusting real model-generated suggestions in live mode.
 2. Add SQLCipher installation route and encrypted workspace creation.
-3. Add installer/deployment health checks and model artifact write manifests.
+3. Add installer/deployment health checks and hash-chain coverage for model artifact manifests.
 4. Add richer synthetic evaluation scenarios for thesis measurements.
 5. Add audit viewer and exportable audit summaries after legal/UX wording review.
 6. Add explicit confidence/data-quality indicators and indicator provenance panel.

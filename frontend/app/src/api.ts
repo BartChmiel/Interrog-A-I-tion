@@ -9,6 +9,7 @@ import type {
   InterviewSession,
   LocalModelConfig,
   LocalModelSmokeResult,
+  ModelArtifactManifest,
   ModelArtifactIsolationStatus,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
@@ -167,6 +168,10 @@ export async function loadModelArtifactIsolation(
   config: RuntimeConfig,
 ): Promise<ModelArtifactIsolationStatus> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/model-artifacts`);
+}
+
+export async function loadModelArtifactManifest(config: RuntimeConfig): Promise<ModelArtifactManifest> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/model-artifacts/manifest`);
 }
 
 export async function ensureModelArtifactIsolation(

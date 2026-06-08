@@ -172,6 +172,27 @@ export type ModelArtifactIsolationStatus = {
   warnings: string[];
 };
 
+export type ModelArtifactRecord = {
+  artifact_id: string;
+  artifact_type: string;
+  relative_path: string;
+  sha256: string;
+  size_bytes: number;
+  content_type: string;
+  source: string;
+  created_by: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
+};
+
+export type ModelArtifactManifest = {
+  schema_version: number;
+  workspace_id: string;
+  manifest_path: string;
+  record_count: number;
+  records: ModelArtifactRecord[];
+};
+
 export type WorkspaceManifest = {
   schema_version: number;
   workspace_id: string;

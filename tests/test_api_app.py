@@ -9,6 +9,7 @@ from interrogaition.api.app import (
     HTTPException,
     MaterialQuestionLinkDecisionRequest,
     ModelArtifactIsolationRequest,
+    ModelArtifactWriteRequest,
     RegisterMaterialRequest,
     StartSessionRequest,
     create_app,
@@ -112,6 +113,8 @@ class ApiAppTest(unittest.TestCase):
         get_access = endpoint(app, "get_workspace_access")
         get_model_artifacts = endpoint(app, "get_workspace_model_artifacts")
         ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
+        get_model_artifact_manifest = endpoint(app, "get_workspace_model_artifact_manifest")
+        write_model_artifact = endpoint(app, "write_workspace_model_artifact")
         register_material = endpoint(app, "register_workspace_material")
         list_materials = endpoint(app, "list_workspace_materials")
         preview_material = endpoint(app, "get_workspace_material_preview")
@@ -150,6 +153,19 @@ class ApiAppTest(unittest.TestCase):
             "api-workspace-001",
             ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
         )
+        model_artifact_write = write_model_artifact(
+            "api-workspace-001",
+            ModelArtifactWriteRequest(
+                artifact_type="context",
+                content='{"allowed_source_ids":["api-material-001"]}',
+                content_type="application/json",
+                created_by="investigator-001",
+                source="api-test",
+                metadata={"prompt_version": "test-v1"},
+                role=WorkspaceRole.INVESTIGATOR,
+            ),
+        )
+        model_artifact_manifest = get_model_artifact_manifest("api-workspace-001")
         material = register_material(
             "api-workspace-001",
             RegisterMaterialRequest(
@@ -234,6 +250,9 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(model_artifacts_after["state"], "ready")
         self.assertEqual(model_artifacts_after["directory_count"], 5)
         self.assertFalse(model_artifacts_after["external_cache_allowed"])
+        self.assertEqual(model_artifact_write["record"]["artifact_type"], "context")
+        self.assertEqual(model_artifact_write["manifest"]["record_count"], 1)
+        self.assertEqual(model_artifact_manifest["record_count"], 1)
         self.assertEqual(material["id"], "api-material-001")
         self.assertEqual(material["source_type"], "case_protocol")
         self.assertEqual(len(materials["materials"]), 1)

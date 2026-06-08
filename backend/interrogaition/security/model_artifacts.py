@@ -8,6 +8,8 @@ reports the prototype directory/policy structure without invoking any model runt
 from __future__ import annotations
 
 import json
+import hashlib
+import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,6 +20,8 @@ from interrogaition.security.case_workspace import CaseWorkspace, WorkspaceError
 
 MODEL_ARTIFACT_SCHEMA_VERSION = 1
 MODEL_ARTIFACT_POLICY_FILE = "artifact-policy.json"
+MODEL_ARTIFACT_MANIFEST_FILE = "artifact-manifest.json"
+MAX_MODEL_ARTIFACT_BYTES = 1_000_000
 MODEL_ARTIFACT_DIRECTORIES = (
     "prompts",
     "contexts",
@@ -25,6 +29,14 @@ MODEL_ARTIFACT_DIRECTORIES = (
     "cache",
     "evaluations",
 )
+MODEL_ARTIFACT_TYPES = ("prompt", "context", "output", "cache", "evaluation")
+_ARTIFACT_TYPE_DIRECTORIES = {
+    "prompt": "prompts",
+    "context": "contexts",
+    "output": "outputs",
+    "cache": "cache",
+    "evaluation": "evaluations",
+}
 
 
 @dataclass(frozen=True)
@@ -55,6 +67,35 @@ class ModelArtifactIsolationStatus:
     sensitive_material_allowed: bool
     detail: str
     warnings: tuple[str, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True)
+class ModelArtifactRecord:
+    artifact_id: str
+    artifact_type: str
+    relative_path: str
+    sha256: str
+    size_bytes: int
+    content_type: str
+    source: str
+    created_by: str
+    created_at: datetime
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ModelArtifactManifest:
+    schema_version: int
+    workspace_id: str
+    manifest_path: str
+    record_count: int
+    records: tuple[ModelArtifactRecord, ...]
+
+
+@dataclass(frozen=True)
+class ModelArtifactWriteResult:
+    record: ModelArtifactRecord
+    manifest: ModelArtifactManifest
 
 
 def inspect_model_artifact_isolation(workspace: CaseWorkspace) -> ModelArtifactIsolationStatus:
@@ -139,6 +180,60 @@ def ensure_model_artifact_isolation(
     return inspect_model_artifact_isolation(workspace)
 
 
+def list_model_artifact_manifest(workspace: CaseWorkspace) -> ModelArtifactManifest:
+    return _read_manifest(workspace)
+
+
+def write_model_artifact(
+    workspace: CaseWorkspace,
+    *,
+    artifact_type: str,
+    content: str,
+    created_by: str,
+    content_type: str = "application/json",
+    source: str = "",
+    metadata: dict[str, Any] | None = None,
+) -> ModelArtifactWriteResult:
+    _require_isolation_ready(workspace)
+    artifact_type = artifact_type.strip().lower()
+    if artifact_type not in MODEL_ARTIFACT_TYPES:
+        raise WorkspaceError(f"Unsupported model artifact type: {artifact_type}.")
+    if not created_by.strip():
+        raise WorkspaceError("created_by cannot be empty.")
+    if not content.strip():
+        raise WorkspaceError("model artifact content cannot be empty.")
+
+    content_bytes = content.encode("utf-8")
+    if len(content_bytes) > MAX_MODEL_ARTIFACT_BYTES:
+        raise WorkspaceError("model artifact content exceeds prototype size limit.")
+
+    _read_manifest(workspace)
+    created_at = datetime.now(UTC)
+    artifact_id = f"{artifact_type}-{created_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
+    extension = "json" if content_type == "application/json" else "txt"
+    models_root = workspace.directory("models")
+    artifact_dir = (models_root / _ARTIFACT_TYPE_DIRECTORIES[artifact_type]).resolve()
+    _require_inside_workspace(workspace.root_path, artifact_dir)
+    artifact_path = (artifact_dir / f"{artifact_id}.{extension}").resolve()
+    _require_inside_workspace(workspace.root_path, artifact_path)
+    artifact_path.write_bytes(content_bytes)
+
+    record = ModelArtifactRecord(
+        artifact_id=artifact_id,
+        artifact_type=artifact_type,
+        relative_path=_relative_workspace_path(workspace.root_path, artifact_path),
+        sha256=hashlib.sha256(content_bytes).hexdigest(),
+        size_bytes=len(content_bytes),
+        content_type=content_type,
+        source=source.strip(),
+        created_by=created_by.strip(),
+        created_at=created_at,
+        metadata=metadata or {},
+    )
+    manifest = _append_manifest_record(workspace, record)
+    return ModelArtifactWriteResult(record=record, manifest=manifest)
+
+
 def _read_policy(path: Path) -> ModelArtifactPolicy | None:
     if not path.exists():
         return None
@@ -174,6 +269,90 @@ def _write_policy(path: Path, policy: ModelArtifactPolicy) -> None:
         "notes": list(policy.notes),
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _require_isolation_ready(workspace: CaseWorkspace) -> None:
+    status = inspect_model_artifact_isolation(workspace)
+    if status.state != "ready":
+        raise WorkspaceError("Model artifact isolation must be initialized before writing artifacts.")
+
+
+def _read_manifest(workspace: CaseWorkspace) -> ModelArtifactManifest:
+    models_root = workspace.directory("models")
+    manifest_path = models_root / MODEL_ARTIFACT_MANIFEST_FILE
+    if not manifest_path.exists():
+        return ModelArtifactManifest(
+            schema_version=MODEL_ARTIFACT_SCHEMA_VERSION,
+            workspace_id=workspace.manifest.workspace_id,
+            manifest_path=_relative_workspace_path(workspace.root_path, manifest_path),
+            record_count=0,
+            records=(),
+        )
+
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if raw.get("workspace_id") != workspace.manifest.workspace_id:
+            raise WorkspaceError("Model artifact manifest does not match workspace id.")
+        records = tuple(_artifact_record_from_dict(item) for item in raw.get("records", ()))
+    except WorkspaceError:
+        raise
+    except (json.JSONDecodeError, OSError, TypeError, KeyError, ValueError) as exc:
+        raise WorkspaceError("Model artifact manifest is unreadable.") from exc
+
+    return ModelArtifactManifest(
+        schema_version=int(raw.get("schema_version", MODEL_ARTIFACT_SCHEMA_VERSION)),
+        workspace_id=workspace.manifest.workspace_id,
+        manifest_path=_relative_workspace_path(workspace.root_path, manifest_path),
+        record_count=len(records),
+        records=records,
+    )
+
+
+def _append_manifest_record(
+    workspace: CaseWorkspace,
+    record: ModelArtifactRecord,
+) -> ModelArtifactManifest:
+    manifest = _read_manifest(workspace)
+    next_records = (*manifest.records, record)
+    models_root = workspace.directory("models")
+    manifest_path = models_root / MODEL_ARTIFACT_MANIFEST_FILE
+    payload = {
+        "schema_version": MODEL_ARTIFACT_SCHEMA_VERSION,
+        "workspace_id": workspace.manifest.workspace_id,
+        "records": [_artifact_record_to_dict(item) for item in next_records],
+    }
+    manifest_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    return _read_manifest(workspace)
+
+
+def _artifact_record_from_dict(raw: dict[str, Any]) -> ModelArtifactRecord:
+    return ModelArtifactRecord(
+        artifact_id=str(raw["artifact_id"]),
+        artifact_type=str(raw["artifact_type"]),
+        relative_path=str(raw["relative_path"]),
+        sha256=str(raw["sha256"]),
+        size_bytes=int(raw["size_bytes"]),
+        content_type=str(raw["content_type"]),
+        source=str(raw.get("source", "")),
+        created_by=str(raw["created_by"]),
+        created_at=datetime.fromisoformat(str(raw["created_at"])),
+        metadata=dict(raw.get("metadata", {})),
+    )
+
+
+def _artifact_record_to_dict(record: ModelArtifactRecord) -> dict[str, Any]:
+    return {
+        "artifact_id": record.artifact_id,
+        "artifact_type": record.artifact_type,
+        "relative_path": record.relative_path,
+        "sha256": record.sha256,
+        "size_bytes": record.size_bytes,
+        "content_type": record.content_type,
+        "source": record.source,
+        "created_by": record.created_by,
+        "created_at": record.created_at.isoformat(),
+        "metadata": record.metadata,
+    }
 
 
 def _relative_workspace_path(root_path: Path, path: Path) -> str:

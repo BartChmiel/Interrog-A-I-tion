@@ -118,6 +118,8 @@ from interrogaition.security.environment_health import build_environment_health_
 from interrogaition.security.model_artifacts import (
     ensure_model_artifact_isolation,
     inspect_model_artifact_isolation,
+    list_model_artifact_manifest,
+    write_model_artifact,
 )
 from interrogaition.storage.json_case_loader import load_case_from_json
 from interrogaition.storage.material_registry import (
@@ -181,6 +183,17 @@ class RegisterMaterialRequest:
 class ModelArtifactIsolationRequest:
     created_by: str = "local-ui"
     role: WorkspaceRole = WorkspaceRole.ADMIN
+
+
+@dataclass(frozen=True)
+class ModelArtifactWriteRequest:
+    artifact_type: str
+    content: str
+    created_by: str = "local-ui"
+    content_type: str = "application/json"
+    source: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
 
 
 @dataclass(frozen=True)
@@ -393,6 +406,62 @@ def create_app(
                 ensure_model_artifact_isolation(
                     workspace,
                     created_by=request.created_by,
+                )
+            )
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/workspaces/{workspace_id}/model-artifacts/manifest")
+    def get_workspace_model_artifact_manifest(
+        workspace_id: str,
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        try:
+            return _to_jsonable(list_model_artifact_manifest(workspace))
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/workspaces/{workspace_id}/model-artifacts/items")
+    def write_workspace_model_artifact(
+        workspace_id: str,
+        request: ModelArtifactWriteRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.RUN_REVIEW,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        try:
+            return _to_jsonable(
+                write_model_artifact(
+                    workspace,
+                    artifact_type=request.artifact_type,
+                    content=request.content,
+                    created_by=request.created_by,
+                    content_type=request.content_type,
+                    source=request.source,
+                    metadata=request.metadata,
                 )
             )
         except WorkspaceError as exc:

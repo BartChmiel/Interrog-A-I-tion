@@ -57,6 +57,10 @@ dedicated prompt, context, output, cache, and evaluation directories under
 `models/`, plus a local artifact policy manifest. The UI can initialize this
 isolation before real local model experiments.
 
+The model artifact panel also shows the current artifact manifest record count and
+the latest artifact type/hash. Artifact content is not manually edited in the UI;
+records are intended to be written by controlled model workflows.
+
 The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
 
 The case map also shows an advisory Evidence Alignment Indicator as a gradient bar with a numeric value, band (`insufficient review`, `low`, `medium`, `high`), reviewed/confidence meta, and explanation bullets. It is derived only from human-reviewed material-question links and does not assert truth, guilt, or credibility (see ADR 0017).
