@@ -960,7 +960,7 @@ h2 {
 }
 
 .material-card-footer {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 10px;
 }
@@ -977,6 +977,90 @@ h2 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.material-link-audit {
+  display: grid;
+  gap: 6px;
+}
+
+.material-link-audit details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 7px 8px;
+}
+
+.material-link-audit summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.material-link-audit p {
+  margin-top: 7px;
+  color: var(--muted);
+  line-height: 1.4;
+  font-size: 12px;
+}
+
+.matched-term-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.matched-term-list span,
+.matched-term-list em {
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #edf5fb;
+  color: var(--info);
+  font-size: 11px;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.material-preview {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.material-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.material-preview-header strong {
+  font-size: 13px;
+}
+
+.material-preview-header span,
+.material-preview p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.material-preview pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-radius: 8px;
+  background: #f8faf9;
+  color: var(--text);
+  padding: 9px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .answer-composer {

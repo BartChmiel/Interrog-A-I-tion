@@ -20,6 +20,7 @@ Goal: make every future AI suggestion traceable.
 Implemented:
 
 - workspace material register,
+- material preview and matched-term audit view,
 - material verification by hash and size,
 - material-question grounding links,
 - audited accepted/rejected material-question link decisions,
@@ -28,7 +29,6 @@ Implemented:
 
 Next:
 
-- material preview and matched-term audit view,
 - evidence graph nodes for materials, answers, claims, questions, and findings,
 - stronger distinction between official evidence, working notes, and synthetic training material,
 - import metadata for source, author, timestamp, chain-of-custody status, and legal sensitivity.
@@ -116,10 +116,10 @@ Implemented:
 - narrative consistency from structured claims,
 - source-of-knowledge coverage,
 - aggregate credibility review summary with limitations.
+- evidence alignment indicator using registered materials and human-reviewed links.
 
 Next:
 
-- evidence alignment indicator using registered materials,
 - explicit confidence and data-quality indicators,
 - indicator provenance panel,
 - separate "process quality" from "material reliability",
@@ -224,14 +224,14 @@ Design rule:
 
 ## Recommended Next Implementation Order
 
-1. Add evidence alignment indicator based on registered materials and reviewed links.
-2. Add material preview and matched-term audit view.
-3. Add local model configuration and Ollama smoke mode behind deterministic tests.
-4. STOP before trusting real model-generated suggestions in institutional live mode.
-5. Add SQLCipher installation route and encrypted workspace creation.
-6. Add model artifact isolation and environment health checks.
-7. Add richer synthetic evaluation scenarios for thesis measurements.
-8. Add audit viewer and exportable audit summaries after legal/UX wording review.
+1. Add local model configuration and Ollama smoke mode behind deterministic tests.
+2. STOP before trusting real model-generated suggestions in institutional live mode.
+3. Add SQLCipher installation route and encrypted workspace creation.
+4. Add model artifact isolation and environment health checks.
+5. Add richer synthetic evaluation scenarios for thesis measurements.
+6. Add audit viewer and exportable audit summaries after legal/UX wording review.
+7. Add explicit confidence/data-quality indicators and indicator provenance panel.
+8. Add evidence graph nodes for materials, answers, claims, questions, and findings.
 
 ## STOP Questions Before Live AI Output
 

@@ -307,6 +307,49 @@ def create_app(
 
         return {"materials": _to_jsonable(materials)}
 
+    @app.get("/workspaces/{workspace_id}/materials/{material_id}/preview")
+    def get_workspace_material_preview(
+        workspace_id: str,
+        material_id: str,
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            registry = MaterialRegistry(workspace)
+            materials = registry.list_materials()
+            record = next((item for item in materials if item.id == material_id), None)
+            if record is None:
+                raise MaterialRegistryError(f"Unknown material: {material_id}.")
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        try:
+            content = registry.read_material_text(material_id)
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        preview_limit = 4000
+        preview_text = content[:preview_limit]
+        return {
+            "material_id": record.id,
+            "title": record.title,
+            "mime_type": record.mime_type,
+            "text_preview": preview_text,
+            "truncated": len(content) > preview_limit,
+            "line_count": len(content.splitlines()) or (1 if content else 0),
+            "char_count": len(content),
+        }
+
     @app.post("/workspaces/{workspace_id}/materials")
     def register_workspace_material(
         workspace_id: str,

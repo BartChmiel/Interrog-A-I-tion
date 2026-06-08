@@ -58,11 +58,13 @@ hashes. Offline decisions remain local demo state only.
 
 The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
 
+Each material card can open a bounded text preview through the local API. The preview shows line/character counts and indicates when the backend truncated long material text.
+
 Registered materials are also linked deterministically to interview questions through shared topic signals. The active question shows linked materials, and each material card shows linked question ids with confidence values.
 
-Material cards also expose compact accept/reject controls for each
-material-question link. Online decisions are recorded through the backend audit
-chain; offline decisions remain local demo state.
+Material cards also expose compact accept/reject controls and matched-term audit
+details for each material-question link. Online decisions are recorded through the
+backend audit chain; offline decisions remain local demo state.
 
 ## Scripts
 

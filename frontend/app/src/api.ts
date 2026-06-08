@@ -11,6 +11,7 @@ import type {
   MaterialQuestionLinkDecisionResponse,
   MaterialLinksResponse,
   MaterialListResponse,
+  MaterialPreview,
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
@@ -146,6 +147,14 @@ export async function loadWorkspaceAccess(
 
 export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`);
+}
+
+export async function loadWorkspaceMaterialPreview(
+  config: RuntimeConfig,
+  materialId: string,
+): Promise<MaterialPreview> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  return fetchJson(config, `/workspaces/${workspaceId}/materials/${encodeURIComponent(materialId)}/preview`);
 }
 
 export async function loadMaterialQuestionLinks(

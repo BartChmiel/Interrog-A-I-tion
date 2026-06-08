@@ -60,6 +60,7 @@ class ApiAppTest(unittest.TestCase):
         get_access = endpoint(app, "get_workspace_access")
         register_material = endpoint(app, "register_workspace_material")
         list_materials = endpoint(app, "list_workspace_materials")
+        preview_material = endpoint(app, "get_workspace_material_preview")
         link_materials = endpoint(app, "link_workspace_materials_to_questions")
         record_link_decision = endpoint(app, "record_material_question_link_decision")
         get_evidence_map = endpoint(app, "get_workspace_evidence_map")
@@ -102,6 +103,7 @@ class ApiAppTest(unittest.TestCase):
             ),
         )
         materials = list_materials("api-workspace-001")
+        material_preview = preview_material("api-workspace-001", "api-material-001")
         material_links = link_materials("api-workspace-001", case_id="case-001", locale="en")
         first_link = material_links["links"][0]
         link_decision = record_link_decision(
@@ -171,6 +173,10 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(material["id"], "api-material-001")
         self.assertEqual(material["source_type"], "case_protocol")
         self.assertEqual(len(materials["materials"]), 1)
+        self.assertEqual(material_preview["material_id"], "api-material-001")
+        self.assertIn("bicycle", material_preview["text_preview"])
+        self.assertFalse(material_preview["truncated"])
+        self.assertEqual(material_preview["line_count"], 1)
         self.assertIn(
             "q-001",
             {link["question_id"] for link in material_links["links"]},

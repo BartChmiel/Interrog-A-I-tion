@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   Database,
+  Eye,
   FileCheck2,
   FileText,
   FolderArchive,
@@ -31,6 +32,7 @@ import {
   loadEvidenceMap,
   loadGroundedSuggestions,
   loadMaterialQuestionLinks,
+  loadWorkspaceMaterialPreview,
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceMaterials,
@@ -59,6 +61,7 @@ import type {
   Locale,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
+  MaterialPreview,
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
@@ -114,6 +117,8 @@ export function App() {
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
   const [materialQuestionLinkDecisions, setMaterialQuestionLinkDecisions] = useState<Record<string, MaterialQuestionLinkDecision>>({});
+  const [materialPreviews, setMaterialPreviews] = useState<Record<string, MaterialPreview>>({});
+  const [activeMaterialPreviewId, setActiveMaterialPreviewId] = useState<string | null>(null);
   const [evidenceMap, setEvidenceMap] = useState<EvidenceMap | null>(null);
   const [evidenceAlignment, setEvidenceAlignment] = useState<EvidenceAlignment | null>(null);
   const [groundedSuggestions, setGroundedSuggestions] = useState<GroundedSuggestion[]>([]);
@@ -228,6 +233,8 @@ export function App() {
       setWorkspaceMaterials([]);
       setMaterialQuestionLinks([]);
       setMaterialQuestionLinkDecisions({});
+      setMaterialPreviews({});
+      setActiveMaterialPreviewId(null);
       setEvidenceMap(null);
       setEvidenceAlignment(null);
       applyGroundedSuggestions(null);
@@ -475,6 +482,33 @@ export function App() {
     }
   }
 
+  async function toggleMaterialPreview(materialId: string) {
+    if (activeMaterialPreviewId === materialId) {
+      setActiveMaterialPreviewId(null);
+      return;
+    }
+
+    if (materialPreviews[materialId]) {
+      setActiveMaterialPreviewId(materialId);
+      return;
+    }
+
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    try {
+      const preview = await loadWorkspaceMaterialPreview(config, materialId);
+      setMaterialPreviews((current) => ({ ...current, [materialId]: preview }));
+      setActiveMaterialPreviewId(materialId);
+      setStatusKey("materialPreviewLoaded");
+    } catch (error) {
+      console.error("Could not load material preview.", error);
+      setStatusKey("materialPreviewFailed");
+    }
+  }
+
   async function decideMaterialQuestionLink(
     link: MaterialQuestionLink,
     decision: MaterialQuestionLinkDecision,
@@ -493,6 +527,9 @@ export function App() {
       ...current,
       [materialQuestionLinkKey(link)]: decision,
     }));
+    if (apiMode === "online") {
+      void loadEvidenceMapOrNull(locale).then(setEvidenceMap);
+    }
     setStatusKey(decision === "accepted" ? "linkAccepted" : "linkRejected");
   }
 
@@ -727,9 +764,12 @@ export function App() {
             locale={locale}
             links={materialQuestionLinks}
             materials={workspaceMaterials}
+            activePreviewId={activeMaterialPreviewId}
+            previews={materialPreviews}
             verifications={materialVerifications}
             onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
             onDraftChange={setMaterialDraft}
+            onPreview={(materialId) => void toggleMaterialPreview(materialId)}
             onSubmit={() => void registerMaterial()}
             onVerify={(materialId) => void verifyMaterial(materialId)}
           />
@@ -1128,6 +1168,7 @@ function suggestionDecisionLabel(decision: GroundedSuggestionDecision, locale: L
 }
 
 function MaterialsPanel({
+  activePreviewId,
   apiMode,
   decisions,
   draft,
@@ -1137,10 +1178,13 @@ function MaterialsPanel({
   materials,
   onDecideLink,
   onDraftChange,
+  onPreview,
   onSubmit,
   onVerify,
+  previews,
   verifications,
 }: {
+  activePreviewId: string | null;
   apiMode: ApiMode;
   decisions: Record<string, MaterialQuestionLinkDecision>;
   draft: MaterialDraft;
@@ -1150,8 +1194,10 @@ function MaterialsPanel({
   materials: MaterialRecord[];
   onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
   onDraftChange: (draft: MaterialDraft) => void;
+  onPreview: (materialId: string) => void;
   onSubmit: () => void;
   onVerify: (materialId: string) => void;
+  previews: Record<string, MaterialPreview>;
   verifications: Record<string, MaterialVerification>;
 }) {
   const disabled = apiMode !== "online" || isSubmitting;
@@ -1230,7 +1276,10 @@ function MaterialsPanel({
               links={links.filter((link) => link.material_id === material.id)}
               locale={locale}
               material={material}
+              preview={previews[material.id]}
+              previewOpen={activePreviewId === material.id}
               onDecideLink={onDecideLink}
+              onPreview={onPreview}
               onVerify={onVerify}
               verification={verifications[material.id]}
             />
@@ -1248,7 +1297,10 @@ function MaterialCard({
   links,
   locale,
   material,
+  preview,
+  previewOpen,
   onDecideLink,
+  onPreview,
   onVerify,
   verification,
 }: {
@@ -1256,7 +1308,10 @@ function MaterialCard({
   links: MaterialQuestionLink[];
   locale: Locale;
   material: MaterialRecord;
+  preview: MaterialPreview | undefined;
+  previewOpen: boolean;
   onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
+  onPreview: (materialId: string) => void;
   onVerify: (materialId: string) => void;
   verification: MaterialVerification | undefined;
 }) {
@@ -1296,11 +1351,18 @@ function MaterialCard({
         locale={locale}
         onDecideLink={onDecideLink}
       />
+      {previewOpen ? (
+        <MaterialPreviewPanel locale={locale} preview={preview} />
+      ) : null}
       <div className="material-card-footer">
         <span className="material-verification">
           <ShieldQuestion size={14} />
           {materialVerificationLabel(verification, locale)}
         </span>
+        <button type="button" onClick={() => onPreview(material.id)}>
+          <Eye size={14} />
+          {previewOpen ? text(locale, "hidePreview") : text(locale, "previewMaterial")}
+        </button>
         <button type="button" onClick={() => onVerify(material.id)}>
           <CheckCircle2 size={14} />
           {text(locale, "verifyMaterial")}
@@ -1361,6 +1423,53 @@ function MaterialQuestionChips({
           );
         })}
       </div>
+      <div className="material-link-audit">
+        {links.map((link) => (
+          <details key={`${materialQuestionLinkKey(link)}-audit`}>
+            <summary>
+              {link.question_id} / {text(locale, "matchedTerms")}
+            </summary>
+            <div className="matched-term-list">
+              {link.matched_terms.length ? (
+                link.matched_terms.map((term) => <span key={`${link.question_id}-${term}`}>{term}</span>)
+              ) : (
+                <em>{text(locale, "noMatchedTerms")}</em>
+              )}
+            </div>
+            <p>{link.rationale}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MaterialPreviewPanel({
+  locale,
+  preview,
+}: {
+  locale: Locale;
+  preview: MaterialPreview | undefined;
+}) {
+  if (!preview) {
+    return (
+      <div className="material-preview">
+        <strong>{text(locale, "materialPreview")}</strong>
+        <p>{text(locale, "loadingPreview")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="material-preview">
+      <div className="material-preview-header">
+        <strong>{text(locale, "materialPreview")}</strong>
+        <span>
+          {preview.line_count} {text(locale, "linesShort")} / {preview.char_count} {text(locale, "charsShort")}
+        </span>
+      </div>
+      <pre>{preview.text_preview}</pre>
+      {preview.truncated ? <p>{text(locale, "previewTruncated")}</p> : null}
     </div>
   );
 }

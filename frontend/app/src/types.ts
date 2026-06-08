@@ -170,6 +170,16 @@ export type MaterialListResponse = {
   materials: MaterialRecord[];
 };
 
+export type MaterialPreview = {
+  material_id: string;
+  title: string;
+  mime_type: string;
+  text_preview: string;
+  truncated: boolean;
+  line_count: number;
+  char_count: number;
+};
+
 export type MaterialVerification = {
   material_id: string;
   verified: boolean;

@@ -113,7 +113,7 @@ Success criteria:
 
 ## Milestone 6: Security Path
 
-Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, export integrity manifests, a workspace material register, deterministic material-question grounding links, audited material-question link decisions, a first topic-level case evidence map, an AI grounding context pack, live-visible grounded suggestions, and audited grounded-suggestion decisions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
+Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, export integrity manifests, a workspace material register, bounded material previews, deterministic material-question grounding links with matched-term audit details, audited material-question link decisions, a first topic-level case evidence map, an advisory Evidence Alignment Indicator, an AI grounding context pack, live-visible grounded suggestions, and audited grounded-suggestion decisions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
 
 Tasks:
 
@@ -121,9 +121,12 @@ Tasks:
 - append-only audit log,
 - export hash,
 - workspace material register,
+- bounded material preview,
 - material-question grounding links,
+- matched-term audit view,
 - audited accepted/rejected material-question link decisions,
 - topic-level case evidence map,
+- advisory evidence alignment indicator,
 - grounding context pack,
 - live-visible grounded suggestions,
 - citation validation warnings,

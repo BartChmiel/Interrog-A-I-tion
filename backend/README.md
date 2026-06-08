@@ -111,6 +111,7 @@ Workspace source materials can also be registered as controlled text records. Th
 ```text
 GET /workspaces/{workspace_id}/materials
 POST /workspaces/{workspace_id}/materials
+GET /workspaces/{workspace_id}/materials/{material_id}/preview
 GET /workspaces/{workspace_id}/materials/links?case_id=case-001
 POST /workspaces/{workspace_id}/materials/{material_id}/questions/{question_id}/decision
 GET /workspaces/{workspace_id}/materials/{material_id}/verification
@@ -120,6 +121,10 @@ POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id
 POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
 GET /workspaces/{workspace_id}/audit
 ```
+
+The material preview endpoint returns a bounded text preview with line and character
+counts plus a `truncated` flag. It uses the workspace read policy and reads through
+the material registry, so callers do not need direct filesystem access.
 
 The `evidence-map` endpoint also returns an `evidence_alignment` block: an advisory
 Evidence Alignment Indicator derived only from human-reviewed material-question links
