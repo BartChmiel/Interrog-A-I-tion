@@ -246,6 +246,19 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Model artifact isolation has reached its first review point.
+
+The project owner should evaluate:
+
+- whether prompt, context, output, cache, and evaluation directories are sufficient,
+- whether model cache should remain workspace-local even when Ollama uses its own global model store,
+- whether prompt/context/output snapshots should be persisted for every model call or only for evaluation runs,
+- whether artifact policy initialization should require an admin role in the future UI,
+- whether model artifacts must be encrypted before any non-synthetic material is used,
+- whether artifact manifests should become part of export integrity checks.
+
+## Current STOP
+
 Milestone 3/6: Local model runtime configuration has reached its first review point.
 
 The project owner should evaluate:

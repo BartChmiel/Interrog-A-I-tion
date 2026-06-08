@@ -9,6 +9,7 @@ import type {
   InterviewSession,
   LocalModelConfig,
   LocalModelSmokeResult,
+  ModelArtifactIsolationStatus,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
   MaterialQuestionLinkDecisionResponse,
@@ -160,6 +161,24 @@ export async function loadWorkspaceAccess(
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({ role, action });
   return fetchJson(config, `/workspaces/${workspaceId}/access?${query.toString()}`);
+}
+
+export async function loadModelArtifactIsolation(
+  config: RuntimeConfig,
+): Promise<ModelArtifactIsolationStatus> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/model-artifacts`);
+}
+
+export async function ensureModelArtifactIsolation(
+  config: RuntimeConfig,
+): Promise<ModelArtifactIsolationStatus> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/model-artifacts/isolation`, {
+    method: "POST",
+    body: JSON.stringify({
+      created_by: "local-ui",
+      role: "admin",
+    }),
+  });
 }
 
 export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {

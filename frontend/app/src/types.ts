@@ -157,6 +157,21 @@ export type LocalModelSmokeResult = {
   completion_tokens: number | null;
 };
 
+export type ModelArtifactIsolationStatus = {
+  workspace_id: string;
+  state: EnvironmentHealthState;
+  root: string;
+  policy_path: string;
+  policy_exists: boolean;
+  missing_directories: string[];
+  directory_count: number;
+  external_cache_allowed: boolean;
+  network_artifacts_allowed: boolean;
+  sensitive_material_allowed: boolean;
+  detail: string;
+  warnings: string[];
+};
+
 export type WorkspaceManifest = {
   schema_version: number;
   workspace_id: string;

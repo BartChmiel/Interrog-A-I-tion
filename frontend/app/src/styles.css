@@ -915,7 +915,8 @@ h2 {
   line-height: 1.35;
 }
 
-.model-runtime-panel {
+.model-runtime-panel,
+.model-artifact-panel {
   display: grid;
   gap: 9px;
   margin: 10px 12px 12px;
@@ -925,12 +926,18 @@ h2 {
   background: var(--surface-strong);
 }
 
-.model-runtime-panel[data-state="ready"] {
+.model-runtime-panel[data-state="ready"],
+.model-artifact-panel[data-state="ready"] {
   border-color: #b9dccb;
 }
 
-.model-runtime-panel[data-state="warning"] {
+.model-runtime-panel[data-state="warning"],
+.model-artifact-panel[data-state="warning"] {
   border-color: #ead39c;
+}
+
+.model-artifact-panel[data-state="blocked"] {
+  border-color: #e5b6ad;
 }
 
 .model-runtime-header {
@@ -946,7 +953,8 @@ h2 {
   font-size: 13px;
 }
 
-.model-runtime-panel ul {
+.model-runtime-panel ul,
+.model-artifact-panel ul {
   margin: 0;
   padding-left: 16px;
   display: grid;
@@ -956,14 +964,16 @@ h2 {
   line-height: 1.35;
 }
 
-.model-runtime-panel p {
+.model-runtime-panel p,
+.model-artifact-panel p {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
   overflow-wrap: anywhere;
 }
 
-.model-runtime-panel button {
+.model-runtime-panel button,
+.model-artifact-panel button {
   min-height: 32px;
   display: inline-flex;
   align-items: center;
@@ -976,7 +986,8 @@ h2 {
   cursor: pointer;
 }
 
-.model-runtime-panel button:disabled {
+.model-runtime-panel button:disabled,
+.model-artifact-panel button:disabled {
   cursor: progress;
   opacity: 0.65;
 }

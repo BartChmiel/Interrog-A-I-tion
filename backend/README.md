@@ -121,7 +121,14 @@ The local API exposes prototype workspace creation, manifest loading, and access
 POST /workspaces
 GET /workspaces/{workspace_id}
 GET /workspaces/{workspace_id}/access
+GET /workspaces/{workspace_id}/model-artifacts
+POST /workspaces/{workspace_id}/model-artifacts/isolation
 ```
+
+Model artifact isolation uses the workspace `models/` directory. The initializer
+creates dedicated prompt, context, output, cache, and evaluation directories plus
+`models/artifact-policy.json`. External cache and network artifacts remain disabled
+by default.
 
 Workspace source materials can also be registered as controlled text records. The prototype stores each material under the workspace `imports/` directory, records metadata in `imports/materials.json`, and verifies SHA-256 plus file size:
 

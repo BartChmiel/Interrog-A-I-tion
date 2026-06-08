@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import {
   addAnswer,
+  ensureModelArtifactIsolation,
   ensureWorkspace,
   loadCaseReview,
   loadEncryptionStatus,
@@ -34,6 +35,7 @@ import {
   loadGroundedSuggestions,
   loadLocalModelConfig,
   loadMaterialQuestionLinks,
+  loadModelArtifactIsolation,
   loadWorkspaceMaterialPreview,
   loadSessionReview,
   loadWorkspaceAccess,
@@ -66,6 +68,7 @@ import type {
   Locale,
   LocalModelConfig,
   LocalModelSmokeResult,
+  ModelArtifactIsolationStatus,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
   MaterialPreview,
@@ -122,6 +125,7 @@ export function App() {
   const [environmentHealth, setEnvironmentHealth] = useState<EnvironmentHealth | null>(null);
   const [localModelConfig, setLocalModelConfig] = useState<LocalModelConfig | null>(null);
   const [localModelSmoke, setLocalModelSmoke] = useState<LocalModelSmokeResult | null>(null);
+  const [modelArtifactIsolation, setModelArtifactIsolation] = useState<ModelArtifactIsolationStatus | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
@@ -148,6 +152,7 @@ export function App() {
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMaterialSubmitting, setIsMaterialSubmitting] = useState(false);
+  const [isArtifactIsolationSubmitting, setIsArtifactIsolationSubmitting] = useState(false);
   const [isModelSmokeRunning, setIsModelSmokeRunning] = useState(false);
   const didInitializeApi = useRef(false);
 
@@ -224,8 +229,16 @@ export function App() {
         loadLocalModelConfig(config),
         ensureWorkspace(config),
       ]);
-      const [access, materialList, materialLinks, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
+      const [
+        access,
+        artifactIsolation,
+        materialList,
+        materialLinks,
+        nextEvidenceMap,
+        nextGroundedSuggestions,
+      ] = await Promise.all([
         loadWorkspaceAccess(config),
+        loadModelArtifactIsolation(config),
         loadWorkspaceMaterials(config),
         loadMaterialQuestionLinksOrEmpty(locale),
         loadEvidenceMapOrNull(locale),
@@ -234,6 +247,7 @@ export function App() {
       setEncryptionStatus(security);
       setEnvironmentHealth(health);
       setLocalModelConfig(modelConfig);
+      setModelArtifactIsolation(artifactIsolation);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
       setWorkspaceMaterials(sortMaterials(materialList.materials));
@@ -246,6 +260,7 @@ export function App() {
       setEnvironmentHealth(null);
       setLocalModelConfig(null);
       setLocalModelSmoke(null);
+      setModelArtifactIsolation(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
       setWorkspaceMaterials([]);
@@ -519,6 +534,27 @@ export function App() {
     }
   }
 
+  async function initializeModelArtifactIsolation() {
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    setIsArtifactIsolationSubmitting(true);
+    try {
+      const isolation = await ensureModelArtifactIsolation(config);
+      const health = await loadEnvironmentHealth(config);
+      setModelArtifactIsolation(isolation);
+      setEnvironmentHealth(health);
+      setStatusKey("artifactIsolationReady");
+    } catch (error) {
+      console.error("Could not initialize model artifact isolation.", error);
+      setStatusKey("artifactIsolationFailed");
+    } finally {
+      setIsArtifactIsolationSubmitting(false);
+    }
+  }
+
   async function toggleMaterialPreview(materialId: string) {
     if (activeMaterialPreviewId === materialId) {
       setActiveMaterialPreviewId(null);
@@ -767,11 +803,14 @@ export function App() {
             accessDecision={workspaceAccess}
             encryptionStatus={encryptionStatus}
             environmentHealth={environmentHealth}
+            isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
             isModelSmokeRunning={isModelSmokeRunning}
             locale={locale}
             localModelConfig={localModelConfig}
             localModelSmoke={localModelSmoke}
+            modelArtifactIsolation={modelArtifactIsolation}
             materials={workspaceMaterials}
+            onArtifactIsolation={() => void initializeModelArtifactIsolation()}
             onModelSmoke={() => void smokeLocalModel()}
             workspace={workspace}
           />
@@ -1531,22 +1570,28 @@ function SecurityPanel({
   accessDecision,
   encryptionStatus,
   environmentHealth,
+  isArtifactIsolationSubmitting,
   isModelSmokeRunning,
   locale,
   localModelConfig,
   localModelSmoke,
+  modelArtifactIsolation,
   materials,
+  onArtifactIsolation,
   onModelSmoke,
   workspace,
 }: {
   accessDecision: WorkspaceAccessDecision | null;
   encryptionStatus: EncryptionStatus | null;
   environmentHealth: EnvironmentHealth | null;
+  isArtifactIsolationSubmitting: boolean;
   isModelSmokeRunning: boolean;
   locale: Locale;
   localModelConfig: LocalModelConfig | null;
   localModelSmoke: LocalModelSmokeResult | null;
+  modelArtifactIsolation: ModelArtifactIsolationStatus | null;
   materials: MaterialRecord[];
+  onArtifactIsolation: () => void;
   onModelSmoke: () => void;
   workspace: WorkspaceResponse | null;
 }) {
@@ -1671,7 +1716,64 @@ function SecurityPanel({
           {isModelSmokeRunning ? "..." : text(locale, "runModelSmoke")}
         </button>
       </div>
+      <ModelArtifactIsolationPanel
+        isSubmitting={isArtifactIsolationSubmitting}
+        isolation={modelArtifactIsolation}
+        locale={locale}
+        onInitialize={onArtifactIsolation}
+      />
     </section>
+  );
+}
+
+function ModelArtifactIsolationPanel({
+  isSubmitting,
+  isolation,
+  locale,
+  onInitialize,
+}: {
+  isSubmitting: boolean;
+  isolation: ModelArtifactIsolationStatus | null;
+  locale: Locale;
+  onInitialize: () => void;
+}) {
+  const state = isolation?.state ?? "unknown";
+  return (
+    <div className="model-artifact-panel" data-state={state}>
+      <div className="model-runtime-header">
+        <span className="security-icon">
+          <FolderArchive size={15} />
+        </span>
+        <div>
+          <span className="security-label">{text(locale, "modelArtifacts")}</span>
+          <strong>{isolation?.policy_exists ? text(locale, "ready") : text(locale, "notReady")}</strong>
+          <span className="security-detail">
+            {isolation ? `${isolation.directory_count}/5 ${text(locale, "artifactDirs")}` : text(locale, "unknown")}
+          </span>
+        </div>
+      </div>
+      {isolation ? (
+        <>
+          <p>{isolation.detail}</p>
+          {isolation.warnings.length ? (
+            <ul>
+              {isolation.warnings.slice(0, 3).map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+          {isolation.missing_directories.length ? (
+            <p>
+              {text(locale, "missingArtifactDirs")}: {isolation.missing_directories.join(", ")}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+      <button disabled={isSubmitting} type="button" onClick={onInitialize}>
+        <FolderArchive size={14} />
+        {isSubmitting ? "..." : text(locale, "initializeArtifacts")}
+      </button>
+    </div>
   );
 }
 

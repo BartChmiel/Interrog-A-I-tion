@@ -8,6 +8,7 @@ from interrogaition.api.app import (
     GroundedSuggestionDecisionRequest,
     HTTPException,
     MaterialQuestionLinkDecisionRequest,
+    ModelArtifactIsolationRequest,
     RegisterMaterialRequest,
     StartSessionRequest,
     create_app,
@@ -109,6 +110,8 @@ class ApiAppTest(unittest.TestCase):
         create_workspace = endpoint(app, "create_workspace")
         get_workspace = endpoint(app, "get_workspace")
         get_access = endpoint(app, "get_workspace_access")
+        get_model_artifacts = endpoint(app, "get_workspace_model_artifacts")
+        ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
         register_material = endpoint(app, "register_workspace_material")
         list_materials = endpoint(app, "list_workspace_materials")
         preview_material = endpoint(app, "get_workspace_material_preview")
@@ -142,6 +145,11 @@ class ApiAppTest(unittest.TestCase):
             action=WorkspaceAction.WRITE_INTERVIEW,
         )
         encryption_status = get_encryption_status()
+        model_artifacts_before = get_model_artifacts("api-workspace-001")
+        model_artifacts_after = ensure_model_artifacts(
+            "api-workspace-001",
+            ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
+        )
         material = register_material(
             "api-workspace-001",
             RegisterMaterialRequest(
@@ -221,6 +229,11 @@ class ApiAppTest(unittest.TestCase):
         self.assertTrue(allowed["allowed"])
         self.assertFalse(denied["allowed"])
         self.assertFalse(encryption_status["available"])
+        self.assertEqual(model_artifacts_before["state"], "warning")
+        self.assertFalse(model_artifacts_before["policy_exists"])
+        self.assertEqual(model_artifacts_after["state"], "ready")
+        self.assertEqual(model_artifacts_after["directory_count"], 5)
+        self.assertFalse(model_artifacts_after["external_cache_allowed"])
         self.assertEqual(material["id"], "api-material-001")
         self.assertEqual(material["source_type"], "case_protocol")
         self.assertEqual(len(materials["materials"]), 1)

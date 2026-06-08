@@ -57,6 +57,7 @@ Implemented:
 - grounded prompt rendering from `GroundingContextPack`,
 - local model runtime configuration,
 - deterministic model smoke endpoint and UI control,
+- workspace-local model artifact isolation,
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
 - audit metadata for prompt version, model id, context hash, and output hash,
@@ -149,13 +150,13 @@ Implemented:
 - export integrity manifest,
 - SQLCipher readiness gate,
 - environment health report,
+- workspace-local model artifact isolation,
 - synthetic-only safe prototype path.
 
 Next:
 
 - choose and document SQLCipher installation route,
 - implement encrypted workspace creation once runtime support is verified,
-- model cache and artifact isolation,
 - role-based UI affordances,
 - signed export manifests,
 - backup and archival policy,
@@ -230,7 +231,7 @@ Design rule:
 
 1. STOP before running real Ollama smoke or trusting real model-generated suggestions in live mode.
 2. Add SQLCipher installation route and encrypted workspace creation.
-3. Add model artifact isolation and installer/deployment health checks.
+3. Add installer/deployment health checks and model artifact write manifests.
 4. Add richer synthetic evaluation scenarios for thesis measurements.
 5. Add audit viewer and exportable audit summaries after legal/UX wording review.
 6. Add explicit confidence/data-quality indicators and indicator provenance panel.

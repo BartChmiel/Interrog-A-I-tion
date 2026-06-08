@@ -115,6 +115,10 @@ from interrogaition.security.case_workspace import (
     WorkspaceError,
 )
 from interrogaition.security.environment_health import build_environment_health_report
+from interrogaition.security.model_artifacts import (
+    ensure_model_artifact_isolation,
+    inspect_model_artifact_isolation,
+)
 from interrogaition.storage.json_case_loader import load_case_from_json
 from interrogaition.storage.material_registry import (
     MaterialRegistry,
@@ -171,6 +175,12 @@ class RegisterMaterialRequest:
     mime_type: str = "text/plain"
     original_name: str | None = None
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
+@dataclass(frozen=True)
+class ModelArtifactIsolationRequest:
+    created_by: str = "local-ui"
+    role: WorkspaceRole = WorkspaceRole.ADMIN
 
 
 @dataclass(frozen=True)
@@ -336,6 +346,57 @@ def create_app(
                 manifest=workspace.manifest,
             )
         )
+
+    @app.get("/workspaces/{workspace_id}/model-artifacts")
+    def get_workspace_model_artifacts(
+        workspace_id: str,
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        try:
+            return _to_jsonable(inspect_model_artifact_isolation(workspace))
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/workspaces/{workspace_id}/model-artifacts/isolation")
+    def ensure_workspace_model_artifact_isolation(
+        workspace_id: str,
+        request: ModelArtifactIsolationRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.MANAGE_WORKSPACE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        try:
+            return _to_jsonable(
+                ensure_model_artifact_isolation(
+                    workspace,
+                    created_by=request.created_by,
+                )
+            )
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/workspaces/{workspace_id}/materials")
     def list_workspace_materials(workspace_id: str) -> dict[str, Any]:
