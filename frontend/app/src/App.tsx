@@ -63,6 +63,7 @@ import type {
   EvidenceTopicStatus,
   GroundedSuggestionDecision,
   GroundedSuggestion,
+  GroundedSuggestionsResponse,
   GroundedSuggestionWarning,
   Indicator,
   InterviewSession,
@@ -311,17 +312,7 @@ export function App() {
   async function loadGroundedSuggestionsOrEmpty(
     nextLocale: Locale,
     questionId: string,
-  ): Promise<{
-    suggestions: GroundedSuggestion[];
-    warnings: GroundedSuggestionWarning[];
-    model: string;
-    prompt_version: string;
-    context_hash: string;
-    output_hash: string;
-    context_artifact?: ModelArtifactSummary | null;
-    output_artifact?: ModelArtifactSummary | null;
-    artifact_warning?: string | null;
-  } | null> {
+  ): Promise<GroundedSuggestionsResponse | null> {
     try {
       return await loadGroundedSuggestions(config, nextLocale, questionId);
     } catch (error) {
@@ -330,19 +321,19 @@ export function App() {
     }
   }
 
-  function applyGroundedSuggestions(
-    response: {
-      suggestions: GroundedSuggestion[];
-      warnings: GroundedSuggestionWarning[];
-      model: string;
-      prompt_version: string;
-      context_hash: string;
-      output_hash: string;
-      context_artifact?: ModelArtifactSummary | null;
-      output_artifact?: ModelArtifactSummary | null;
-      artifact_warning?: string | null;
-    } | null,
-  ) {
+  function refreshModelArtifactManifestAfterCapture(response: GroundedSuggestionsResponse | null) {
+    if (!response?.context_artifact && !response?.output_artifact) {
+      return;
+    }
+
+    void loadModelArtifactManifest(config)
+      .then(setModelArtifactManifest)
+      .catch((error) => {
+        console.warn("Could not refresh model artifact manifest after grounded suggestions.", error);
+      });
+  }
+
+  function applyGroundedSuggestions(response: GroundedSuggestionsResponse | null) {
     setGroundedSuggestions(response?.suggestions ?? []);
     setGroundedSuggestionWarnings(response?.warnings ?? []);
     setGroundedSuggestionMeta(
@@ -360,6 +351,7 @@ export function App() {
     );
     setSuggestionDrafts({});
     setSuggestionDecisions({});
+    refreshModelArtifactManifestAfterCapture(response);
   }
 
   async function startOrResumeSession(runtime: RuntimeConfig) {
