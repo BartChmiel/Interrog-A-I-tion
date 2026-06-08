@@ -117,6 +117,23 @@ export type EncryptionStatus = {
   checked_at: string;
 };
 
+export type EnvironmentHealthState = "ready" | "warning" | "blocked" | "unknown";
+
+export type EnvironmentHealthCheck = {
+  id: string;
+  label: string;
+  state: EnvironmentHealthState;
+  detail: string;
+  remediation: string;
+};
+
+export type EnvironmentHealth = {
+  state: EnvironmentHealthState;
+  generated_at: string;
+  checks: EnvironmentHealthCheck[];
+  summary: Record<string, number>;
+};
+
 export type LocalModelConfig = {
   provider: string;
   effective_provider: string;

@@ -39,6 +39,24 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(endpoint(app, "health")(), {"status": "ok"})
         self.assertEqual(endpoint(app, "locales")(), {"locales": ["en", "pl"]})
 
+    def test_environment_health_endpoint_reports_readiness_checks(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"health-workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+
+        report = endpoint(app, "get_environment_health")()
+        checks = {check["id"]: check for check in report["checks"]}
+
+        self.assertEqual(report["state"], "warning")
+        self.assertIn("generated_at", report)
+        self.assertEqual(checks["api"]["state"], "ready")
+        self.assertEqual(checks["synthetic_cases"]["state"], "ready")
+        self.assertEqual(checks["encryption"]["state"], "warning")
+        self.assertEqual(checks["local_model"]["state"], "ready")
+
     def test_local_model_config_and_deterministic_smoke_endpoint(self) -> None:
         app = create_app()
 

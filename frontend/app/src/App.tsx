@@ -29,6 +29,7 @@ import {
   ensureWorkspace,
   loadCaseReview,
   loadEncryptionStatus,
+  loadEnvironmentHealth,
   loadEvidenceMap,
   loadGroundedSuggestions,
   loadLocalModelConfig,
@@ -52,6 +53,8 @@ import type {
   ApiMode,
   CaseData,
   EncryptionStatus,
+  EnvironmentHealth,
+  EnvironmentHealthState,
   EvidenceAlignment,
   EvidenceMap,
   EvidenceTopicStatus,
@@ -116,6 +119,7 @@ export function App() {
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
+  const [environmentHealth, setEnvironmentHealth] = useState<EnvironmentHealth | null>(null);
   const [localModelConfig, setLocalModelConfig] = useState<LocalModelConfig | null>(null);
   const [localModelSmoke, setLocalModelSmoke] = useState<LocalModelSmokeResult | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
@@ -214,8 +218,9 @@ export function App() {
 
   async function refreshSecurityState() {
     try {
-      const [security, modelConfig, ensuredWorkspace] = await Promise.all([
+      const [security, health, modelConfig, ensuredWorkspace] = await Promise.all([
         loadEncryptionStatus(config),
+        loadEnvironmentHealth(config),
         loadLocalModelConfig(config),
         ensureWorkspace(config),
       ]);
@@ -227,6 +232,7 @@ export function App() {
         loadGroundedSuggestionsOrEmpty(locale, activeQuestionId),
       ]);
       setEncryptionStatus(security);
+      setEnvironmentHealth(health);
       setLocalModelConfig(modelConfig);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
@@ -237,6 +243,7 @@ export function App() {
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
+      setEnvironmentHealth(null);
       setLocalModelConfig(null);
       setLocalModelSmoke(null);
       setWorkspace(null);
@@ -759,6 +766,7 @@ export function App() {
           <SecurityPanel
             accessDecision={workspaceAccess}
             encryptionStatus={encryptionStatus}
+            environmentHealth={environmentHealth}
             isModelSmokeRunning={isModelSmokeRunning}
             locale={locale}
             localModelConfig={localModelConfig}
@@ -1522,6 +1530,7 @@ function materialQuestionLinkDecisionLabel(
 function SecurityPanel({
   accessDecision,
   encryptionStatus,
+  environmentHealth,
   isModelSmokeRunning,
   locale,
   localModelConfig,
@@ -1532,6 +1541,7 @@ function SecurityPanel({
 }: {
   accessDecision: WorkspaceAccessDecision | null;
   encryptionStatus: EncryptionStatus | null;
+  environmentHealth: EnvironmentHealth | null;
   isModelSmokeRunning: boolean;
   locale: Locale;
   localModelConfig: LocalModelConfig | null;
@@ -1582,6 +1592,7 @@ function SecurityPanel({
         meta={manifest?.status ?? text(locale, "unknown")}
         compact
       />
+      <EnvironmentHealthPanel health={environmentHealth} locale={locale} />
       <div className="security-list">
         <SecurityItem
           detail={manifest?.data_sensitivity ?? text(locale, "unknown")}
@@ -1664,6 +1675,51 @@ function SecurityPanel({
   );
 }
 
+function EnvironmentHealthPanel({
+  health,
+  locale,
+}: {
+  health: EnvironmentHealth | null;
+  locale: Locale;
+}) {
+  if (!health) {
+    return (
+      <div className="environment-health" data-state="unknown">
+        <div className="environment-health-header">
+          <strong>{text(locale, "environmentHealth")}</strong>
+          <span>{text(locale, "unknown")}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="environment-health" data-state={health.state}>
+      <div className="environment-health-header">
+        <strong>{text(locale, "environmentHealth")}</strong>
+        <span>{environmentStateLabel(health.state, locale)}</span>
+      </div>
+      <div className="environment-health-summary">
+        <span>{text(locale, "ready")}: {health.summary.ready ?? 0}</span>
+        <span>{text(locale, "warning")}: {health.summary.warning ?? 0}</span>
+        <span>{text(locale, "blocked")}: {health.summary.blocked ?? 0}</span>
+      </div>
+      <div className="environment-health-checks">
+        {health.checks.map((check) => (
+          <details data-state={check.state} key={check.id}>
+            <summary>
+              <span>{check.label}</span>
+              <em>{environmentStateLabel(check.state, locale)}</em>
+            </summary>
+            <p>{check.detail}</p>
+            {check.remediation ? <p>{check.remediation}</p> : null}
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SecurityItem({
   detail,
   icon,
@@ -1687,6 +1743,16 @@ function SecurityItem({
       </div>
     </article>
   );
+}
+
+function environmentStateLabel(state: EnvironmentHealthState, locale: Locale): string {
+  const keys: Record<EnvironmentHealthState, CopyKey> = {
+    blocked: "blocked",
+    ready: "ready",
+    unknown: "unknown",
+    warning: "warning",
+  };
+  return text(locale, keys[state]);
 }
 
 function storageModeLabel(

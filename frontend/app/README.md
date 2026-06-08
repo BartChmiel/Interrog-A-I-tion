@@ -43,6 +43,10 @@ Supported runtime query parameters:
 
 The right insight rail includes a compact security panel backed by the local API. It shows the current workspace, storage mode, encryption runtime status, workspace access decision, and export manifest readiness.
 
+The security rail begins with an environment health report. It summarizes local API
+readiness, synthetic fixtures, workspace root status, encryption readiness, and
+local model gating with expandable details and remediation text.
+
 The security rail also shows local model runtime readiness. It displays the
 configured model, effective provider, live-output gate, runtime restrictions, and a
 safe smoke-test button. The smoke check is deterministic by default and does not

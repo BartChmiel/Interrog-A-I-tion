@@ -114,6 +114,7 @@ from interrogaition.security.case_workspace import (
     StorageMode,
     WorkspaceError,
 )
+from interrogaition.security.environment_health import build_environment_health_report
 from interrogaition.storage.json_case_loader import load_case_from_json
 from interrogaition.storage.material_registry import (
     MaterialRegistry,
@@ -250,6 +251,17 @@ def create_app(
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/environment/health")
+    def get_environment_health() -> dict[str, Any]:
+        return _to_jsonable(
+            build_environment_health_report(
+                synthetic_cases_root=SYNTHETIC_CASES_ROOT,
+                workspace_root=workspace_manager.root_path,
+                encryption_status=workspace_manager.encryption_status(),
+                local_model_config=local_model_config,
+            )
+        )
 
     @app.get("/locales")
     def locales() -> dict[str, list[str]]:

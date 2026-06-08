@@ -813,6 +813,108 @@ h2 {
   font-size: 12px;
 }
 
+.environment-health {
+  display: grid;
+  gap: 9px;
+  margin: 0 12px 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.environment-health[data-state="ready"] {
+  border-color: #b9dccb;
+}
+
+.environment-health[data-state="warning"] {
+  border-color: #ead39c;
+}
+
+.environment-health[data-state="blocked"] {
+  border-color: #e5b6ad;
+}
+
+.environment-health-header,
+.environment-health-summary,
+.environment-health-checks summary {
+  display: flex;
+  align-items: center;
+}
+
+.environment-health-header {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.environment-health-header strong {
+  font-size: 13px;
+}
+
+.environment-health-header span,
+.environment-health-summary,
+.environment-health-checks em,
+.environment-health-checks p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.environment-health-summary {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.environment-health-summary span {
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.environment-health-checks {
+  display: grid;
+  gap: 6px;
+}
+
+.environment-health-checks details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 7px 8px;
+}
+
+.environment-health-checks details[data-state="ready"] {
+  border-color: #b9dccb;
+}
+
+.environment-health-checks details[data-state="warning"] {
+  border-color: #ead39c;
+}
+
+.environment-health-checks details[data-state="blocked"] {
+  border-color: #e5b6ad;
+}
+
+.environment-health-checks summary {
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.environment-health-checks summary span {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.environment-health-checks em {
+  font-style: normal;
+}
+
+.environment-health-checks p {
+  margin-top: 7px;
+  line-height: 1.35;
+}
+
 .model-runtime-panel {
   display: grid;
   gap: 9px;

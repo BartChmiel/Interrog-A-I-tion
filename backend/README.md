@@ -96,7 +96,12 @@ Encrypted workspace creation is also blocked until the local SQLite runtime repo
 
 ```text
 GET /security/encryption
+GET /environment/health
 ```
+
+The environment health endpoint summarizes local API readiness, synthetic fixtures,
+workspace root status, encrypted-storage readiness, and local model runtime gating.
+It is deterministic and does not run a real model or import sensitive data.
 
 Local model runtime readiness is exposed separately from the live suggestion workflow:
 

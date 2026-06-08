@@ -1,6 +1,7 @@
 import type {
   CaseReviewResponse,
   EncryptionStatus,
+  EnvironmentHealth,
   GroundedSuggestionDecision,
   GroundedSuggestionDecisionResponse,
   EvidenceMapResponse,
@@ -99,6 +100,10 @@ export async function loadSessionReview(
 
 export async function loadEncryptionStatus(config: RuntimeConfig): Promise<EncryptionStatus> {
   return fetchJson(config, "/security/encryption");
+}
+
+export async function loadEnvironmentHealth(config: RuntimeConfig): Promise<EnvironmentHealth> {
+  return fetchJson(config, "/environment/health");
 }
 
 export async function loadLocalModelConfig(config: RuntimeConfig): Promise<LocalModelConfig> {
