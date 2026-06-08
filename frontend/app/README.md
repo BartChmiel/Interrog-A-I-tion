@@ -59,7 +59,9 @@ isolation before real local model experiments.
 
 The model artifact panel also shows the current artifact manifest record count and
 the latest artifact type/hash. Artifact content is not manually edited in the UI;
-records are intended to be written by controlled model workflows.
+records are intended to be written by controlled model workflows. Backend writes
+deduplicate repeated artifacts by type and SHA-256, so deterministic refreshes can
+reuse existing prompt/context/output records.
 
 The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
 
@@ -69,11 +71,11 @@ The same rail includes a grounded AI panel. It calls the local
 `/grounded-suggestions` endpoint for the active question and shows suggested
 follow-up questions, topic gaps, potential inconsistencies, and summaries with
 their reasons, source ids, model id, prompt version, citation warnings, and compact
-grounded-suggestion artifact ids/hashes when the backend captured context/output
+grounded-suggestion artifact ids/hashes when the backend captured prompt/context/output
 artifacts.
 Each suggestion has `use`, `edit`, and `reject` controls. Online decisions are
 recorded through the backend append-only audit chain with the original text,
-final operator text, source ids, model id, prompt version, and context/output
+final operator text, source ids, model id, prompt version, and prompt/context/output
 hashes. Offline decisions remain local demo state only.
 
 The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.

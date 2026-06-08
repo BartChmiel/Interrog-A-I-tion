@@ -57,6 +57,7 @@ export type GroundedSuggestionDecisionPayload = {
   confidence: number | null;
   model: string;
   prompt_version: string;
+  prompt_hash: string;
   context_hash: string;
   output_hash: string;
   question_id: string;

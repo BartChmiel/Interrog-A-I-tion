@@ -31,6 +31,8 @@ class GroundedSuggestionResult:
     batch: ParsedSuggestionBatch
     warnings: tuple[GroundedSuggestionWarning, ...]
     prompt_version: str
+    prompt_hash: str
+    prompt_text: str
     context_hash: str
     output_hash: str
     output_text: str
@@ -46,11 +48,17 @@ def generate_grounded_suggestions(
     """Generate model suggestions and validate source citations against the grounding pack."""
 
     user_prompt = render_grounded_followup_user_prompt(grounding_pack, locale=locale)
+    context_hash = _sha256_json(grounding_pack)
     request = ModelRequest(
         system_prompt=load_system_prompt("grounded_followup_questions.system.md"),
         user_prompt=user_prompt,
         temperature=0.2,
         response_format="json",
+    )
+    prompt_text = _prompt_artifact_text(
+        request=request,
+        prompt_version=PROMPT_VERSION,
+        context_hash=context_hash,
     )
     response = model_client.complete(request)
     batch = parse_suggestion_response(response.text, model=response.model)
@@ -66,10 +74,32 @@ def generate_grounded_suggestions(
         batch=batch,
         warnings=warnings,
         prompt_version=PROMPT_VERSION,
-        context_hash=_sha256_json(grounding_pack),
+        prompt_hash=hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
+        prompt_text=prompt_text,
+        context_hash=context_hash,
         output_hash=hashlib.sha256(response.text.encode("utf-8")).hexdigest(),
         output_text=response.text,
     )
+
+
+def _prompt_artifact_text(
+    *,
+    request: ModelRequest,
+    prompt_version: str,
+    context_hash: str,
+) -> str:
+    payload = {
+        "artifact_schema": "grounded_suggestion_prompt@v1",
+        "prompt_version": prompt_version,
+        "context_hash": context_hash,
+        "request": {
+            "system_prompt": request.system_prompt,
+            "user_prompt": request.user_prompt,
+            "temperature": request.temperature,
+            "response_format": request.response_format,
+        },
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
 
 
 def _citation_warnings(

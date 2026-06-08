@@ -196,7 +196,9 @@ export type ModelArtifactManifest = {
 export type ModelArtifactSummary = Pick<
   ModelArtifactRecord,
   "artifact_id" | "artifact_type" | "relative_path" | "sha256"
->;
+> & {
+  deduplicated?: boolean;
+};
 
 export type WorkspaceManifest = {
   schema_version: number;
@@ -416,9 +418,11 @@ export type GroundedSuggestionsResponse = {
   suggestions: GroundedSuggestion[];
   model: string;
   prompt_version: string;
+  prompt_hash: string;
   context_hash: string;
   output_hash: string;
   warnings: GroundedSuggestionWarning[];
+  prompt_artifact?: ModelArtifactSummary | null;
   context_artifact?: ModelArtifactSummary | null;
   output_artifact?: ModelArtifactSummary | null;
   artifact_warning?: string | null;

@@ -96,6 +96,7 @@ class ModelArtifactManifest:
 class ModelArtifactWriteResult:
     record: ModelArtifactRecord
     manifest: ModelArtifactManifest
+    deduplicated: bool = False
 
 
 def inspect_model_artifact_isolation(workspace: CaseWorkspace) -> ModelArtifactIsolationStatus:
@@ -207,7 +208,20 @@ def write_model_artifact(
     if len(content_bytes) > MAX_MODEL_ARTIFACT_BYTES:
         raise WorkspaceError("model artifact content exceeds prototype size limit.")
 
-    _read_manifest(workspace)
+    manifest = _read_manifest(workspace)
+    content_hash = hashlib.sha256(content_bytes).hexdigest()
+    existing_record = _find_duplicate_record(
+        manifest,
+        artifact_type=artifact_type,
+        sha256=content_hash,
+    )
+    if existing_record is not None:
+        return ModelArtifactWriteResult(
+            record=existing_record,
+            manifest=manifest,
+            deduplicated=True,
+        )
+
     created_at = datetime.now(UTC)
     artifact_id = f"{artifact_type}-{created_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
     extension = "json" if content_type == "application/json" else "txt"
@@ -222,7 +236,7 @@ def write_model_artifact(
         artifact_id=artifact_id,
         artifact_type=artifact_type,
         relative_path=_relative_workspace_path(workspace.root_path, artifact_path),
-        sha256=hashlib.sha256(content_bytes).hexdigest(),
+        sha256=content_hash,
         size_bytes=len(content_bytes),
         content_type=content_type,
         source=source.strip(),
@@ -232,6 +246,19 @@ def write_model_artifact(
     )
     manifest = _append_manifest_record(workspace, record)
     return ModelArtifactWriteResult(record=record, manifest=manifest)
+
+
+def _find_duplicate_record(
+    manifest: ModelArtifactManifest,
+    *,
+    artifact_type: str,
+    sha256: str,
+) -> ModelArtifactRecord | None:
+    for record in manifest.records:
+        if record.artifact_type == artifact_type and record.sha256 == sha256:
+            return record
+
+    return None
 
 
 def _read_policy(path: Path) -> ModelArtifactPolicy | None:

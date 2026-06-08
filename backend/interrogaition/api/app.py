@@ -117,7 +117,7 @@ from interrogaition.security.case_workspace import (
 )
 from interrogaition.security.environment_health import build_environment_health_report
 from interrogaition.security.model_artifacts import (
-    ModelArtifactRecord,
+    ModelArtifactWriteResult,
     ensure_model_artifact_isolation,
     inspect_model_artifact_isolation,
     list_model_artifact_manifest,
@@ -211,6 +211,7 @@ class GroundedSuggestionDecisionRequest:
     confidence: float | None = None
     model: str = ""
     prompt_version: str = ""
+    prompt_hash: str = ""
     context_hash: str = ""
     output_hash: str = ""
     actor_id: str = "local-ui"
@@ -757,7 +758,7 @@ def create_app(
             locale=locale,
             citation_policy="warn",
         )
-        context_artifact, output_artifact, artifact_warning = _capture_grounded_suggestion_artifacts(
+        prompt_artifact, context_artifact, output_artifact, artifact_warning = _capture_grounded_suggestion_artifacts(
             workspace=workspace,
             grounding_pack=grounding_pack,
             result=result,
@@ -771,17 +772,24 @@ def create_app(
             "question_id": question_id,
             "model": result.batch.model,
             "prompt_version": result.prompt_version,
+            "prompt_hash": result.prompt_hash,
             "context_hash": result.context_hash,
             "output_hash": result.output_hash,
             "suggestion_count": len(result.batch.suggestions),
             "warning_count": len(result.warnings),
         }
+        if prompt_artifact is not None:
+            audit_details["prompt_artifact_id"] = prompt_artifact["artifact_id"]
+            audit_details["prompt_artifact_sha256"] = prompt_artifact["sha256"]
+            audit_details["prompt_artifact_deduplicated"] = prompt_artifact["deduplicated"]
         if context_artifact is not None:
             audit_details["context_artifact_id"] = context_artifact["artifact_id"]
             audit_details["context_artifact_sha256"] = context_artifact["sha256"]
+            audit_details["context_artifact_deduplicated"] = context_artifact["deduplicated"]
         if output_artifact is not None:
             audit_details["output_artifact_id"] = output_artifact["artifact_id"]
             audit_details["output_artifact_sha256"] = output_artifact["sha256"]
+            audit_details["output_artifact_deduplicated"] = output_artifact["deduplicated"]
         if artifact_warning:
             audit_details["artifact_warning"] = artifact_warning
         store.append_audit_event(
@@ -796,9 +804,11 @@ def create_app(
             "suggestions": _to_jsonable(result.batch.suggestions),
             "model": result.batch.model,
             "prompt_version": result.prompt_version,
+            "prompt_hash": result.prompt_hash,
             "context_hash": result.context_hash,
             "output_hash": result.output_hash,
             "warnings": _to_jsonable(result.warnings),
+            "prompt_artifact": prompt_artifact,
             "context_artifact": context_artifact,
             "output_artifact": output_artifact,
             "artifact_warning": artifact_warning,
@@ -850,6 +860,7 @@ def create_app(
                 "confidence": request.confidence,
                 "model": request.model,
                 "prompt_version": request.prompt_version,
+                "prompt_hash": request.prompt_hash,
                 "context_hash": request.context_hash,
                 "output_hash": request.output_hash,
             },
@@ -1214,6 +1225,7 @@ def _validate_grounded_suggestion_decision(
         raise HTTPException(status_code=400, detail="Unsupported grounded suggestion decision.")
     if request.decision in {SuggestionStatus.ACCEPTED, SuggestionStatus.EDITED}:
         _require_non_empty("final_text", request.final_text or request.original_text)
+    _validate_optional_sha256("prompt_hash", request.prompt_hash)
     _validate_optional_sha256("context_hash", request.context_hash)
     _validate_optional_sha256("output_hash", request.output_hash)
 
@@ -1266,10 +1278,11 @@ def _capture_grounded_suggestion_artifacts(
     case_id: str,
     session_id: str | None,
     question_id: str | None,
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str | None]:
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None, str | None]:
     isolation_status = inspect_model_artifact_isolation(workspace)
     if isolation_status.state != "ready":
         return (
+            None,
             None,
             None,
             "Model artifact isolation is not ready; grounded suggestion artifacts were not written.",
@@ -1282,6 +1295,19 @@ def _capture_grounded_suggestion_artifacts(
         "prompt_version": result.prompt_version,
     }
     try:
+        prompt_write = write_model_artifact(
+            workspace,
+            artifact_type="prompt",
+            content=result.prompt_text,
+            content_type="application/json",
+            source="grounded_suggestions.prompt",
+            created_by="grounded-suggestions-service",
+            metadata={
+                **base_metadata,
+                "prompt_hash": result.prompt_hash,
+                "context_hash": result.context_hash,
+            },
+        )
         context_write = write_model_artifact(
             workspace,
             artifact_type="context",
@@ -1291,6 +1317,7 @@ def _capture_grounded_suggestion_artifacts(
             created_by="grounded-suggestions-service",
             metadata={
                 **base_metadata,
+                "prompt_hash": result.prompt_hash,
                 "context_hash": result.context_hash,
             },
         )
@@ -1304,23 +1331,31 @@ def _capture_grounded_suggestion_artifacts(
             metadata={
                 **base_metadata,
                 "model": result.batch.model,
+                "prompt_hash": result.prompt_hash,
                 "output_hash": result.output_hash,
                 "suggestion_count": len(result.batch.suggestions),
                 "warning_count": len(result.warnings),
             },
         )
     except WorkspaceError as exc:
-        return None, None, f"Grounded suggestion artifact write failed safely: {exc}"
+        return None, None, None, f"Grounded suggestion artifact write failed safely: {exc}"
 
-    return _artifact_summary(context_write.record), _artifact_summary(output_write.record), None
+    return (
+        _artifact_summary(prompt_write),
+        _artifact_summary(context_write),
+        _artifact_summary(output_write),
+        None,
+    )
 
 
-def _artifact_summary(record: ModelArtifactRecord) -> dict[str, Any]:
+def _artifact_summary(write_result: ModelArtifactWriteResult) -> dict[str, Any]:
+    record = write_result.record
     return {
         "artifact_id": record.artifact_id,
         "artifact_type": record.artifact_type,
         "relative_path": record.relative_path,
         "sha256": record.sha256,
+        "deduplicated": write_result.deduplicated,
     }
 
 

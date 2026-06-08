@@ -62,6 +62,6 @@ Those are future security/product decisions.
 ## Follow-up
 
 - Decide whether artifact capture should become mandatory before any real model experiment.
-- Decide whether prompt artifacts should also be written for each grounded suggestion call.
+- Prompt artifacts were added later by ADR 0023.
 - Decide whether artifact manifests should be included in export integrity manifests.
 - Decide how artifact records should be displayed in a future audit/provenance view.

@@ -135,6 +135,9 @@ by default.
 Model artifact writes are recorded in `models/artifact-manifest.json` with relative
 path, SHA-256, byte size, content type, source, creator, timestamp, and metadata.
 Supported artifact types are `prompt`, `context`, `output`, `cache`, and `evaluation`.
+Writes are deduplicated by `artifact_type` plus SHA-256, so repeated deterministic
+model calls can point to an existing prompt, context, or output record without
+growing the manifest.
 
 Workspace source materials can also be registered as controlled text records. The prototype stores each material under the workspace `imports/` directory, records metadata in `imports/materials.json`, and verifies SHA-256 plus file size:
 
@@ -167,17 +170,19 @@ does not assert truth, guilt, or credibility.
 The grounded suggestions endpoint is the first live-visible AI workflow. It uses
 the current grounding context pack, validates every suggested `linked_evidence`
 entry against `allowed_source_ids`, returns citation warnings, and writes an
-audit event containing model id, prompt version, context hash, and output hash.
+audit event containing model id, prompt version, prompt hash, context hash, and
+output hash.
 If model artifact isolation is already initialized, it also writes workspace-local
-`context` and `output` artifacts and links their ids/hashes in the audit event and
-API response. If isolation is missing, generation still succeeds in prototype mode
-with an explicit artifact warning. The default runtime is a deterministic fake model
-so the live workflow can be tested before connecting a real local model.
+`prompt`, `context`, and `output` artifacts and links their ids/hashes and
+deduplication status in the audit event and API response. If isolation is missing,
+generation still succeeds in prototype mode with an explicit artifact warning.
+The default runtime is a deterministic fake model so the live workflow can be
+tested before connecting a real local model.
 
 The grounded suggestion decision endpoint records human `accepted`, `edited`,
 or `rejected` decisions as append-only audit events. Decision records preserve
 the original suggestion text, final operator text, linked source ids, model id,
-prompt version, and context/output hashes.
+prompt version, and prompt/context/output hashes.
 
 The material-question link decision endpoint records human `accepted` or
 `rejected` decisions for deterministic material-question grounding links. These

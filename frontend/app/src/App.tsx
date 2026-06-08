@@ -145,8 +145,10 @@ export function App() {
   const [groundedSuggestionMeta, setGroundedSuggestionMeta] = useState<{
     model: string;
     promptVersion: string;
+    promptHash: string;
     contextHash: string;
     outputHash: string;
+    promptArtifact: ModelArtifactSummary | null;
     contextArtifact: ModelArtifactSummary | null;
     outputArtifact: ModelArtifactSummary | null;
     artifactWarning: string | null;
@@ -322,7 +324,7 @@ export function App() {
   }
 
   function refreshModelArtifactManifestAfterCapture(response: GroundedSuggestionsResponse | null) {
-    if (!response?.context_artifact && !response?.output_artifact) {
+    if (!response?.prompt_artifact && !response?.context_artifact && !response?.output_artifact) {
       return;
     }
 
@@ -341,8 +343,10 @@ export function App() {
         ? {
             model: response.model,
             promptVersion: response.prompt_version,
+            promptHash: response.prompt_hash,
             contextHash: response.context_hash,
             outputHash: response.output_hash,
+            promptArtifact: response.prompt_artifact ?? null,
             contextArtifact: response.context_artifact ?? null,
             outputArtifact: response.output_artifact ?? null,
             artifactWarning: response.artifact_warning ?? null,
@@ -676,6 +680,7 @@ export function App() {
           confidence: suggestion.confidence,
           model: groundedSuggestionMeta?.model ?? "",
           prompt_version: groundedSuggestionMeta?.promptVersion ?? "",
+          prompt_hash: groundedSuggestionMeta?.promptHash ?? "",
           context_hash: groundedSuggestionMeta?.contextHash ?? "",
           output_hash: groundedSuggestionMeta?.outputHash ?? "",
           question_id: activeQuestionId,
@@ -1123,6 +1128,7 @@ function GroundedSuggestionsPanel({
   meta: {
     model: string;
     promptVersion: string;
+    promptArtifact: ModelArtifactSummary | null;
     contextArtifact: ModelArtifactSummary | null;
     outputArtifact: ModelArtifactSummary | null;
     artifactWarning: string | null;
@@ -1155,6 +1161,9 @@ function GroundedSuggestionsPanel({
           <div className="grounded-ai-meta">
             <span>{text(locale, "modelLabel")}: {meta.model}</span>
             <span>{text(locale, "promptVersion")}: {meta.promptVersion}</span>
+            {meta.promptArtifact ? (
+              <span>{text(locale, "promptArtifact")}: {shortArtifact(meta.promptArtifact)}</span>
+            ) : null}
             {meta.contextArtifact ? (
               <span>{text(locale, "contextArtifact")}: {shortArtifact(meta.contextArtifact)}</span>
             ) : null}

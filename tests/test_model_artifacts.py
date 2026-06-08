@@ -87,6 +87,7 @@ class ModelArtifactIsolationTest(unittest.TestCase):
         manifest = list_model_artifact_manifest(workspace)
 
         self.assertTrue(artifact_path.exists())
+        self.assertFalse(result.deduplicated)
         self.assertEqual(record.artifact_type, "prompt")
         self.assertEqual(record.sha256, hashlib.sha256(expected_bytes).hexdigest())
         self.assertEqual(record.size_bytes, len(expected_bytes))
@@ -94,6 +95,48 @@ class ModelArtifactIsolationTest(unittest.TestCase):
         self.assertEqual(manifest.record_count, 1)
         self.assertEqual(manifest.records[0].artifact_id, record.artifact_id)
         self.assertTrue((workspace.directory("models") / MODEL_ARTIFACT_MANIFEST_FILE).exists())
+
+    def test_deduplicates_same_type_and_hash(self) -> None:
+        workspace = CaseWorkspaceManager(_workspace_root("deduplicate")).create_workspace(
+            case_id="case-001",
+            created_by="investigator-001",
+            workspace_id="workspace-deduplicate-artifact",
+        )
+        ensure_model_artifact_isolation(workspace, created_by="admin-001")
+
+        first = write_model_artifact(
+            workspace,
+            artifact_type="prompt",
+            content='{"instruction":"same"}',
+            content_type="application/json",
+            source="unit-test",
+            created_by="model-audit-test",
+        )
+        second = write_model_artifact(
+            workspace,
+            artifact_type="prompt",
+            content='{"instruction":"same"}',
+            content_type="application/json",
+            source="unit-test-repeat",
+            created_by="model-audit-test",
+        )
+        third = write_model_artifact(
+            workspace,
+            artifact_type="context",
+            content='{"instruction":"same"}',
+            content_type="application/json",
+            source="unit-test-context",
+            created_by="model-audit-test",
+        )
+        manifest = list_model_artifact_manifest(workspace)
+
+        self.assertFalse(first.deduplicated)
+        self.assertTrue(second.deduplicated)
+        self.assertFalse(third.deduplicated)
+        self.assertEqual(second.record.artifact_id, first.record.artifact_id)
+        self.assertEqual(manifest.record_count, 2)
+        self.assertEqual([record.artifact_type for record in manifest.records], ["prompt", "context"])
+        self.assertEqual(len(tuple((workspace.directory("models") / "prompts").iterdir())), 1)
 
     def test_requires_isolation_before_artifact_write(self) -> None:
         workspace = CaseWorkspaceManager(_workspace_root("uninitialized")).create_workspace(

@@ -246,11 +246,23 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Prompt artifact capture and hash deduplication has reached its first review point.
+
+The project owner should evaluate:
+
+- whether deduplication by `artifact_type` plus SHA-256 is sufficient, or whether metadata-aware deduplication is needed before real model experiments,
+- whether prompt/context/output artifact capture should become mandatory instead of warning-only before real local model calls,
+- whether deduplicated artifact reuse should be highlighted more strongly in the Grounded AI panel or reserved for a future provenance view,
+- whether artifact manifests should now become hash-chained like audit events,
+- whether prompt artifacts must be included in export integrity manifests before any anonymized/non-synthetic material is imported.
+
+## Current STOP
+
 Milestone 6: Grounded suggestion artifact capture has reached its first review point.
 
 The project owner should evaluate:
 
-- whether `context` and `output` artifacts are sufficient for grounded suggestion provenance, or whether prompt artifacts should also be required,
+- whether the new `prompt`, `context`, and `output` artifact triplet is sufficient for grounded suggestion provenance,
 - whether missing artifact isolation should remain a warning in prototype mode or become a hard `400` before real model experiments,
 - whether artifact ids/hashes in the Grounded AI panel are useful or should move to a dedicated provenance view,
 - whether artifact manifests should be hash-chained or included in export integrity manifests,

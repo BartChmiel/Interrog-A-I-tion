@@ -8,6 +8,7 @@
     "suggestions",
     "model",
     "prompt_version",
+    "prompt_hash",
     "context_hash",
     "output_hash",
     "warnings"
@@ -56,6 +57,10 @@
     },
     "model": { "type": "string" },
     "prompt_version": { "type": "string" },
+    "prompt_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "context_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
@@ -63,6 +68,12 @@
     "output_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "prompt_artifact": {
+      "anyOf": [
+        { "$ref": "#/$defs/artifact_summary" },
+        { "type": "null" }
+      ]
     },
     "context_artifact": {
       "anyOf": [
@@ -98,17 +109,20 @@
   "$defs": {
     "artifact_summary": {
       "type": "object",
-      "required": ["artifact_id", "artifact_type", "relative_path", "sha256"],
+      "required": ["artifact_id", "artifact_type", "relative_path", "sha256", "deduplicated"],
       "properties": {
         "artifact_id": { "type": "string" },
         "artifact_type": {
           "type": "string",
-          "enum": ["context", "output"]
+          "enum": ["prompt", "context", "output"]
         },
         "relative_path": { "type": "string" },
         "sha256": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "deduplicated": {
+          "type": "boolean"
         }
       }
     }
