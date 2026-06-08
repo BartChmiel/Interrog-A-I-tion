@@ -168,8 +168,11 @@ The grounded suggestions endpoint is the first live-visible AI workflow. It uses
 the current grounding context pack, validates every suggested `linked_evidence`
 entry against `allowed_source_ids`, returns citation warnings, and writes an
 audit event containing model id, prompt version, context hash, and output hash.
-The default runtime is a deterministic fake model so the live workflow can be
-tested before connecting a real local model.
+If model artifact isolation is already initialized, it also writes workspace-local
+`context` and `output` artifacts and links their ids/hashes in the audit event and
+API response. If isolation is missing, generation still succeeds in prototype mode
+with an explicit artifact warning. The default runtime is a deterministic fake model
+so the live workflow can be tested before connecting a real local model.
 
 The grounded suggestion decision endpoint records human `accepted`, `edited`,
 or `rejected` decisions as append-only audit events. Decision records preserve

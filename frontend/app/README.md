@@ -68,7 +68,9 @@ The case map also shows an advisory Evidence Alignment Indicator as a gradient b
 The same rail includes a grounded AI panel. It calls the local
 `/grounded-suggestions` endpoint for the active question and shows suggested
 follow-up questions, topic gaps, potential inconsistencies, and summaries with
-their reasons, source ids, model id, prompt version, and citation warnings.
+their reasons, source ids, model id, prompt version, citation warnings, and compact
+grounded-suggestion artifact ids/hashes when the backend captured context/output
+artifacts.
 Each suggestion has `use`, `edit`, and `reject` controls. Online decisions are
 recorded through the backend append-only audit chain with the original text,
 final operator text, source ids, model id, prompt version, and context/output

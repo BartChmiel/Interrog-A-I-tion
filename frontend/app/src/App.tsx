@@ -71,6 +71,7 @@ import type {
   LocalModelSmokeResult,
   ModelArtifactManifest,
   ModelArtifactIsolationStatus,
+  ModelArtifactSummary,
   MaterialQuestionLink,
   MaterialQuestionLinkDecision,
   MaterialPreview,
@@ -145,6 +146,9 @@ export function App() {
     promptVersion: string;
     contextHash: string;
     outputHash: string;
+    contextArtifact: ModelArtifactSummary | null;
+    outputArtifact: ModelArtifactSummary | null;
+    artifactWarning: string | null;
   } | null>(null);
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, GroundedSuggestionDecision>>({});
@@ -314,6 +318,9 @@ export function App() {
     prompt_version: string;
     context_hash: string;
     output_hash: string;
+    context_artifact?: ModelArtifactSummary | null;
+    output_artifact?: ModelArtifactSummary | null;
+    artifact_warning?: string | null;
   } | null> {
     try {
       return await loadGroundedSuggestions(config, nextLocale, questionId);
@@ -331,6 +338,9 @@ export function App() {
       prompt_version: string;
       context_hash: string;
       output_hash: string;
+      context_artifact?: ModelArtifactSummary | null;
+      output_artifact?: ModelArtifactSummary | null;
+      artifact_warning?: string | null;
     } | null,
   ) {
     setGroundedSuggestions(response?.suggestions ?? []);
@@ -342,6 +352,9 @@ export function App() {
             promptVersion: response.prompt_version,
             contextHash: response.context_hash,
             outputHash: response.output_hash,
+            contextArtifact: response.context_artifact ?? null,
+            outputArtifact: response.output_artifact ?? null,
+            artifactWarning: response.artifact_warning ?? null,
           }
         : null,
     );
@@ -1115,7 +1128,13 @@ function GroundedSuggestionsPanel({
   decisions: Record<string, GroundedSuggestionDecision>;
   drafts: Record<string, string>;
   locale: Locale;
-  meta: { model: string; promptVersion: string } | null;
+  meta: {
+    model: string;
+    promptVersion: string;
+    contextArtifact: ModelArtifactSummary | null;
+    outputArtifact: ModelArtifactSummary | null;
+    artifactWarning: string | null;
+  } | null;
   suggestions: GroundedSuggestion[];
   warnings: GroundedSuggestionWarning[];
   onDraftChange: (suggestionId: string, value: string) => void;
@@ -1144,6 +1163,15 @@ function GroundedSuggestionsPanel({
           <div className="grounded-ai-meta">
             <span>{text(locale, "modelLabel")}: {meta.model}</span>
             <span>{text(locale, "promptVersion")}: {meta.promptVersion}</span>
+            {meta.contextArtifact ? (
+              <span>{text(locale, "contextArtifact")}: {shortArtifact(meta.contextArtifact)}</span>
+            ) : null}
+            {meta.outputArtifact ? (
+              <span>{text(locale, "outputArtifact")}: {shortArtifact(meta.outputArtifact)}</span>
+            ) : null}
+            {meta.artifactWarning ? (
+              <span>{text(locale, "artifactWarning")}: {meta.artifactWarning}</span>
+            ) : null}
           </div>
         ) : null}
         {suggestions.length ? (
@@ -1962,6 +1990,10 @@ function sortMaterials(materials: MaterialRecord[]): MaterialRecord[] {
 
 function shortHash(value: string): string {
   return value.length > 12 ? `${value.slice(0, 12)}...` : value;
+}
+
+function shortArtifact(artifact: ModelArtifactSummary): string {
+  return `${artifact.artifact_id} / ${shortHash(artifact.sha256)}`;
 }
 
 function formatBytes(value: number): string {

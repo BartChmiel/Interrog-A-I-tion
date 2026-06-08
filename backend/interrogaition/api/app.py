@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
@@ -86,7 +87,7 @@ from interrogaition.analysis.material_link_decisions import (
     MaterialLinkDecisionLog,
     derive_material_link_decisions,
 )
-from interrogaition.ai.grounded_suggestion_service import generate_grounded_suggestions
+from interrogaition.ai.grounded_suggestion_service import GroundedSuggestionResult, generate_grounded_suggestions
 from interrogaition.ai.local_model_runtime import (
     LocalModelRuntimeConfig,
     load_local_model_runtime_config,
@@ -116,6 +117,7 @@ from interrogaition.security.case_workspace import (
 )
 from interrogaition.security.environment_health import build_environment_health_report
 from interrogaition.security.model_artifacts import (
+    ModelArtifactRecord,
     ensure_model_artifact_isolation,
     inspect_model_artifact_isolation,
     list_model_artifact_manifest,
@@ -755,22 +757,39 @@ def create_app(
             locale=locale,
             citation_policy="warn",
         )
+        context_artifact, output_artifact, artifact_warning = _capture_grounded_suggestion_artifacts(
+            workspace=workspace,
+            grounding_pack=grounding_pack,
+            result=result,
+            case_id=case_id,
+            session_id=session_id,
+            question_id=question_id,
+        )
+        audit_details = {
+            "case_id": case_id,
+            "session_id": session_id,
+            "question_id": question_id,
+            "model": result.batch.model,
+            "prompt_version": result.prompt_version,
+            "context_hash": result.context_hash,
+            "output_hash": result.output_hash,
+            "suggestion_count": len(result.batch.suggestions),
+            "warning_count": len(result.warnings),
+        }
+        if context_artifact is not None:
+            audit_details["context_artifact_id"] = context_artifact["artifact_id"]
+            audit_details["context_artifact_sha256"] = context_artifact["sha256"]
+        if output_artifact is not None:
+            audit_details["output_artifact_id"] = output_artifact["artifact_id"]
+            audit_details["output_artifact_sha256"] = output_artifact["sha256"]
+        if artifact_warning:
+            audit_details["artifact_warning"] = artifact_warning
         store.append_audit_event(
             actor=Actor.AI,
             action="grounded_suggestions_generated",
             object_type="workspace",
             object_id=workspace_id,
-            details={
-                "case_id": case_id,
-                "session_id": session_id,
-                "question_id": question_id,
-                "model": result.batch.model,
-                "prompt_version": result.prompt_version,
-                "context_hash": result.context_hash,
-                "output_hash": result.output_hash,
-                "suggestion_count": len(result.batch.suggestions),
-                "warning_count": len(result.warnings),
-            },
+            details=audit_details,
         )
         return {
             "grounding_pack": _to_jsonable(grounding_pack),
@@ -780,6 +799,9 @@ def create_app(
             "context_hash": result.context_hash,
             "output_hash": result.output_hash,
             "warnings": _to_jsonable(result.warnings),
+            "context_artifact": context_artifact,
+            "output_artifact": output_artifact,
+            "artifact_warning": artifact_warning,
         }
 
     @app.post("/workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision")
@@ -1234,6 +1256,76 @@ def _validate_optional_sha256(field_name: str, value: str) -> None:
         return
     if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
         raise HTTPException(status_code=400, detail=f"{field_name} must be a lowercase SHA-256 hex digest.")
+
+
+def _capture_grounded_suggestion_artifacts(
+    *,
+    workspace: CaseWorkspace,
+    grounding_pack: Any,
+    result: GroundedSuggestionResult,
+    case_id: str,
+    session_id: str | None,
+    question_id: str | None,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, str | None]:
+    isolation_status = inspect_model_artifact_isolation(workspace)
+    if isolation_status.state != "ready":
+        return (
+            None,
+            None,
+            "Model artifact isolation is not ready; grounded suggestion artifacts were not written.",
+        )
+
+    base_metadata: dict[str, Any] = {
+        "case_id": case_id,
+        "session_id": session_id,
+        "question_id": question_id,
+        "prompt_version": result.prompt_version,
+    }
+    try:
+        context_write = write_model_artifact(
+            workspace,
+            artifact_type="context",
+            content=_json_artifact_content(_to_jsonable(grounding_pack)),
+            content_type="application/json",
+            source="grounded_suggestions.context",
+            created_by="grounded-suggestions-service",
+            metadata={
+                **base_metadata,
+                "context_hash": result.context_hash,
+            },
+        )
+        output_write = write_model_artifact(
+            workspace,
+            artifact_type="output",
+            content=result.output_text,
+            content_type="application/json",
+            source="grounded_suggestions.output",
+            created_by="grounded-suggestions-service",
+            metadata={
+                **base_metadata,
+                "model": result.batch.model,
+                "output_hash": result.output_hash,
+                "suggestion_count": len(result.batch.suggestions),
+                "warning_count": len(result.warnings),
+            },
+        )
+    except WorkspaceError as exc:
+        return None, None, f"Grounded suggestion artifact write failed safely: {exc}"
+
+    return _artifact_summary(context_write.record), _artifact_summary(output_write.record), None
+
+
+def _artifact_summary(record: ModelArtifactRecord) -> dict[str, Any]:
+    return {
+        "artifact_id": record.artifact_id,
+        "artifact_type": record.artifact_type,
+        "relative_path": record.relative_path,
+        "sha256": record.sha256,
+    }
+
+
+def _json_artifact_content(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
 
 
 def _to_jsonable(value: Any) -> Any:

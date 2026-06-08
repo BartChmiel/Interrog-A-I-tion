@@ -193,6 +193,11 @@ export type ModelArtifactManifest = {
   records: ModelArtifactRecord[];
 };
 
+export type ModelArtifactSummary = Pick<
+  ModelArtifactRecord,
+  "artifact_id" | "artifact_type" | "relative_path" | "sha256"
+>;
+
 export type WorkspaceManifest = {
   schema_version: number;
   workspace_id: string;
@@ -414,6 +419,9 @@ export type GroundedSuggestionsResponse = {
   context_hash: string;
   output_hash: string;
   warnings: GroundedSuggestionWarning[];
+  context_artifact?: ModelArtifactSummary | null;
+  output_artifact?: ModelArtifactSummary | null;
+  artifact_warning?: string | null;
 };
 
 export type QuestionView = {

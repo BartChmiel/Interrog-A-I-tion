@@ -215,6 +215,7 @@ class ApiAppTest(unittest.TestCase):
             question_id="q-001",
             locale="en",
         )
+        model_artifact_manifest_after_suggestions = get_model_artifact_manifest("api-workspace-001")
         first_suggestion = grounded_suggestions["suggestions"][0]
         decision = record_suggestion_decision(
             "api-workspace-001",
@@ -295,6 +296,18 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(grounded_suggestions["model"], "deterministic-grounded-fake")
         self.assertEqual(len(grounded_suggestions["context_hash"]), 64)
         self.assertEqual(len(grounded_suggestions["output_hash"]), 64)
+        self.assertIsNotNone(grounded_suggestions["context_artifact"])
+        self.assertIsNotNone(grounded_suggestions["output_artifact"])
+        self.assertIsNone(grounded_suggestions["artifact_warning"])
+        self.assertEqual(grounded_suggestions["context_artifact"]["artifact_type"], "context")
+        self.assertEqual(grounded_suggestions["output_artifact"]["artifact_type"], "output")
+        self.assertEqual(len(grounded_suggestions["context_artifact"]["sha256"]), 64)
+        self.assertEqual(len(grounded_suggestions["output_artifact"]["sha256"]), 64)
+        self.assertEqual(model_artifact_manifest_after_suggestions["record_count"], 3)
+        self.assertEqual(
+            [record["artifact_type"] for record in model_artifact_manifest_after_suggestions["records"]],
+            ["context", "context", "output"],
+        )
         self.assertEqual(grounded_suggestions["warnings"], [])
         self.assertTrue(grounded_suggestions["suggestions"])
         self.assertEqual(decision["decision"], "accepted")
@@ -302,6 +315,23 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(decision["audit_event"]["action"], "grounded_suggestion_accepted")
         self.assertEqual(decision["audit_event"]["details"]["context_hash"], grounded_suggestions["context_hash"])
         self.assertTrue(workspace_audit["chain_valid"])
+        generated_event = workspace_audit["events"][1]
+        self.assertEqual(
+            generated_event["details"]["context_artifact_id"],
+            grounded_suggestions["context_artifact"]["artifact_id"],
+        )
+        self.assertEqual(
+            generated_event["details"]["context_artifact_sha256"],
+            grounded_suggestions["context_artifact"]["sha256"],
+        )
+        self.assertEqual(
+            generated_event["details"]["output_artifact_id"],
+            grounded_suggestions["output_artifact"]["artifact_id"],
+        )
+        self.assertEqual(
+            generated_event["details"]["output_artifact_sha256"],
+            grounded_suggestions["output_artifact"]["sha256"],
+        )
         self.assertEqual(
             [event["action"] for event in workspace_audit["events"]],
             [
@@ -324,6 +354,48 @@ class ApiAppTest(unittest.TestCase):
             )
 
         self.assertEqual(caught.exception.status_code, 400)
+
+    def test_grounded_suggestions_warn_when_artifact_isolation_is_missing(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
+        get_model_artifact_manifest = endpoint(app, "get_workspace_model_artifact_manifest")
+        get_workspace_audit = endpoint(app, "get_workspace_audit")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-missing-artifacts",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        grounded_suggestions = generate_grounded_suggestions(
+            "api-workspace-missing-artifacts",
+            case_id="case-001",
+            session_id=None,
+            question_id="q-001",
+            locale="en",
+        )
+        manifest = get_model_artifact_manifest("api-workspace-missing-artifacts")
+        workspace_audit = get_workspace_audit("api-workspace-missing-artifacts")
+
+        self.assertTrue(grounded_suggestions["suggestions"])
+        self.assertIsNone(grounded_suggestions["context_artifact"])
+        self.assertIsNone(grounded_suggestions["output_artifact"])
+        self.assertIn("not ready", grounded_suggestions["artifact_warning"])
+        self.assertEqual(manifest["record_count"], 0)
+        self.assertTrue(workspace_audit["chain_valid"])
+        self.assertEqual(workspace_audit["events"][0]["action"], "grounded_suggestions_generated")
+        self.assertIn("artifact_warning", workspace_audit["events"][0]["details"])
+        self.assertNotIn("context_artifact_id", workspace_audit["events"][0]["details"])
 
     def test_session_endpoint_flow(self) -> None:
         app = create_app()

@@ -33,6 +33,7 @@ class GroundedSuggestionResult:
     prompt_version: str
     context_hash: str
     output_hash: str
+    output_text: str
 
 
 def generate_grounded_suggestions(
@@ -67,6 +68,7 @@ def generate_grounded_suggestions(
         prompt_version=PROMPT_VERSION,
         context_hash=_sha256_json(grounding_pack),
         output_hash=hashlib.sha256(response.text.encode("utf-8")).hexdigest(),
+        output_text=response.text,
     )
 
 

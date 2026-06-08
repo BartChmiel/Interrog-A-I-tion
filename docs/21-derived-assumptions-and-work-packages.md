@@ -59,9 +59,10 @@ Implemented:
 - deterministic model smoke endpoint and UI control,
 - workspace-local model artifact isolation,
 - model artifact write manifests,
+- grounded suggestion context/output artifact capture,
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
-- audit metadata for prompt version, model id, context hash, and output hash,
+- audit metadata for prompt version, model id, context/output hashes, and captured artifact ids,
 - React right-rail display with source ids and `use`, `edit`, and `reject` controls,
 - backend audit events for grounded suggestion `accepted`, `edited`, and `rejected` decisions.
 
@@ -70,6 +71,7 @@ Next:
 - run a real Ollama smoke check in developer mode after STOP review,
 - connect Ollama behind the same grounded service in controlled test mode after runtime approval,
 - block institutional live use of real model output until a STOP review,
+- decide whether prompt artifacts should be captured for every grounded suggestion call,
 - add model selection persistence and runtime policy configuration.
 
 Strategic risk:
