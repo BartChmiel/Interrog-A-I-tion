@@ -254,7 +254,9 @@ class ApiAppTest(unittest.TestCase):
         self.assertFalse(model_artifacts_after["external_cache_allowed"])
         self.assertEqual(model_artifact_write["record"]["artifact_type"], "context")
         self.assertEqual(model_artifact_write["manifest"]["record_count"], 1)
+        self.assertTrue(model_artifact_write["manifest"]["chain_valid"])
         self.assertEqual(model_artifact_manifest["record_count"], 1)
+        self.assertTrue(model_artifact_manifest["chain_valid"])
         self.assertEqual(material["id"], "api-material-001")
         self.assertEqual(material["source_type"], "case_protocol")
         self.assertEqual(len(materials["materials"]), 1)
@@ -312,6 +314,8 @@ class ApiAppTest(unittest.TestCase):
         self.assertFalse(grounded_suggestions["context_artifact"]["deduplicated"])
         self.assertFalse(grounded_suggestions["output_artifact"]["deduplicated"])
         self.assertEqual(model_artifact_manifest_after_suggestions["record_count"], 4)
+        self.assertTrue(model_artifact_manifest_after_suggestions["chain_valid"])
+        self.assertEqual(len(model_artifact_manifest_after_suggestions["latest_record_hash"]), 64)
         self.assertEqual(
             [record["artifact_type"] for record in model_artifact_manifest_after_suggestions["records"]],
             ["context", "prompt", "context", "output"],
@@ -413,6 +417,7 @@ class ApiAppTest(unittest.TestCase):
         self.assertIsNone(grounded_suggestions["output_artifact"])
         self.assertIn("not ready", grounded_suggestions["artifact_warning"])
         self.assertEqual(manifest["record_count"], 0)
+        self.assertTrue(manifest["chain_valid"])
         self.assertTrue(workspace_audit["chain_valid"])
         self.assertEqual(workspace_audit["events"][0]["action"], "grounded_suggestions_generated")
         self.assertIn("artifact_warning", workspace_audit["events"][0]["details"])
@@ -464,7 +469,9 @@ class ApiAppTest(unittest.TestCase):
         workspace_audit = get_workspace_audit("api-workspace-dedup-artifacts")
 
         self.assertEqual(first_manifest["record_count"], 3)
+        self.assertTrue(first_manifest["chain_valid"])
         self.assertEqual(second_manifest["record_count"], 3)
+        self.assertTrue(second_manifest["chain_valid"])
         self.assertEqual(
             [record["artifact_type"] for record in second_manifest["records"]],
             ["prompt", "context", "output"],

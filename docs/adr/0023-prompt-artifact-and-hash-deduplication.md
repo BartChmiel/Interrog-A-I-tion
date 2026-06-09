@@ -61,13 +61,12 @@ Deduplication is deliberately conservative. The same SHA-256 is only reused with
 artifact type, so a prompt, context, and output cannot accidentally collapse into one record
 even if their bytes somehow match.
 
-The prototype still does not hash-chain the model artifact manifest or include artifact
-records in export integrity manifests. Those remain follow-up security decisions before
-non-synthetic material is introduced.
+The prototype still does not include artifact records in export integrity manifests.
+That remains a follow-up security decision before non-synthetic material is introduced.
 
 ## Follow-up
 
 - Decide whether artifact capture should become mandatory before any real local model call.
-- Decide whether artifact manifests should be hash-chained.
+- Artifact manifests were hash-chained later by ADR 0024.
 - Decide whether prompt/context/output artifacts should be included in export integrity manifests.
 - Decide whether the UI should expose deduplication status in a dedicated provenance view.

@@ -183,6 +183,8 @@ export type ModelArtifactRecord = {
   created_by: string;
   created_at: string;
   metadata: Record<string, unknown>;
+  previous_hash: string | null;
+  record_hash: string | null;
 };
 
 export type ModelArtifactManifest = {
@@ -191,6 +193,8 @@ export type ModelArtifactManifest = {
   manifest_path: string;
   record_count: number;
   records: ModelArtifactRecord[];
+  chain_valid: boolean;
+  latest_record_hash: string | null;
 };
 
 export type ModelArtifactSummary = Pick<

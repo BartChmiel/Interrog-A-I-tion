@@ -1821,6 +1821,13 @@ function ModelArtifactIsolationPanel({
               {text(locale, "lastArtifact")}: {lastRecord.artifact_type} / {shortHash(lastRecord.sha256)}
             </p>
           ) : null}
+          {manifest ? (
+            <p>
+              {text(locale, "artifactChain")}:{" "}
+              {manifest.chain_valid ? text(locale, "chainValid") : text(locale, "chainInvalid")}
+              {manifest.latest_record_hash ? ` / ${shortHash(manifest.latest_record_hash)}` : ""}
+            </p>
+          ) : null}
         </>
       ) : null}
       <button disabled={isSubmitting} type="button" onClick={onInitialize}>

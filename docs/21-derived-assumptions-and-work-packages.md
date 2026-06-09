@@ -58,7 +58,7 @@ Implemented:
 - local model runtime configuration,
 - deterministic model smoke endpoint and UI control,
 - workspace-local model artifact isolation,
-- deduplicating model artifact write manifests,
+- hash-chained deduplicating model artifact write manifests,
 - grounded suggestion prompt/context/output artifact capture,
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
@@ -72,6 +72,7 @@ Next:
 - connect Ollama behind the same grounded service in controlled test mode after runtime approval,
 - block institutional live use of real model output until a STOP review,
 - decide whether artifact capture should become mandatory before every real model call,
+- decide whether model artifact records should be included in export integrity manifests,
 - add model selection persistence and runtime policy configuration.
 
 Strategic risk:

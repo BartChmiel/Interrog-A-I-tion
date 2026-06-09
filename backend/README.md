@@ -137,7 +137,10 @@ path, SHA-256, byte size, content type, source, creator, timestamp, and metadata
 Supported artifact types are `prompt`, `context`, `output`, `cache`, and `evaluation`.
 Writes are deduplicated by `artifact_type` plus SHA-256, so repeated deterministic
 model calls can point to an existing prompt, context, or output record without
-growing the manifest.
+growing the manifest. Manifest records are hash-chained with `previous_hash` and
+`record_hash`; `GET /workspaces/{workspace_id}/model-artifacts/manifest` returns
+`chain_valid` and `latest_record_hash`. Writes are blocked when an existing manifest
+chain is invalid.
 
 Workspace source materials can also be registered as controlled text records. The prototype stores each material under the workspace `imports/` directory, records metadata in `imports/materials.json`, and verifies SHA-256 plus file size:
 

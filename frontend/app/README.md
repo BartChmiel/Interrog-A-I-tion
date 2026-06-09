@@ -58,10 +58,11 @@ dedicated prompt, context, output, cache, and evaluation directories under
 isolation before real local model experiments.
 
 The model artifact panel also shows the current artifact manifest record count and
-the latest artifact type/hash. Artifact content is not manually edited in the UI;
-records are intended to be written by controlled model workflows. Backend writes
-deduplicate repeated artifacts by type and SHA-256, so deterministic refreshes can
-reuse existing prompt/context/output records.
+the latest artifact type/hash, plus whether the artifact manifest hash chain is
+valid. Artifact content is not manually edited in the UI; records are intended to
+be written by controlled model workflows. Backend writes deduplicate repeated
+artifacts by type and SHA-256, so deterministic refreshes can reuse existing
+prompt/context/output records.
 
 The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
 

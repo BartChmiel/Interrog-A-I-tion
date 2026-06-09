@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import hashlib
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -81,6 +81,8 @@ class ModelArtifactRecord:
     created_by: str
     created_at: datetime
     metadata: dict[str, Any] = field(default_factory=dict)
+    previous_hash: str | None = None
+    record_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,8 @@ class ModelArtifactManifest:
     manifest_path: str
     record_count: int
     records: tuple[ModelArtifactRecord, ...]
+    chain_valid: bool
+    latest_record_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -209,6 +213,9 @@ def write_model_artifact(
         raise WorkspaceError("model artifact content exceeds prototype size limit.")
 
     manifest = _read_manifest(workspace)
+    if not manifest.chain_valid:
+        raise WorkspaceError("Model artifact manifest hash chain is invalid.")
+
     content_hash = hashlib.sha256(content_bytes).hexdigest()
     existing_record = _find_duplicate_record(
         manifest,
@@ -314,6 +321,7 @@ def _read_manifest(workspace: CaseWorkspace) -> ModelArtifactManifest:
             manifest_path=_relative_workspace_path(workspace.root_path, manifest_path),
             record_count=0,
             records=(),
+            chain_valid=True,
         )
 
     try:
@@ -326,12 +334,15 @@ def _read_manifest(workspace: CaseWorkspace) -> ModelArtifactManifest:
     except (json.JSONDecodeError, OSError, TypeError, KeyError, ValueError) as exc:
         raise WorkspaceError("Model artifact manifest is unreadable.") from exc
 
+    latest_record_hash = records[-1].record_hash if records else None
     return ModelArtifactManifest(
         schema_version=int(raw.get("schema_version", MODEL_ARTIFACT_SCHEMA_VERSION)),
         workspace_id=workspace.manifest.workspace_id,
         manifest_path=_relative_workspace_path(workspace.root_path, manifest_path),
         record_count=len(records),
         records=records,
+        chain_valid=_verify_manifest_chain(records),
+        latest_record_hash=latest_record_hash,
     )
 
 
@@ -340,7 +351,12 @@ def _append_manifest_record(
     record: ModelArtifactRecord,
 ) -> ModelArtifactManifest:
     manifest = _read_manifest(workspace)
-    next_records = (*manifest.records, record)
+    if not manifest.chain_valid:
+        raise WorkspaceError("Model artifact manifest hash chain is invalid.")
+
+    chained_record = replace(record, previous_hash=manifest.latest_record_hash)
+    chained_record = replace(chained_record, record_hash=_artifact_record_hash(chained_record))
+    next_records = (*manifest.records, chained_record)
     models_root = workspace.directory("models")
     manifest_path = models_root / MODEL_ARTIFACT_MANIFEST_FILE
     payload = {
@@ -364,6 +380,8 @@ def _artifact_record_from_dict(raw: dict[str, Any]) -> ModelArtifactRecord:
         created_by=str(raw["created_by"]),
         created_at=datetime.fromisoformat(str(raw["created_at"])),
         metadata=dict(raw.get("metadata", {})),
+        previous_hash=raw.get("previous_hash"),
+        record_hash=raw.get("record_hash"),
     )
 
 
@@ -379,7 +397,46 @@ def _artifact_record_to_dict(record: ModelArtifactRecord) -> dict[str, Any]:
         "created_by": record.created_by,
         "created_at": record.created_at.isoformat(),
         "metadata": record.metadata,
+        "previous_hash": record.previous_hash,
+        "record_hash": record.record_hash,
     }
+
+
+def _verify_manifest_chain(records: tuple[ModelArtifactRecord, ...]) -> bool:
+    previous_hash: str | None = None
+    for record in records:
+        if record.previous_hash != previous_hash:
+            return False
+        if record.record_hash != _artifact_record_hash(record):
+            return False
+        previous_hash = record.record_hash
+
+    return True
+
+
+def _artifact_record_hash(record: ModelArtifactRecord) -> str:
+    payload = {
+        "artifact_id": record.artifact_id,
+        "artifact_type": record.artifact_type,
+        "relative_path": record.relative_path,
+        "sha256": record.sha256,
+        "size_bytes": record.size_bytes,
+        "content_type": record.content_type,
+        "source": record.source,
+        "created_by": record.created_by,
+        "created_at": record.created_at.isoformat(),
+        "metadata": record.metadata,
+        "previous_hash": record.previous_hash,
+    }
+    return hashlib.sha256(
+        json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()
 
 
 def _relative_workspace_path(root_path: Path, path: Path) -> str:

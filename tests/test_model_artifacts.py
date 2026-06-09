@@ -93,6 +93,10 @@ class ModelArtifactIsolationTest(unittest.TestCase):
         self.assertEqual(record.size_bytes, len(expected_bytes))
         self.assertEqual(record.metadata["prompt_version"], "test-v1")
         self.assertEqual(manifest.record_count, 1)
+        self.assertTrue(manifest.chain_valid)
+        self.assertIsNone(manifest.records[0].previous_hash)
+        self.assertEqual(len(manifest.records[0].record_hash or ""), 64)
+        self.assertEqual(manifest.latest_record_hash, manifest.records[0].record_hash)
         self.assertEqual(manifest.records[0].artifact_id, record.artifact_id)
         self.assertTrue((workspace.directory("models") / MODEL_ARTIFACT_MANIFEST_FILE).exists())
 
@@ -135,8 +139,46 @@ class ModelArtifactIsolationTest(unittest.TestCase):
         self.assertFalse(third.deduplicated)
         self.assertEqual(second.record.artifact_id, first.record.artifact_id)
         self.assertEqual(manifest.record_count, 2)
+        self.assertTrue(manifest.chain_valid)
         self.assertEqual([record.artifact_type for record in manifest.records], ["prompt", "context"])
+        self.assertIsNone(manifest.records[0].previous_hash)
+        self.assertEqual(manifest.records[1].previous_hash, manifest.records[0].record_hash)
+        self.assertEqual(manifest.latest_record_hash, manifest.records[1].record_hash)
         self.assertEqual(len(tuple((workspace.directory("models") / "prompts").iterdir())), 1)
+
+    def test_detects_manifest_hash_chain_tampering_and_blocks_writes(self) -> None:
+        workspace = CaseWorkspaceManager(_workspace_root("tampered-chain")).create_workspace(
+            case_id="case-001",
+            created_by="investigator-001",
+            workspace_id="workspace-tampered-artifact-chain",
+        )
+        ensure_model_artifact_isolation(workspace, created_by="admin-001")
+        write_model_artifact(
+            workspace,
+            artifact_type="prompt",
+            content='{"instruction":"original"}',
+            content_type="application/json",
+            source="unit-test",
+            created_by="model-audit-test",
+        )
+        manifest_path = workspace.directory("models") / MODEL_ARTIFACT_MANIFEST_FILE
+        manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_payload["records"][0]["metadata"]["tampered"] = True
+        manifest_path.write_text(json.dumps(manifest_payload, indent=2, sort_keys=True), encoding="utf-8")
+
+        manifest = list_model_artifact_manifest(workspace)
+
+        self.assertFalse(manifest.chain_valid)
+        with self.assertRaises(ValueError):
+            write_model_artifact(
+                workspace,
+                artifact_type="output",
+                content='{"result":"blocked"}',
+                content_type="application/json",
+                source="unit-test",
+                created_by="model-audit-test",
+            )
+        self.assertEqual(tuple((workspace.directory("models") / "outputs").iterdir()), ())
 
     def test_requires_isolation_before_artifact_write(self) -> None:
         workspace = CaseWorkspaceManager(_workspace_root("uninitialized")).create_workspace(

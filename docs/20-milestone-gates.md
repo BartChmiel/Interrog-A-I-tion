@@ -246,6 +246,18 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Hash-chained model artifact manifests has reached its first review point.
+
+The project owner should evaluate:
+
+- whether invalid artifact manifest chains should remain a hard write blocker,
+- whether old prototype manifests without record hashes should be migrated manually or treated as invalid,
+- whether model artifact records should now be included in export integrity manifests,
+- whether the UI should expose a dedicated artifact provenance view,
+- whether prompt/context/output artifact capture should become mandatory before any real local model call.
+
+## Current STOP
+
 Milestone 6: Prompt artifact capture and hash deduplication has reached its first review point.
 
 The project owner should evaluate:
@@ -253,7 +265,7 @@ The project owner should evaluate:
 - whether deduplication by `artifact_type` plus SHA-256 is sufficient, or whether metadata-aware deduplication is needed before real model experiments,
 - whether prompt/context/output artifact capture should become mandatory instead of warning-only before real local model calls,
 - whether deduplicated artifact reuse should be highlighted more strongly in the Grounded AI panel or reserved for a future provenance view,
-- whether artifact manifests should now become hash-chained like audit events,
+- whether hash-chained artifact manifests are sufficient before adding export integrity coverage,
 - whether prompt artifacts must be included in export integrity manifests before any anonymized/non-synthetic material is imported.
 
 ## Current STOP
