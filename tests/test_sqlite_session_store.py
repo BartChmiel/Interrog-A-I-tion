@@ -3,9 +3,9 @@ import unittest
 import uuid
 from pathlib import Path
 
-from interigaition.domain.models import Actor, Answer, Claim
-from interigaition.domain.session import ParticipantRole, add_answer, start_interview_session
-from interigaition.storage.sqlite_session_store import SQLiteSessionStore
+from interrogaition.domain.models import Actor, Answer, Claim
+from interrogaition.domain.session import ParticipantRole, add_answer, start_interview_session
+from interrogaition.storage.sqlite_session_store import SQLiteSessionStore
 
 
 TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "sqlite"

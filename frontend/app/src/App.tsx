@@ -5,6 +5,7 @@ import {
   Check,
   CheckCircle2,
   Database,
+  Eye,
   FileCheck2,
   FileText,
   FolderArchive,
@@ -25,16 +26,25 @@ import {
 } from "lucide-react";
 import {
   addAnswer,
+  ensureModelArtifactIsolation,
   ensureWorkspace,
   loadCaseReview,
   loadEncryptionStatus,
+  loadEnvironmentHealth,
   loadEvidenceMap,
   loadGroundedSuggestions,
+  loadLocalModelConfig,
   loadMaterialQuestionLinks,
+  loadModelArtifactManifest,
+  loadModelArtifactIsolation,
+  loadWorkspaceMaterialPreview,
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceMaterials,
+  recordGroundedSuggestionDecision,
+  recordMaterialQuestionLinkDecision,
   registerWorkspaceMaterial,
+  runLocalModelSmoke,
   startSession,
   verifyWorkspaceMaterial,
   type ApiError,
@@ -46,14 +56,26 @@ import type {
   ApiMode,
   CaseData,
   EncryptionStatus,
+  EnvironmentHealth,
+  EnvironmentHealthState,
+  EvidenceAlignment,
   EvidenceMap,
   EvidenceTopicStatus,
+  GroundedSuggestionDecision,
   GroundedSuggestion,
+  GroundedSuggestionsResponse,
   GroundedSuggestionWarning,
   Indicator,
   InterviewSession,
   Locale,
+  LocalModelConfig,
+  LocalModelSmokeResult,
+  ModelArtifactManifest,
+  ModelArtifactIsolationStatus,
+  ModelArtifactSummary,
   MaterialQuestionLink,
+  MaterialQuestionLinkDecision,
+  MaterialPreview,
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
@@ -104,19 +126,35 @@ export function App() {
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
+  const [environmentHealth, setEnvironmentHealth] = useState<EnvironmentHealth | null>(null);
+  const [localModelConfig, setLocalModelConfig] = useState<LocalModelConfig | null>(null);
+  const [localModelSmoke, setLocalModelSmoke] = useState<LocalModelSmokeResult | null>(null);
+  const [modelArtifactManifest, setModelArtifactManifest] = useState<ModelArtifactManifest | null>(null);
+  const [modelArtifactIsolation, setModelArtifactIsolation] = useState<ModelArtifactIsolationStatus | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
+  const [materialQuestionLinkDecisions, setMaterialQuestionLinkDecisions] = useState<Record<string, MaterialQuestionLinkDecision>>({});
+  const [materialPreviews, setMaterialPreviews] = useState<Record<string, MaterialPreview>>({});
+  const [activeMaterialPreviewId, setActiveMaterialPreviewId] = useState<string | null>(null);
   const [evidenceMap, setEvidenceMap] = useState<EvidenceMap | null>(null);
+  const [evidenceAlignment, setEvidenceAlignment] = useState<EvidenceAlignment | null>(null);
   const [groundedSuggestions, setGroundedSuggestions] = useState<GroundedSuggestion[]>([]);
   const [groundedSuggestionWarnings, setGroundedSuggestionWarnings] = useState<GroundedSuggestionWarning[]>([]);
   const [groundedSuggestionMeta, setGroundedSuggestionMeta] = useState<{
     model: string;
     promptVersion: string;
+    promptHash: string;
+    contextHash: string;
+    outputHash: string;
+    promptArtifact: ModelArtifactSummary | null;
+    contextArtifact: ModelArtifactSummary | null;
+    outputArtifact: ModelArtifactSummary | null;
+    artifactWarning: string | null;
   } | null>(null);
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
-  const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, "used" | "rejected">>({});
+  const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, GroundedSuggestionDecision>>({});
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
@@ -124,6 +162,8 @@ export function App() {
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMaterialSubmitting, setIsMaterialSubmitting] = useState(false);
+  const [isArtifactIsolationSubmitting, setIsArtifactIsolationSubmitting] = useState(false);
+  const [isModelSmokeRunning, setIsModelSmokeRunning] = useState(false);
   const didInitializeApi = useRef(false);
 
   const questions = useMemo<QuestionView[]>(() => {
@@ -193,18 +233,34 @@ export function App() {
 
   async function refreshSecurityState() {
     try {
-      const [security, ensuredWorkspace] = await Promise.all([
+      const [security, health, modelConfig, ensuredWorkspace] = await Promise.all([
         loadEncryptionStatus(config),
+        loadEnvironmentHealth(config),
+        loadLocalModelConfig(config),
         ensureWorkspace(config),
       ]);
-      const [access, materialList, materialLinks, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
+      const [
+        access,
+        artifactManifest,
+        artifactIsolation,
+        materialList,
+        materialLinks,
+        nextEvidenceMap,
+        nextGroundedSuggestions,
+      ] = await Promise.all([
         loadWorkspaceAccess(config),
+        loadModelArtifactManifest(config),
+        loadModelArtifactIsolation(config),
         loadWorkspaceMaterials(config),
         loadMaterialQuestionLinksOrEmpty(locale),
         loadEvidenceMapOrNull(locale),
         loadGroundedSuggestionsOrEmpty(locale, activeQuestionId),
       ]);
       setEncryptionStatus(security);
+      setEnvironmentHealth(health);
+      setLocalModelConfig(modelConfig);
+      setModelArtifactManifest(artifactManifest);
+      setModelArtifactIsolation(artifactIsolation);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
       setWorkspaceMaterials(sortMaterials(materialList.materials));
@@ -214,11 +270,20 @@ export function App() {
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
       setEncryptionStatus(null);
+      setEnvironmentHealth(null);
+      setLocalModelConfig(null);
+      setLocalModelSmoke(null);
+      setModelArtifactManifest(null);
+      setModelArtifactIsolation(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
       setWorkspaceMaterials([]);
       setMaterialQuestionLinks([]);
+      setMaterialQuestionLinkDecisions({});
+      setMaterialPreviews({});
+      setActiveMaterialPreviewId(null);
       setEvidenceMap(null);
+      setEvidenceAlignment(null);
       applyGroundedSuggestions(null);
       setMaterialVerifications({});
     }
@@ -237,9 +302,11 @@ export function App() {
   async function loadEvidenceMapOrNull(nextLocale: Locale): Promise<EvidenceMap | null> {
     try {
       const response = await loadEvidenceMap(config, nextLocale);
+      setEvidenceAlignment(response.evidence_alignment ?? null);
       return response.evidence_map;
     } catch (error) {
       console.warn("Could not refresh evidence map.", error);
+      setEvidenceAlignment(null);
       return null;
     }
   }
@@ -247,12 +314,7 @@ export function App() {
   async function loadGroundedSuggestionsOrEmpty(
     nextLocale: Locale,
     questionId: string,
-  ): Promise<{
-    suggestions: GroundedSuggestion[];
-    warnings: GroundedSuggestionWarning[];
-    model: string;
-    prompt_version: string;
-  } | null> {
+  ): Promise<GroundedSuggestionsResponse | null> {
     try {
       return await loadGroundedSuggestions(config, nextLocale, questionId);
     } catch (error) {
@@ -261,19 +323,39 @@ export function App() {
     }
   }
 
-  function applyGroundedSuggestions(
-    response: {
-      suggestions: GroundedSuggestion[];
-      warnings: GroundedSuggestionWarning[];
-      model: string;
-      prompt_version: string;
-    } | null,
-  ) {
+  function refreshModelArtifactManifestAfterCapture(response: GroundedSuggestionsResponse | null) {
+    if (!response?.prompt_artifact && !response?.context_artifact && !response?.output_artifact) {
+      return;
+    }
+
+    void loadModelArtifactManifest(config)
+      .then(setModelArtifactManifest)
+      .catch((error) => {
+        console.warn("Could not refresh model artifact manifest after grounded suggestions.", error);
+      });
+  }
+
+  function applyGroundedSuggestions(response: GroundedSuggestionsResponse | null) {
     setGroundedSuggestions(response?.suggestions ?? []);
     setGroundedSuggestionWarnings(response?.warnings ?? []);
-    setGroundedSuggestionMeta(response ? { model: response.model, promptVersion: response.prompt_version } : null);
+    setGroundedSuggestionMeta(
+      response
+        ? {
+            model: response.model,
+            promptVersion: response.prompt_version,
+            promptHash: response.prompt_hash,
+            contextHash: response.context_hash,
+            outputHash: response.output_hash,
+            promptArtifact: response.prompt_artifact ?? null,
+            contextArtifact: response.context_artifact ?? null,
+            outputArtifact: response.output_artifact ?? null,
+            artifactWarning: response.artifact_warning ?? null,
+          }
+        : null,
+    );
     setSuggestionDrafts({});
     setSuggestionDecisions({});
+    refreshModelArtifactManifestAfterCapture(response);
   }
 
   async function startOrResumeSession(runtime: RuntimeConfig) {
@@ -449,6 +531,101 @@ export function App() {
     }
   }
 
+  async function smokeLocalModel() {
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    setIsModelSmokeRunning(true);
+    try {
+      const result = await runLocalModelSmoke(config);
+      setLocalModelSmoke(result);
+      setStatusKey(result.ok ? "modelSmokeOk" : "modelSmokeFailed");
+    } catch (error) {
+      console.error("Could not run local model smoke check.", error);
+      setStatusKey("modelSmokeFailed");
+    } finally {
+      setIsModelSmokeRunning(false);
+    }
+  }
+
+  async function initializeModelArtifactIsolation() {
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    setIsArtifactIsolationSubmitting(true);
+    try {
+      const isolation = await ensureModelArtifactIsolation(config);
+      const [health, manifest] = await Promise.all([
+        loadEnvironmentHealth(config),
+        loadModelArtifactManifest(config),
+      ]);
+      setModelArtifactIsolation(isolation);
+      setModelArtifactManifest(manifest);
+      setEnvironmentHealth(health);
+      setStatusKey("artifactIsolationReady");
+    } catch (error) {
+      console.error("Could not initialize model artifact isolation.", error);
+      setStatusKey("artifactIsolationFailed");
+    } finally {
+      setIsArtifactIsolationSubmitting(false);
+    }
+  }
+
+  async function toggleMaterialPreview(materialId: string) {
+    if (activeMaterialPreviewId === materialId) {
+      setActiveMaterialPreviewId(null);
+      return;
+    }
+
+    if (materialPreviews[materialId]) {
+      setActiveMaterialPreviewId(materialId);
+      return;
+    }
+
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    try {
+      const preview = await loadWorkspaceMaterialPreview(config, materialId);
+      setMaterialPreviews((current) => ({ ...current, [materialId]: preview }));
+      setActiveMaterialPreviewId(materialId);
+      setStatusKey("materialPreviewLoaded");
+    } catch (error) {
+      console.error("Could not load material preview.", error);
+      setStatusKey("materialPreviewFailed");
+    }
+  }
+
+  async function decideMaterialQuestionLink(
+    link: MaterialQuestionLink,
+    decision: MaterialQuestionLinkDecision,
+  ) {
+    if (apiMode === "online") {
+      try {
+        await recordMaterialQuestionLinkDecision(config, { decision, link });
+      } catch (error) {
+        console.error("Could not audit material-question link decision.", error);
+        setStatusKey("saveFailed");
+        return;
+      }
+    }
+
+    setMaterialQuestionLinkDecisions((current) => ({
+      ...current,
+      [materialQuestionLinkKey(link)]: decision,
+    }));
+    if (apiMode === "online") {
+      void loadEvidenceMapOrNull(locale).then(setEvidenceMap);
+    }
+    setStatusKey(decision === "accepted" ? "linkAccepted" : "linkRejected");
+  }
+
   function selectActiveQuestion(questionId: string) {
     setActiveQuestionId(questionId);
     if (apiMode === "online") {
@@ -456,12 +633,7 @@ export function App() {
     }
   }
 
-  function useSuggestion(suggestionId: string) {
-    setSuggestionDecisions((current) => ({ ...current, [suggestionId]: "used" }));
-    setStatusKey("suggestionUsed");
-  }
-
-  function editSuggestion(suggestion: GroundedSuggestion) {
+  function startEditingSuggestion(suggestion: GroundedSuggestion) {
     setSuggestionDrafts((current) => ({
       ...current,
       [suggestion.id]: current[suggestion.id] ?? suggestion.text,
@@ -469,9 +641,62 @@ export function App() {
     setStatusKey("suggestionEdit");
   }
 
-  function rejectSuggestion(suggestionId: string) {
-    setSuggestionDecisions((current) => ({ ...current, [suggestionId]: "rejected" }));
-    setStatusKey("suggestionRejected");
+  async function useSuggestion(suggestion: GroundedSuggestion) {
+    const finalText = suggestionDrafts[suggestion.id]?.trim() || suggestion.text;
+    await recordSuggestionDecision(suggestion, "accepted", finalText, "suggestionUsed");
+  }
+
+  async function saveEditedSuggestion(suggestion: GroundedSuggestion) {
+    const finalText = suggestionDrafts[suggestion.id]?.trim();
+    if (!finalText) {
+      setStatusKey("answerRequired");
+      return;
+    }
+    await recordSuggestionDecision(suggestion, "edited", finalText, "suggestionEdited");
+  }
+
+  async function rejectSuggestion(suggestion: GroundedSuggestion) {
+    const finalText = suggestionDrafts[suggestion.id]?.trim() || suggestion.text;
+    await recordSuggestionDecision(suggestion, "rejected", finalText, "suggestionRejected");
+  }
+
+  async function recordSuggestionDecision(
+    suggestion: GroundedSuggestion,
+    decision: GroundedSuggestionDecision,
+    finalText: string,
+    nextStatus: CopyKey,
+  ) {
+    if (apiMode === "online") {
+      try {
+        await recordGroundedSuggestionDecision(config, suggestion.id, {
+          decision,
+          original_text: suggestion.text,
+          final_text: finalText,
+          suggestion_type: suggestion.suggestion_type,
+          reason: suggestion.reason,
+          linked_topics: suggestion.linked_topics,
+          linked_evidence: suggestion.linked_evidence,
+          risk_flags: suggestion.risk_flags,
+          confidence: suggestion.confidence,
+          model: groundedSuggestionMeta?.model ?? "",
+          prompt_version: groundedSuggestionMeta?.promptVersion ?? "",
+          prompt_hash: groundedSuggestionMeta?.promptHash ?? "",
+          context_hash: groundedSuggestionMeta?.contextHash ?? "",
+          output_hash: groundedSuggestionMeta?.outputHash ?? "",
+          question_id: activeQuestionId,
+        });
+      } catch (error) {
+        console.error("Could not audit grounded suggestion decision.", error);
+        setStatusKey("saveFailed");
+        return;
+      }
+    }
+
+    setSuggestionDecisions((current) => ({ ...current, [suggestion.id]: decision }));
+    if (decision === "accepted" || decision === "edited") {
+      setSuggestionDrafts((current) => ({ ...current, [suggestion.id]: finalText }));
+    }
+    setStatusKey(nextStatus);
   }
 
   function changeLocale(nextLocale: Locale) {
@@ -483,9 +708,9 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-block">
-          <div className="brand-mark">IA</div>
+          <img className="brand-mark" src="/brand/logo-mark.svg" alt="InterrogA(I)tion" width={44} height={44} />
           <div>
-            <h1>InterigA(I)tion</h1>
+            <h1>InterrogA(I)tion</h1>
             <p>{caseData?.title ?? text(locale, "caseFallback")}</p>
           </div>
         </div>
@@ -598,12 +823,25 @@ export function App() {
           <SecurityPanel
             accessDecision={workspaceAccess}
             encryptionStatus={encryptionStatus}
+            environmentHealth={environmentHealth}
+            isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
+            isModelSmokeRunning={isModelSmokeRunning}
             locale={locale}
+            localModelConfig={localModelConfig}
+            localModelSmoke={localModelSmoke}
+            modelArtifactManifest={modelArtifactManifest}
+            modelArtifactIsolation={modelArtifactIsolation}
             materials={workspaceMaterials}
+            onArtifactIsolation={() => void initializeModelArtifactIsolation()}
+            onModelSmoke={() => void smokeLocalModel()}
             workspace={workspace}
           />
 
-          <EvidenceMapPanel evidenceMap={evidenceMap} locale={locale} />
+          <EvidenceMapPanel
+            evidenceMap={evidenceMap}
+            alignment={evidenceAlignment}
+            locale={locale}
+          />
 
           <GroundedSuggestionsPanel
             decisions={suggestionDecisions}
@@ -615,20 +853,26 @@ export function App() {
             onDraftChange={(suggestionId, value) =>
               setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
             }
-            onEdit={editSuggestion}
+            onEdit={startEditingSuggestion}
             onReject={rejectSuggestion}
+            onSaveEdit={saveEditedSuggestion}
             onUse={useSuggestion}
           />
 
           <MaterialsPanel
             apiMode={apiMode}
+            decisions={materialQuestionLinkDecisions}
             draft={materialDraft}
             isSubmitting={isMaterialSubmitting}
             locale={locale}
             links={materialQuestionLinks}
             materials={workspaceMaterials}
+            activePreviewId={activeMaterialPreviewId}
+            previews={materialPreviews}
             verifications={materialVerifications}
+            onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
             onDraftChange={setMaterialDraft}
+            onPreview={(materialId) => void toggleMaterialPreview(materialId)}
             onSubmit={() => void registerMaterial()}
             onVerify={(materialId) => void verifyMaterial(materialId)}
           />
@@ -716,9 +960,11 @@ function LinkedMaterialStrip({
 
 function EvidenceMapPanel({
   evidenceMap,
+  alignment,
   locale,
 }: {
   evidenceMap: EvidenceMap | null;
+  alignment: EvidenceAlignment | null;
   locale: Locale;
 }) {
   if (!evidenceMap) {
@@ -739,6 +985,7 @@ function EvidenceMapPanel({
         meta={`${summary.covered_topics}/${summary.total_topics} ${text(locale, "topicsShort")}`}
         compact
       />
+      <EvidenceAlignmentBar alignment={alignment} locale={locale} />
       <div className="evidence-map">
         <div className="evidence-map-summary">
           <EvidenceMapMetric
@@ -792,6 +1039,64 @@ function EvidenceMapMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function EvidenceAlignmentBar({
+  alignment,
+  locale,
+}: {
+  alignment: EvidenceAlignment | null;
+  locale: Locale;
+}) {
+  if (!alignment) {
+    return null;
+  }
+
+  const insufficient = alignment.band === "insufficient_review";
+  const percent = insufficient || alignment.score === null
+    ? 0
+    : Math.round(alignment.score * 100);
+  const valueLabel = insufficient || alignment.score === null
+    ? text(locale, "alignmentNotAvailable")
+    : `${percent}%`;
+
+  return (
+    <div className="evidence-alignment" data-band={alignment.band}>
+      <div className="evidence-alignment-header">
+        <span className="evidence-alignment-title">{text(locale, "evidenceAlignment")}</span>
+        <span className="evidence-alignment-band">{alignmentBandLabel(alignment.band, locale)}</span>
+      </div>
+      <div className="evidence-alignment-track" role="img" aria-label={valueLabel}>
+        <div className="evidence-alignment-fill" style={{ width: `${percent}%` }} />
+        <span className="evidence-alignment-value">{valueLabel}</span>
+      </div>
+      <div className="evidence-alignment-meta">
+        <span>
+          {text(locale, "alignmentReviewed")}: {alignment.reviewed_links}/{alignment.total_proposed_links}
+        </span>
+        <span>
+          {text(locale, "alignmentConfidence")}: {alignment.confidence.toFixed(2)}
+        </span>
+      </div>
+      <ul className="evidence-alignment-explanation">
+        {alignment.explanation.map((bullet, index) => (
+          <li key={index}>{bullet}</li>
+        ))}
+      </ul>
+      <p className="evidence-alignment-disclaimer">{text(locale, "alignmentAdvisory")}</p>
+    </div>
+  );
+}
+
+function alignmentBandLabel(band: EvidenceAlignment["band"], locale: Locale): string {
+  const keys: Record<EvidenceAlignment["band"], CopyKey> = {
+    insufficient_review: "alignmentInsufficient",
+    low: "alignmentLow",
+    medium: "alignmentMedium",
+    high: "alignmentHigh",
+  };
+
+  return text(locale, keys[band]);
+}
+
 function evidenceStatusLabel(status: EvidenceTopicStatus, locale: Locale): string {
   const keys: Record<EvidenceTopicStatus, CopyKey> = {
     covered: "statusCovered",
@@ -814,18 +1119,27 @@ function GroundedSuggestionsPanel({
   onDraftChange,
   onEdit,
   onReject,
+  onSaveEdit,
   onUse,
 }: {
-  decisions: Record<string, "used" | "rejected">;
+  decisions: Record<string, GroundedSuggestionDecision>;
   drafts: Record<string, string>;
   locale: Locale;
-  meta: { model: string; promptVersion: string } | null;
+  meta: {
+    model: string;
+    promptVersion: string;
+    promptArtifact: ModelArtifactSummary | null;
+    contextArtifact: ModelArtifactSummary | null;
+    outputArtifact: ModelArtifactSummary | null;
+    artifactWarning: string | null;
+  } | null;
   suggestions: GroundedSuggestion[];
   warnings: GroundedSuggestionWarning[];
   onDraftChange: (suggestionId: string, value: string) => void;
   onEdit: (suggestion: GroundedSuggestion) => void;
-  onReject: (suggestionId: string) => void;
-  onUse: (suggestionId: string) => void;
+  onReject: (suggestion: GroundedSuggestion) => void;
+  onSaveEdit: (suggestion: GroundedSuggestion) => void;
+  onUse: (suggestion: GroundedSuggestion) => void;
 }) {
   const warningsBySuggestion = useMemo(() => {
     const grouped = new Map<string, GroundedSuggestionWarning[]>();
@@ -847,6 +1161,18 @@ function GroundedSuggestionsPanel({
           <div className="grounded-ai-meta">
             <span>{text(locale, "modelLabel")}: {meta.model}</span>
             <span>{text(locale, "promptVersion")}: {meta.promptVersion}</span>
+            {meta.promptArtifact ? (
+              <span>{text(locale, "promptArtifact")}: {shortArtifact(meta.promptArtifact)}</span>
+            ) : null}
+            {meta.contextArtifact ? (
+              <span>{text(locale, "contextArtifact")}: {shortArtifact(meta.contextArtifact)}</span>
+            ) : null}
+            {meta.outputArtifact ? (
+              <span>{text(locale, "outputArtifact")}: {shortArtifact(meta.outputArtifact)}</span>
+            ) : null}
+            {meta.artifactWarning ? (
+              <span>{text(locale, "artifactWarning")}: {meta.artifactWarning}</span>
+            ) : null}
           </div>
         ) : null}
         {suggestions.length ? (
@@ -861,6 +1187,7 @@ function GroundedSuggestionsPanel({
               onDraftChange={onDraftChange}
               onEdit={onEdit}
               onReject={onReject}
+              onSaveEdit={onSaveEdit}
               onUse={onUse}
             />
           ))
@@ -881,17 +1208,19 @@ function GroundedSuggestionCard({
   onDraftChange,
   onEdit,
   onReject,
+  onSaveEdit,
   onUse,
 }: {
-  decision?: "used" | "rejected";
+  decision?: GroundedSuggestionDecision;
   draft?: string;
   locale: Locale;
   suggestion: GroundedSuggestion;
   warnings: GroundedSuggestionWarning[];
   onDraftChange: (suggestionId: string, value: string) => void;
   onEdit: (suggestion: GroundedSuggestion) => void;
-  onReject: (suggestionId: string) => void;
-  onUse: (suggestionId: string) => void;
+  onReject: (suggestion: GroundedSuggestion) => void;
+  onSaveEdit: (suggestion: GroundedSuggestion) => void;
+  onUse: (suggestion: GroundedSuggestion) => void;
 }) {
   const visibleText = draft ?? suggestion.text;
 
@@ -902,7 +1231,7 @@ function GroundedSuggestionCard({
           <Sparkles size={13} />
           {suggestion.suggestion_type}
         </span>
-        {decision ? <span className="meta">{text(locale, decision === "used" ? "usedSuggestion" : "rejectedSuggestion")}</span> : null}
+        {decision ? <span className="meta">{suggestionDecisionLabel(decision, locale)}</span> : null}
       </div>
       {draft !== undefined ? (
         <textarea
@@ -927,15 +1256,22 @@ function GroundedSuggestionCard({
         </div>
       ) : null}
       <div className="grounded-suggestion-actions">
-        <button type="button" onClick={() => onUse(suggestion.id)}>
+        <button type="button" onClick={() => onUse(suggestion)}>
           <Check size={14} />
           {text(locale, "useSuggestion")}
         </button>
-        <button type="button" onClick={() => onEdit(suggestion)}>
-          <Pencil size={14} />
-          {text(locale, "editSuggestion")}
-        </button>
-        <button type="button" onClick={() => onReject(suggestion.id)}>
+        {draft !== undefined ? (
+          <button type="button" onClick={() => onSaveEdit(suggestion)}>
+            <Check size={14} />
+            {text(locale, "saveEditSuggestion")}
+          </button>
+        ) : (
+          <button type="button" onClick={() => onEdit(suggestion)}>
+            <Pencil size={14} />
+            {text(locale, "editSuggestion")}
+          </button>
+        )}
+        <button type="button" onClick={() => onReject(suggestion)}>
           <X size={14} />
           {text(locale, "rejectSuggestion")}
         </button>
@@ -944,27 +1280,46 @@ function GroundedSuggestionCard({
   );
 }
 
+function suggestionDecisionLabel(decision: GroundedSuggestionDecision, locale: Locale): string {
+  const keys: Record<GroundedSuggestionDecision, CopyKey> = {
+    accepted: "usedSuggestion",
+    edited: "editedSuggestion",
+    rejected: "rejectedSuggestion",
+  };
+  return text(locale, keys[decision]);
+}
+
 function MaterialsPanel({
+  activePreviewId,
   apiMode,
+  decisions,
   draft,
   isSubmitting,
   links,
   locale,
   materials,
+  onDecideLink,
   onDraftChange,
+  onPreview,
   onSubmit,
   onVerify,
+  previews,
   verifications,
 }: {
+  activePreviewId: string | null;
   apiMode: ApiMode;
+  decisions: Record<string, MaterialQuestionLinkDecision>;
   draft: MaterialDraft;
   isSubmitting: boolean;
   links: MaterialQuestionLink[];
   locale: Locale;
   materials: MaterialRecord[];
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
   onDraftChange: (draft: MaterialDraft) => void;
+  onPreview: (materialId: string) => void;
   onSubmit: () => void;
   onVerify: (materialId: string) => void;
+  previews: Record<string, MaterialPreview>;
   verifications: Record<string, MaterialVerification>;
 }) {
   const disabled = apiMode !== "online" || isSubmitting;
@@ -1038,10 +1393,15 @@ function MaterialsPanel({
         {materials.length ? (
           materials.map((material) => (
             <MaterialCard
+              decisions={decisions}
               key={material.id}
               links={links.filter((link) => link.material_id === material.id)}
               locale={locale}
               material={material}
+              preview={previews[material.id]}
+              previewOpen={activePreviewId === material.id}
+              onDecideLink={onDecideLink}
+              onPreview={onPreview}
               onVerify={onVerify}
               verification={verifications[material.id]}
             />
@@ -1055,15 +1415,25 @@ function MaterialsPanel({
 }
 
 function MaterialCard({
+  decisions,
   links,
   locale,
   material,
+  preview,
+  previewOpen,
+  onDecideLink,
+  onPreview,
   onVerify,
   verification,
 }: {
+  decisions: Record<string, MaterialQuestionLinkDecision>;
   links: MaterialQuestionLink[];
   locale: Locale;
   material: MaterialRecord;
+  preview: MaterialPreview | undefined;
+  previewOpen: boolean;
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
+  onPreview: (materialId: string) => void;
   onVerify: (materialId: string) => void;
   verification: MaterialVerification | undefined;
 }) {
@@ -1097,12 +1467,24 @@ function MaterialCard({
           ))}
         </div>
       ) : null}
-      <MaterialQuestionChips links={links} locale={locale} />
+      <MaterialQuestionChips
+        decisions={decisions}
+        links={links}
+        locale={locale}
+        onDecideLink={onDecideLink}
+      />
+      {previewOpen ? (
+        <MaterialPreviewPanel locale={locale} preview={preview} />
+      ) : null}
       <div className="material-card-footer">
         <span className="material-verification">
           <ShieldQuestion size={14} />
           {materialVerificationLabel(verification, locale)}
         </span>
+        <button type="button" onClick={() => onPreview(material.id)}>
+          <Eye size={14} />
+          {previewOpen ? text(locale, "hidePreview") : text(locale, "previewMaterial")}
+        </button>
         <button type="button" onClick={() => onVerify(material.id)}>
           <CheckCircle2 size={14} />
           {text(locale, "verifyMaterial")}
@@ -1113,11 +1495,15 @@ function MaterialCard({
 }
 
 function MaterialQuestionChips({
+  decisions,
   links,
   locale,
+  onDecideLink,
 }: {
+  decisions: Record<string, MaterialQuestionLinkDecision>;
   links: MaterialQuestionLink[];
   locale: Locale;
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
 }) {
   if (!links.length) {
     return (
@@ -1132,30 +1518,124 @@ function MaterialQuestionChips({
     <div className="material-grounding">
       <span>{text(locale, "groundedQuestions")}</span>
       <div className="material-question-chips">
+        {links.map((link) => {
+          const decision = decisions[materialQuestionLinkKey(link)];
+          return (
+            <span data-state={decision ?? "proposed"} key={materialQuestionLinkKey(link)}>
+              {link.question_id}
+              <em>
+                {text(locale, "confidenceShort")} {link.confidence.toFixed(2)}
+              </em>
+              {decision ? <strong>{materialQuestionLinkDecisionLabel(decision, locale)}</strong> : null}
+              <button
+                aria-label={`${text(locale, "acceptLink")} ${link.question_id}`}
+                type="button"
+                onClick={() => onDecideLink(link, "accepted")}
+              >
+                <Check size={12} />
+              </button>
+              <button
+                aria-label={`${text(locale, "rejectLink")} ${link.question_id}`}
+                type="button"
+                onClick={() => onDecideLink(link, "rejected")}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          );
+        })}
+      </div>
+      <div className="material-link-audit">
         {links.map((link) => (
-          <span key={`${link.material_id}-${link.question_id}`}>
-            {link.question_id}
-            <em>
-              {text(locale, "confidenceShort")} {link.confidence.toFixed(2)}
-            </em>
-          </span>
+          <details key={`${materialQuestionLinkKey(link)}-audit`}>
+            <summary>
+              {link.question_id} / {text(locale, "matchedTerms")}
+            </summary>
+            <div className="matched-term-list">
+              {link.matched_terms.length ? (
+                link.matched_terms.map((term) => <span key={`${link.question_id}-${term}`}>{term}</span>)
+              ) : (
+                <em>{text(locale, "noMatchedTerms")}</em>
+              )}
+            </div>
+            <p>{link.rationale}</p>
+          </details>
         ))}
       </div>
     </div>
   );
 }
 
+function MaterialPreviewPanel({
+  locale,
+  preview,
+}: {
+  locale: Locale;
+  preview: MaterialPreview | undefined;
+}) {
+  if (!preview) {
+    return (
+      <div className="material-preview">
+        <strong>{text(locale, "materialPreview")}</strong>
+        <p>{text(locale, "loadingPreview")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="material-preview">
+      <div className="material-preview-header">
+        <strong>{text(locale, "materialPreview")}</strong>
+        <span>
+          {preview.line_count} {text(locale, "linesShort")} / {preview.char_count} {text(locale, "charsShort")}
+        </span>
+      </div>
+      <pre>{preview.text_preview}</pre>
+      {preview.truncated ? <p>{text(locale, "previewTruncated")}</p> : null}
+    </div>
+  );
+}
+
+function materialQuestionLinkKey(link: MaterialQuestionLink): string {
+  return `${link.material_id}:${link.question_id}`;
+}
+
+function materialQuestionLinkDecisionLabel(
+  decision: MaterialQuestionLinkDecision,
+  locale: Locale,
+): string {
+  return text(locale, decision === "accepted" ? "linkAcceptedLabel" : "linkRejectedLabel");
+}
+
 function SecurityPanel({
   accessDecision,
   encryptionStatus,
+  environmentHealth,
+  isArtifactIsolationSubmitting,
+  isModelSmokeRunning,
   locale,
+  localModelConfig,
+  localModelSmoke,
+  modelArtifactManifest,
+  modelArtifactIsolation,
   materials,
+  onArtifactIsolation,
+  onModelSmoke,
   workspace,
 }: {
   accessDecision: WorkspaceAccessDecision | null;
   encryptionStatus: EncryptionStatus | null;
+  environmentHealth: EnvironmentHealth | null;
+  isArtifactIsolationSubmitting: boolean;
+  isModelSmokeRunning: boolean;
   locale: Locale;
+  localModelConfig: LocalModelConfig | null;
+  localModelSmoke: LocalModelSmokeResult | null;
+  modelArtifactManifest: ModelArtifactManifest | null;
+  modelArtifactIsolation: ModelArtifactIsolationStatus | null;
   materials: MaterialRecord[];
+  onArtifactIsolation: () => void;
+  onModelSmoke: () => void;
   workspace: WorkspaceResponse | null;
 }) {
   const manifest = workspace?.manifest;
@@ -1171,6 +1651,11 @@ function SecurityPanel({
   const accessState = accessDecision ? (accessReady ? "ready" : "blocked") : "unknown";
   const exportState = manifest ? "ready" : "unknown";
   const materialsState = manifest ? "ready" : "unknown";
+  const modelState = localModelConfig
+    ? localModelConfig.real_model_enabled
+      ? "warning"
+      : "ready"
+    : "unknown";
   const storageDetail = manifest
     ? text(locale, manifest.storage_mode === "encrypted_required" ? "encryptionRequired" : "prototypeMode")
     : text(locale, "unknown");
@@ -1182,6 +1667,11 @@ function SecurityPanel({
     : text(locale, "unknown");
   const exportDetail = manifest ? text(locale, "manifestReady") : text(locale, "unknown");
   const materialsDetail = manifest ? text(locale, "registered") : text(locale, "unknown");
+  const modelDetail = localModelConfig
+    ? localModelConfig.live_output_enabled
+      ? text(locale, "liveModelEnabled")
+      : text(locale, "liveModelBlocked")
+    : text(locale, "unknown");
 
   return (
     <section>
@@ -1190,6 +1680,7 @@ function SecurityPanel({
         meta={manifest?.status ?? text(locale, "unknown")}
         compact
       />
+      <EnvironmentHealthPanel health={environmentHealth} locale={locale} />
       <div className="security-list">
         <SecurityItem
           detail={manifest?.data_sensitivity ?? text(locale, "unknown")}
@@ -1234,7 +1725,161 @@ function SecurityPanel({
           value={manifest ? text(locale, "ready") : text(locale, "unknown")}
         />
       </div>
+      <div className="model-runtime-panel" data-state={modelState}>
+        <div className="model-runtime-header">
+          <span className="security-icon">
+            <Network size={15} />
+          </span>
+          <div>
+            <span className="security-label">{text(locale, "localModelRuntime")}</span>
+            <strong>{localModelConfig?.configured_model ?? text(locale, "unknown")}</strong>
+            <span className="security-detail">
+              {localModelConfig?.effective_provider ?? text(locale, "unknown")} / {modelDetail}
+            </span>
+          </div>
+        </div>
+        {localModelConfig?.restrictions.length ? (
+          <ul>
+            {localModelConfig.restrictions.slice(0, 3).map((restriction) => (
+              <li key={restriction}>{restriction}</li>
+            ))}
+          </ul>
+        ) : null}
+        {localModelSmoke ? (
+          <p>
+            {localModelSmoke.ok ? text(locale, "modelSmokeOk") : text(locale, "modelSmokeFailed")}
+            {" / "}
+            {localModelSmoke.model}
+            {" / "}
+            {localModelSmoke.real_model_invoked ? text(locale, "realModelInvoked") : text(locale, "noRealModel")}
+          </p>
+        ) : null}
+        <button disabled={!localModelConfig || isModelSmokeRunning} type="button" onClick={onModelSmoke}>
+          <Activity size={14} />
+          {isModelSmokeRunning ? "..." : text(locale, "runModelSmoke")}
+        </button>
+      </div>
+      <ModelArtifactIsolationPanel
+        isSubmitting={isArtifactIsolationSubmitting}
+        manifest={modelArtifactManifest}
+        isolation={modelArtifactIsolation}
+        locale={locale}
+        onInitialize={onArtifactIsolation}
+      />
     </section>
+  );
+}
+
+function ModelArtifactIsolationPanel({
+  isSubmitting,
+  manifest,
+  isolation,
+  locale,
+  onInitialize,
+}: {
+  isSubmitting: boolean;
+  manifest: ModelArtifactManifest | null;
+  isolation: ModelArtifactIsolationStatus | null;
+  locale: Locale;
+  onInitialize: () => void;
+}) {
+  const state = isolation?.state ?? "unknown";
+  const lastRecord = manifest?.records.length ? manifest.records[manifest.records.length - 1] : null;
+  return (
+    <div className="model-artifact-panel" data-state={state}>
+      <div className="model-runtime-header">
+        <span className="security-icon">
+          <FolderArchive size={15} />
+        </span>
+        <div>
+          <span className="security-label">{text(locale, "modelArtifacts")}</span>
+          <strong>{isolation?.policy_exists ? text(locale, "ready") : text(locale, "notReady")}</strong>
+          <span className="security-detail">
+            {isolation ? `${isolation.directory_count}/5 ${text(locale, "artifactDirs")}` : text(locale, "unknown")}
+            {" / "}
+            {manifest?.record_count ?? 0} {text(locale, "artifactRecords")}
+          </span>
+        </div>
+      </div>
+      {isolation ? (
+        <>
+          <p>{isolation.detail}</p>
+          {isolation.warnings.length ? (
+            <ul>
+              {isolation.warnings.slice(0, 3).map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          ) : null}
+          {isolation.missing_directories.length ? (
+            <p>
+              {text(locale, "missingArtifactDirs")}: {isolation.missing_directories.join(", ")}
+            </p>
+          ) : null}
+          {lastRecord ? (
+            <p>
+              {text(locale, "lastArtifact")}: {lastRecord.artifact_type} / {shortHash(lastRecord.sha256)}
+            </p>
+          ) : null}
+          {manifest ? (
+            <p>
+              {text(locale, "artifactChain")}:{" "}
+              {manifest.chain_valid ? text(locale, "chainValid") : text(locale, "chainInvalid")}
+              {manifest.latest_record_hash ? ` / ${shortHash(manifest.latest_record_hash)}` : ""}
+            </p>
+          ) : null}
+        </>
+      ) : null}
+      <button disabled={isSubmitting} type="button" onClick={onInitialize}>
+        <FolderArchive size={14} />
+        {isSubmitting ? "..." : text(locale, "initializeArtifacts")}
+      </button>
+    </div>
+  );
+}
+
+function EnvironmentHealthPanel({
+  health,
+  locale,
+}: {
+  health: EnvironmentHealth | null;
+  locale: Locale;
+}) {
+  if (!health) {
+    return (
+      <div className="environment-health" data-state="unknown">
+        <div className="environment-health-header">
+          <strong>{text(locale, "environmentHealth")}</strong>
+          <span>{text(locale, "unknown")}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="environment-health" data-state={health.state}>
+      <div className="environment-health-header">
+        <strong>{text(locale, "environmentHealth")}</strong>
+        <span>{environmentStateLabel(health.state, locale)}</span>
+      </div>
+      <div className="environment-health-summary">
+        <span>{text(locale, "ready")}: {health.summary.ready ?? 0}</span>
+        <span>{text(locale, "warning")}: {health.summary.warning ?? 0}</span>
+        <span>{text(locale, "blocked")}: {health.summary.blocked ?? 0}</span>
+      </div>
+      <div className="environment-health-checks">
+        {health.checks.map((check) => (
+          <details data-state={check.state} key={check.id}>
+            <summary>
+              <span>{check.label}</span>
+              <em>{environmentStateLabel(check.state, locale)}</em>
+            </summary>
+            <p>{check.detail}</p>
+            {check.remediation ? <p>{check.remediation}</p> : null}
+          </details>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1261,6 +1906,16 @@ function SecurityItem({
       </div>
     </article>
   );
+}
+
+function environmentStateLabel(state: EnvironmentHealthState, locale: Locale): string {
+  const keys: Record<EnvironmentHealthState, CopyKey> = {
+    blocked: "blocked",
+    ready: "ready",
+    unknown: "unknown",
+    warning: "warning",
+  };
+  return text(locale, keys[state]);
 }
 
 function storageModeLabel(
@@ -1343,6 +1998,10 @@ function sortMaterials(materials: MaterialRecord[]): MaterialRecord[] {
 
 function shortHash(value: string): string {
   return value.length > 12 ? `${value.slice(0, 12)}...` : value;
+}
+
+function shortArtifact(artifact: ModelArtifactSummary): string {
+  return `${artifact.artifact_id} / ${shortHash(artifact.sha256)}`;
 }
 
 function formatBytes(value: number): string {
@@ -1467,14 +2126,14 @@ function findingTitle(finding: ReviewFinding, locale: Locale): string {
 
   if (finding.category === "missing_topic") {
     const topic = typeof finding.metadata?.topic_label === "string" ? finding.metadata.topic_label : "";
-    return `Niepokryty temat: ${topic}`.trim();
+    return `${text(locale, "missingTopicTitlePrefix")}: ${topic}`.trim();
   }
   if (finding.category === "question_neutrality") {
-    return "Pytanie może wymagać neutralizacji";
+    return text(locale, "questionNeutralityTitle");
   }
   if (finding.category === "potential_inconsistency") {
     const attribute = typeof finding.metadata?.attribute === "string" ? finding.metadata.attribute : "";
-    return `Potencjalna niespójność: ${attribute}`.trim();
+    return `${text(locale, "potentialInconsistencyTitlePrefix")}: ${attribute}`.trim();
   }
 
   return finding.title;
@@ -1486,13 +2145,13 @@ function findingDetail(finding: ReviewFinding, locale: Locale): string {
   }
 
   if (finding.category === "missing_topic") {
-    return "Temat nie został pokryty żadnym pytaniem ani odpowiedzią.";
+    return text(locale, "missingTopicDetail");
   }
   if (finding.category === "question_neutrality") {
-    return "Pytanie wymaga przeglądu pod kątem neutralności językowej.";
+    return text(locale, "questionNeutralityDetail");
   }
   if (finding.category === "potential_inconsistency") {
-    return "W materiale zapisano różne wartości dla tego samego elementu narracji. Wymaga to doprecyzowania, a nie automatycznego werdyktu.";
+    return text(locale, "potentialInconsistencyDetail");
   }
 
   return finding.detail;

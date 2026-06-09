@@ -1,11 +1,11 @@
 [project]
-name = "interigaition"
+name = "interrogaition"
 version = "0.1.0"
 description = "Local AI-assisted investigative interviewing prototype."
 requires-python = ">=3.11"
 readme = "README.md"
 authors = [
-  { name = "InterigA(I)tion research project" }
+  { name = "InterrogA(I)tion research project" }
 ]
 dependencies = [
   "fastapi==0.115.12",
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-interigaition = "interigaition.cli:main"
+interrogaition = "interrogaition.cli:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["backend"]

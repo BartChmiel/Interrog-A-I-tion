@@ -54,7 +54,7 @@ Actual evidence, notes, and interview answers should not be automatically transl
 For the CLI prototype, language is selected with:
 
 ```powershell
-python -m interigaition.cli review ..\data\synthetic\case-001\case.json --locale pl
+python -m interrogaition.cli review ..\data\synthetic\case-001\case.json --locale pl
 ```
 
 In the future desktop app, language can be selected:

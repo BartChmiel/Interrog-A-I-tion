@@ -1,11 +1,22 @@
 import type {
   CaseReviewResponse,
   EncryptionStatus,
+  EnvironmentHealth,
+  GroundedSuggestionDecision,
+  GroundedSuggestionDecisionResponse,
   EvidenceMapResponse,
   GroundedSuggestionsResponse,
   InterviewSession,
+  LocalModelConfig,
+  LocalModelSmokeResult,
+  ModelArtifactManifest,
+  ModelArtifactIsolationStatus,
+  MaterialQuestionLink,
+  MaterialQuestionLinkDecision,
+  MaterialQuestionLinkDecisionResponse,
   MaterialLinksResponse,
   MaterialListResponse,
+  MaterialPreview,
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
@@ -32,6 +43,29 @@ export type RegisterMaterialPayload = {
   content: string;
   source_type: MaterialSourceType;
   tags: string[];
+};
+
+export type GroundedSuggestionDecisionPayload = {
+  decision: GroundedSuggestionDecision;
+  original_text: string;
+  final_text: string;
+  suggestion_type: string;
+  reason: string;
+  linked_topics: string[];
+  linked_evidence: string[];
+  risk_flags: string[];
+  confidence: number | null;
+  model: string;
+  prompt_version: string;
+  prompt_hash: string;
+  context_hash: string;
+  output_hash: string;
+  question_id: string;
+};
+
+export type MaterialQuestionLinkDecisionPayload = {
+  decision: MaterialQuestionLinkDecision;
+  link: MaterialQuestionLink;
 };
 
 export async function loadCaseReview(config: RuntimeConfig, locale: string): Promise<CaseReviewResponse> {
@@ -69,6 +103,20 @@ export async function loadSessionReview(
 
 export async function loadEncryptionStatus(config: RuntimeConfig): Promise<EncryptionStatus> {
   return fetchJson(config, "/security/encryption");
+}
+
+export async function loadEnvironmentHealth(config: RuntimeConfig): Promise<EnvironmentHealth> {
+  return fetchJson(config, "/environment/health");
+}
+
+export async function loadLocalModelConfig(config: RuntimeConfig): Promise<LocalModelConfig> {
+  return fetchJson(config, "/ai/local-model/config");
+}
+
+export async function runLocalModelSmoke(config: RuntimeConfig): Promise<LocalModelSmokeResult> {
+  return fetchJson(config, "/ai/local-model/smoke", {
+    method: "POST",
+  });
 }
 
 export async function loadWorkspace(config: RuntimeConfig): Promise<WorkspaceResponse> {
@@ -117,8 +165,38 @@ export async function loadWorkspaceAccess(
   return fetchJson(config, `/workspaces/${workspaceId}/access?${query.toString()}`);
 }
 
+export async function loadModelArtifactIsolation(
+  config: RuntimeConfig,
+): Promise<ModelArtifactIsolationStatus> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/model-artifacts`);
+}
+
+export async function loadModelArtifactManifest(config: RuntimeConfig): Promise<ModelArtifactManifest> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/model-artifacts/manifest`);
+}
+
+export async function ensureModelArtifactIsolation(
+  config: RuntimeConfig,
+): Promise<ModelArtifactIsolationStatus> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/model-artifacts/isolation`, {
+    method: "POST",
+    body: JSON.stringify({
+      created_by: "local-ui",
+      role: "admin",
+    }),
+  });
+}
+
 export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`);
+}
+
+export async function loadWorkspaceMaterialPreview(
+  config: RuntimeConfig,
+  materialId: string,
+): Promise<MaterialPreview> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  return fetchJson(config, `/workspaces/${workspaceId}/materials/${encodeURIComponent(materialId)}/preview`);
 }
 
 export async function loadMaterialQuestionLinks(
@@ -128,6 +206,33 @@ export async function loadMaterialQuestionLinks(
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({ case_id: config.caseId, locale });
   return fetchJson(config, `/workspaces/${workspaceId}/materials/links?${query.toString()}`);
+}
+
+export async function recordMaterialQuestionLinkDecision(
+  config: RuntimeConfig,
+  payload: MaterialQuestionLinkDecisionPayload,
+): Promise<MaterialQuestionLinkDecisionResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const materialId = encodeURIComponent(payload.link.material_id);
+  const questionId = encodeURIComponent(payload.link.question_id);
+  return fetchJson(
+    config,
+    `/workspaces/${workspaceId}/materials/${materialId}/questions/${questionId}/decision`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        decision: payload.decision,
+        case_id: config.caseId,
+        session_id: config.sessionId,
+        actor_id: "local-ui",
+        question_id: payload.link.question_id,
+        topic_ids: payload.link.topic_ids,
+        matched_terms: payload.link.matched_terms,
+        confidence: payload.link.confidence,
+        rationale: payload.link.rationale,
+      }),
+    },
+  );
 }
 
 export async function loadEvidenceMap(
@@ -158,6 +263,27 @@ export async function loadGroundedSuggestions(
   return fetchJson(config, `/workspaces/${workspaceId}/grounded-suggestions?${query.toString()}`, {
     method: "POST",
   });
+}
+
+export async function recordGroundedSuggestionDecision(
+  config: RuntimeConfig,
+  suggestionId: string,
+  payload: GroundedSuggestionDecisionPayload,
+): Promise<GroundedSuggestionDecisionResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  return fetchJson(
+    config,
+    `/workspaces/${workspaceId}/grounded-suggestions/${encodeURIComponent(suggestionId)}/decision`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...payload,
+        actor_id: "local-ui",
+        case_id: config.caseId,
+        session_id: config.sessionId,
+      }),
+    },
+  );
 }
 
 export async function registerWorkspaceMaterial(

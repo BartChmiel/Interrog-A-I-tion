@@ -29,7 +29,7 @@ Audit records are append-only and hash-chained. Each audit record stores its `pr
 The normal API app writes to:
 
 ```text
-backend/local-data/interigaition.sqlite3
+backend/local-data/interrogaition.sqlite3
 ```
 
 Tests use isolated SQLite files under ignored test output directories.

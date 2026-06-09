@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://interigaition.local/schemas/case.schema.json",
+  "$id": "https://interrogaition.local/schemas/case.schema.json",
   "title": "Case",
   "type": "object",
   "required": ["id", "title", "created_at", "topics"],

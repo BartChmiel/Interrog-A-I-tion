@@ -1,0 +1,10 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="InterrogA(I)tion">
+  <rect x="0" y="0" width="512" height="512" fill="#0F1E33"/>
+  <g transform="scale(8)">
+    <circle cx="31" cy="29" r="20.5" fill="none" stroke="#FFFFFF" stroke-width="5.5"/>
+    <path d="M43 44 L55 55 L46 37 Z" fill="#FFFFFF"/>
+    <path d="M18 24 H33 M18 30 H33 M18 36 H27" stroke="#FFFFFF" stroke-width="4.2" stroke-linecap="round"/>
+    <path d="M34 26 C34 21.5 44 21.5 44 27 C44 31.5 38 31.5 38 37" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="38" cy="44" r="3.4" fill="#4A78B7"/>
+  </g>
+</svg>

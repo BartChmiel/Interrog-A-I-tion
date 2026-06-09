@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://interigaition.local/schemas/audit-event.schema.json",
+  "$id": "https://interrogaition.local/schemas/audit-event.schema.json",
   "title": "AuditEvent",
   "type": "object",
   "required": ["id", "timestamp", "actor", "action", "object_type", "object_id"],

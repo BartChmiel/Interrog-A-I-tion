@@ -3,19 +3,19 @@ import uuid
 from dataclasses import replace
 from pathlib import Path
 
-from interigaition.security.access_policy import (
+from interrogaition.security.access_policy import (
     WorkspaceAction,
     WorkspaceRole,
     decide_workspace_access,
 )
-from interigaition.security.case_workspace import (
+from interrogaition.security.case_workspace import (
     CaseWorkspaceManager,
     DataSensitivity,
     StorageMode,
     WorkspaceError,
     WorkspaceStatus,
 )
-from interigaition.security.encryption_status import EncryptionBackend, EncryptionStatus
+from interrogaition.security.encryption_status import EncryptionBackend, EncryptionStatus
 
 
 TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "workspaces"

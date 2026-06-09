@@ -1,28 +1,28 @@
-# Synthetic case 001
+# Synthetic Case 001
 
-Pierwszy scenariusz syntetyczny.
+First synthetic scenario.
 
-Cel:
+Purpose:
 
-- przetestowac plan pytan,
-- sprawdzic pokrycie tematow,
-- dodac jedna luke chronologiczna,
-- dodac jedna potencjalna niespojnosc dotyczaca miejsca albo czasu.
+- test question planning,
+- verify topic coverage,
+- include one chronological gap,
+- include one potential time or location inconsistency.
 
-## Zawartosc
+## Content
 
-Plik `case.json` opisuje syntetyczna rozmowe dotyczaca kradziezy roweru.
+`case.json` describes a synthetic bicycle theft interview scenario.
 
-Scenariusz zawiera celowo:
+The scenario intentionally includes:
 
-- niepokryty temat potencjalnego nagrania,
-- jedno pytanie potencjalnie sugerujace,
-- jedna potencjalna niespojnosc czasu: `19:45` vs `20:10`.
+- an uncovered potential recording topic,
+- one potentially leading question,
+- one potential time inconsistency: `19:45` vs `20:10`.
 
-## Uruchomienie analizy
+## Run Analysis
 
-Z katalogu `backend/`:
+From `backend/`:
 
 ```powershell
-python -m interigaition.cli review ..\data\synthetic\case-001\case.json
+python -m interrogaition.cli review ..\data\synthetic\case-001\case.json
 ```

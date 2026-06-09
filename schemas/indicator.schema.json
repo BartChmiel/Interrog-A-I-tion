@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://interigaition.local/schemas/indicator.schema.json",
+  "$id": "https://interrogaition.local/schemas/indicator.schema.json",
   "title": "Indicator",
   "type": "object",
   "required": ["id", "category", "label", "description", "confidence", "factors"],

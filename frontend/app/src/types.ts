@@ -117,6 +117,93 @@ export type EncryptionStatus = {
   checked_at: string;
 };
 
+export type EnvironmentHealthState = "ready" | "warning" | "blocked" | "unknown";
+
+export type EnvironmentHealthCheck = {
+  id: string;
+  label: string;
+  state: EnvironmentHealthState;
+  detail: string;
+  remediation: string;
+};
+
+export type EnvironmentHealth = {
+  state: EnvironmentHealthState;
+  generated_at: string;
+  checks: EnvironmentHealthCheck[];
+  summary: Record<string, number>;
+};
+
+export type LocalModelConfig = {
+  provider: string;
+  effective_provider: string;
+  configured_model: string;
+  ollama_base_url: string;
+  timeout_seconds: number;
+  temperature: number;
+  real_model_enabled: boolean;
+  live_output_enabled: boolean;
+  restrictions: string[];
+};
+
+export type LocalModelSmokeResult = {
+  ok: boolean;
+  provider: string;
+  model: string;
+  real_model_invoked: boolean;
+  detail: string;
+  response_preview: string;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+};
+
+export type ModelArtifactIsolationStatus = {
+  workspace_id: string;
+  state: EnvironmentHealthState;
+  root: string;
+  policy_path: string;
+  policy_exists: boolean;
+  missing_directories: string[];
+  directory_count: number;
+  external_cache_allowed: boolean;
+  network_artifacts_allowed: boolean;
+  sensitive_material_allowed: boolean;
+  detail: string;
+  warnings: string[];
+};
+
+export type ModelArtifactRecord = {
+  artifact_id: string;
+  artifact_type: string;
+  relative_path: string;
+  sha256: string;
+  size_bytes: number;
+  content_type: string;
+  source: string;
+  created_by: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
+  previous_hash: string | null;
+  record_hash: string | null;
+};
+
+export type ModelArtifactManifest = {
+  schema_version: number;
+  workspace_id: string;
+  manifest_path: string;
+  record_count: number;
+  records: ModelArtifactRecord[];
+  chain_valid: boolean;
+  latest_record_hash: string | null;
+};
+
+export type ModelArtifactSummary = Pick<
+  ModelArtifactRecord,
+  "artifact_id" | "artifact_type" | "relative_path" | "sha256"
+> & {
+  deduplicated?: boolean;
+};
+
 export type WorkspaceManifest = {
   schema_version: number;
   workspace_id: string;
@@ -170,6 +257,16 @@ export type MaterialListResponse = {
   materials: MaterialRecord[];
 };
 
+export type MaterialPreview = {
+  material_id: string;
+  title: string;
+  mime_type: string;
+  text_preview: string;
+  truncated: boolean;
+  line_count: number;
+  char_count: number;
+};
+
 export type MaterialVerification = {
   material_id: string;
   verified: boolean;
@@ -189,6 +286,20 @@ export type MaterialQuestionLink = {
   matched_terms: string[];
   confidence: number;
   rationale: string;
+};
+
+export type MaterialQuestionLinkDecision = "accepted" | "rejected";
+
+export type MaterialQuestionLinkDecisionResponse = {
+  decision: MaterialQuestionLinkDecision;
+  chain_valid: boolean;
+  audit_event: {
+    id: string;
+    action: string;
+    object_type: string;
+    object_id: string;
+    event_hash: string;
+  };
 };
 
 export type MaterialLinksResponse = {
@@ -237,8 +348,41 @@ export type EvidenceMap = {
   topic_nodes: EvidenceTopicNode[];
 };
 
+export type AlignmentBand = "insufficient_review" | "low" | "medium" | "high";
+
+export type AlignmentTopicNode = {
+  topic_id: string;
+  label: string;
+  priority: string;
+  weight: number;
+  in_scope: boolean;
+  supported: boolean;
+  accepted_link_count: number;
+  rejected_link_count: number;
+  pending_link_count: number;
+};
+
+export type EvidenceAlignment = {
+  case_id: string;
+  band: AlignmentBand;
+  score: number | null;
+  confidence: number;
+  total_proposed_links: number;
+  reviewed_links: number;
+  accepted_links: number;
+  rejected_links: number;
+  pending_links: number;
+  in_scope_topics: number;
+  supported_topics: number;
+  rejection_rate: number;
+  topic_nodes: AlignmentTopicNode[];
+  explanation: string[];
+  indicator: Indicator;
+};
+
 export type EvidenceMapResponse = {
   evidence_map: EvidenceMap;
+  evidence_alignment: EvidenceAlignment;
 };
 
 export type GroundedSuggestion = {
@@ -260,13 +404,32 @@ export type GroundedSuggestionWarning = {
   detail: string;
 };
 
+export type GroundedSuggestionDecision = "accepted" | "edited" | "rejected";
+
+export type GroundedSuggestionDecisionResponse = {
+  decision: GroundedSuggestionDecision;
+  chain_valid: boolean;
+  audit_event: {
+    id: string;
+    action: string;
+    object_type: string;
+    object_id: string;
+    event_hash: string;
+  };
+};
+
 export type GroundedSuggestionsResponse = {
   suggestions: GroundedSuggestion[];
   model: string;
   prompt_version: string;
+  prompt_hash: string;
   context_hash: string;
   output_hash: string;
   warnings: GroundedSuggestionWarning[];
+  prompt_artifact?: ModelArtifactSummary | null;
+  context_artifact?: ModelArtifactSummary | null;
+  output_artifact?: ModelArtifactSummary | null;
+  artifact_warning?: string | null;
 };
 
 export type QuestionView = {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://interigaition.local/schemas/grounded-suggestions.schema.json",
+  "$id": "https://interrogaition.local/schemas/grounded-suggestions.schema.json",
   "title": "GroundedSuggestionsResponse",
   "type": "object",
   "required": [
@@ -8,6 +8,7 @@
     "suggestions",
     "model",
     "prompt_version",
+    "prompt_hash",
     "context_hash",
     "output_hash",
     "warnings"
@@ -56,6 +57,10 @@
     },
     "model": { "type": "string" },
     "prompt_version": { "type": "string" },
+    "prompt_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "context_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
@@ -63,6 +68,27 @@
     "output_hash": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
+    },
+    "prompt_artifact": {
+      "anyOf": [
+        { "$ref": "#/$defs/artifact_summary" },
+        { "type": "null" }
+      ]
+    },
+    "context_artifact": {
+      "anyOf": [
+        { "$ref": "#/$defs/artifact_summary" },
+        { "type": "null" }
+      ]
+    },
+    "output_artifact": {
+      "anyOf": [
+        { "$ref": "#/$defs/artifact_summary" },
+        { "type": "null" }
+      ]
+    },
+    "artifact_warning": {
+      "type": ["string", "null"]
     },
     "warnings": {
       "type": "array",
@@ -76,6 +102,27 @@
             "enum": ["missing_linked_evidence", "unknown_source_id"]
           },
           "detail": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "artifact_summary": {
+      "type": "object",
+      "required": ["artifact_id", "artifact_type", "relative_path", "sha256", "deduplicated"],
+      "properties": {
+        "artifact_id": { "type": "string" },
+        "artifact_type": {
+          "type": "string",
+          "enum": ["prompt", "context", "output"]
+        },
+        "relative_path": { "type": "string" },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "deduplicated": {
+          "type": "boolean"
         }
       }
     }

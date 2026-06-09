@@ -2,9 +2,9 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 
-from interigaition.analysis.live_review import review_live_session
-from interigaition.domain.models import Actor, Answer, Claim
-from interigaition.domain.session import (
+from interrogaition.analysis.live_review import review_live_session
+from interrogaition.domain.models import Actor, Answer, Claim
+from interrogaition.domain.session import (
     LiveNote,
     ParticipantRole,
     add_answer,
@@ -13,7 +13,7 @@ from interigaition.domain.session import (
     select_question,
     start_interview_session,
 )
-from interigaition.storage.json_case_loader import load_case_from_json
+from interrogaition.storage.json_case_loader import load_case_from_json
 
 
 ROOT = Path(__file__).resolve().parents[1]

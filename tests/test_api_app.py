@@ -2,19 +2,25 @@ import unittest
 import uuid
 from pathlib import Path
 
-from interigaition.api.app import (
+from interrogaition.api.app import (
     AddAnswerRequest,
     CreateWorkspaceRequest,
+    GroundedSuggestionDecisionRequest,
     HTTPException,
+    MaterialQuestionLinkDecisionRequest,
+    ModelArtifactIsolationRequest,
+    ModelArtifactWriteRequest,
     RegisterMaterialRequest,
     StartSessionRequest,
     create_app,
 )
-from interigaition.domain.session import ParticipantRole
-from interigaition.security.access_policy import WorkspaceAction, WorkspaceRole
-from interigaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
-from interigaition.security.encryption_status import EncryptionBackend, EncryptionStatus
-from interigaition.storage.material_registry import MaterialSourceType
+from interrogaition.ai.local_model_runtime import LocalModelRuntimeConfig
+from interrogaition.domain.models import SuggestionStatus
+from interrogaition.domain.session import ParticipantRole
+from interrogaition.security.access_policy import WorkspaceAction, WorkspaceRole
+from interrogaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
+from interrogaition.security.encryption_status import EncryptionBackend, EncryptionStatus
+from interrogaition.storage.material_registry import MaterialSourceType
 
 
 TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-output" / "api"
@@ -34,6 +40,56 @@ class ApiAppTest(unittest.TestCase):
 
         self.assertEqual(endpoint(app, "health")(), {"status": "ok"})
         self.assertEqual(endpoint(app, "locales")(), {"locales": ["en", "pl"]})
+
+    def test_environment_health_endpoint_reports_readiness_checks(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"health-workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+
+        report = endpoint(app, "get_environment_health")()
+        checks = {check["id"]: check for check in report["checks"]}
+
+        self.assertEqual(report["state"], "warning")
+        self.assertIn("generated_at", report)
+        self.assertEqual(checks["api"]["state"], "ready")
+        self.assertEqual(checks["synthetic_cases"]["state"], "ready")
+        self.assertEqual(checks["encryption"]["state"], "warning")
+        self.assertEqual(checks["local_model"]["state"], "ready")
+
+    def test_local_model_config_and_deterministic_smoke_endpoint(self) -> None:
+        app = create_app()
+
+        config = endpoint(app, "get_local_model_config")()
+        smoke = endpoint(app, "smoke_local_model")(execute_real=False)
+
+        self.assertEqual(config["provider"], "deterministic")
+        self.assertEqual(config["effective_provider"], "deterministic")
+        self.assertFalse(config["real_model_enabled"])
+        self.assertFalse(config["live_output_enabled"])
+        self.assertTrue(smoke["ok"])
+        self.assertEqual(smoke["model"], "deterministic-smoke")
+        self.assertFalse(smoke["real_model_invoked"])
+
+    def test_local_model_real_smoke_requires_explicit_enablement(self) -> None:
+        app = create_app(
+            local_model_config=LocalModelRuntimeConfig(
+                provider="ollama",
+                configured_model="llama3.1:8b",
+                real_model_enabled=False,
+            )
+        )
+
+        config = endpoint(app, "get_local_model_config")()
+        smoke = endpoint(app, "smoke_local_model")(execute_real=True)
+
+        self.assertEqual(config["provider"], "ollama")
+        self.assertEqual(config["effective_provider"], "deterministic")
+        self.assertFalse(smoke["ok"])
+        self.assertFalse(smoke["real_model_invoked"])
+        self.assertIn("disabled", smoke["detail"])
 
     def test_case_review_endpoint_returns_indicators_and_report(self) -> None:
         app = create_app()
@@ -55,12 +111,20 @@ class ApiAppTest(unittest.TestCase):
         create_workspace = endpoint(app, "create_workspace")
         get_workspace = endpoint(app, "get_workspace")
         get_access = endpoint(app, "get_workspace_access")
+        get_model_artifacts = endpoint(app, "get_workspace_model_artifacts")
+        ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
+        get_model_artifact_manifest = endpoint(app, "get_workspace_model_artifact_manifest")
+        write_model_artifact = endpoint(app, "write_workspace_model_artifact")
         register_material = endpoint(app, "register_workspace_material")
         list_materials = endpoint(app, "list_workspace_materials")
+        preview_material = endpoint(app, "get_workspace_material_preview")
         link_materials = endpoint(app, "link_workspace_materials_to_questions")
+        record_link_decision = endpoint(app, "record_material_question_link_decision")
         get_evidence_map = endpoint(app, "get_workspace_evidence_map")
         get_grounding_pack = endpoint(app, "get_workspace_grounding_pack")
         generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
+        record_suggestion_decision = endpoint(app, "record_workspace_grounded_suggestion_decision")
+        get_workspace_audit = endpoint(app, "get_workspace_audit")
         verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
@@ -84,6 +148,24 @@ class ApiAppTest(unittest.TestCase):
             action=WorkspaceAction.WRITE_INTERVIEW,
         )
         encryption_status = get_encryption_status()
+        model_artifacts_before = get_model_artifacts("api-workspace-001")
+        model_artifacts_after = ensure_model_artifacts(
+            "api-workspace-001",
+            ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
+        )
+        model_artifact_write = write_model_artifact(
+            "api-workspace-001",
+            ModelArtifactWriteRequest(
+                artifact_type="context",
+                content='{"allowed_source_ids":["api-material-001"]}',
+                content_type="application/json",
+                created_by="investigator-001",
+                source="api-test",
+                metadata={"prompt_version": "test-v1"},
+                role=WorkspaceRole.INVESTIGATOR,
+            ),
+        )
+        model_artifact_manifest = get_model_artifact_manifest("api-workspace-001")
         material = register_material(
             "api-workspace-001",
             RegisterMaterialRequest(
@@ -96,7 +178,23 @@ class ApiAppTest(unittest.TestCase):
             ),
         )
         materials = list_materials("api-workspace-001")
+        material_preview = preview_material("api-workspace-001", "api-material-001")
         material_links = link_materials("api-workspace-001", case_id="case-001", locale="en")
+        first_link = material_links["links"][0]
+        link_decision = record_link_decision(
+            "api-workspace-001",
+            first_link["material_id"],
+            first_link["question_id"],
+            MaterialQuestionLinkDecisionRequest(
+                decision="accepted",
+                case_id="case-001",
+                question_id=first_link["question_id"],
+                topic_ids=first_link["topic_ids"],
+                matched_terms=first_link["matched_terms"],
+                confidence=first_link["confidence"],
+                rationale=first_link["rationale"],
+            ),
+        )
         evidence_map = get_evidence_map(
             "api-workspace-001",
             case_id="case-001",
@@ -117,6 +215,31 @@ class ApiAppTest(unittest.TestCase):
             question_id="q-001",
             locale="en",
         )
+        model_artifact_manifest_after_suggestions = get_model_artifact_manifest("api-workspace-001")
+        first_suggestion = grounded_suggestions["suggestions"][0]
+        decision = record_suggestion_decision(
+            "api-workspace-001",
+            first_suggestion["id"],
+            GroundedSuggestionDecisionRequest(
+                decision=SuggestionStatus.ACCEPTED,
+                original_text=first_suggestion["text"],
+                final_text=first_suggestion["text"],
+                suggestion_type=first_suggestion["suggestion_type"],
+                reason=first_suggestion["reason"],
+                linked_topics=first_suggestion["linked_topics"],
+                linked_evidence=first_suggestion["linked_evidence"],
+                risk_flags=first_suggestion["risk_flags"],
+                confidence=first_suggestion["confidence"],
+                model=grounded_suggestions["model"],
+                prompt_version=grounded_suggestions["prompt_version"],
+                prompt_hash=grounded_suggestions["prompt_hash"],
+                context_hash=grounded_suggestions["context_hash"],
+                output_hash=grounded_suggestions["output_hash"],
+                case_id="case-001",
+                question_id="q-001",
+            ),
+        )
+        workspace_audit = get_workspace_audit("api-workspace-001")
         material_verification = verify_material("api-workspace-001", "api-material-001")
 
         self.assertEqual(created["manifest"]["workspace_id"], "api-workspace-001")
@@ -124,13 +247,31 @@ class ApiAppTest(unittest.TestCase):
         self.assertTrue(allowed["allowed"])
         self.assertFalse(denied["allowed"])
         self.assertFalse(encryption_status["available"])
+        self.assertEqual(model_artifacts_before["state"], "warning")
+        self.assertFalse(model_artifacts_before["policy_exists"])
+        self.assertEqual(model_artifacts_after["state"], "ready")
+        self.assertEqual(model_artifacts_after["directory_count"], 5)
+        self.assertFalse(model_artifacts_after["external_cache_allowed"])
+        self.assertEqual(model_artifact_write["record"]["artifact_type"], "context")
+        self.assertEqual(model_artifact_write["manifest"]["record_count"], 1)
+        self.assertTrue(model_artifact_write["manifest"]["chain_valid"])
+        self.assertEqual(model_artifact_manifest["record_count"], 1)
+        self.assertTrue(model_artifact_manifest["chain_valid"])
         self.assertEqual(material["id"], "api-material-001")
         self.assertEqual(material["source_type"], "case_protocol")
         self.assertEqual(len(materials["materials"]), 1)
+        self.assertEqual(material_preview["material_id"], "api-material-001")
+        self.assertIn("bicycle", material_preview["text_preview"])
+        self.assertFalse(material_preview["truncated"])
+        self.assertEqual(material_preview["line_count"], 1)
         self.assertIn(
             "q-001",
             {link["question_id"] for link in material_links["links"]},
         )
+        self.assertEqual(link_decision["decision"], "accepted")
+        self.assertTrue(link_decision["chain_valid"])
+        self.assertEqual(link_decision["audit_event"]["action"], "material_question_link_accepted")
+        self.assertEqual(link_decision["audit_event"]["details"]["material_id"], first_link["material_id"])
         self.assertEqual(evidence_map["evidence_map"]["case_id"], "case-001")
         self.assertEqual(evidence_map["evidence_map"]["summary"]["total_materials"], 1)
         self.assertIn(
@@ -156,10 +297,73 @@ class ApiAppTest(unittest.TestCase):
         )
         self.assertIn("suggestions", grounded_suggestions)
         self.assertEqual(grounded_suggestions["model"], "deterministic-grounded-fake")
+        self.assertEqual(len(grounded_suggestions["prompt_hash"]), 64)
         self.assertEqual(len(grounded_suggestions["context_hash"]), 64)
         self.assertEqual(len(grounded_suggestions["output_hash"]), 64)
+        self.assertIsNotNone(grounded_suggestions["prompt_artifact"])
+        self.assertIsNotNone(grounded_suggestions["context_artifact"])
+        self.assertIsNotNone(grounded_suggestions["output_artifact"])
+        self.assertIsNone(grounded_suggestions["artifact_warning"])
+        self.assertEqual(grounded_suggestions["prompt_artifact"]["artifact_type"], "prompt")
+        self.assertEqual(grounded_suggestions["context_artifact"]["artifact_type"], "context")
+        self.assertEqual(grounded_suggestions["output_artifact"]["artifact_type"], "output")
+        self.assertEqual(len(grounded_suggestions["prompt_artifact"]["sha256"]), 64)
+        self.assertEqual(len(grounded_suggestions["context_artifact"]["sha256"]), 64)
+        self.assertEqual(len(grounded_suggestions["output_artifact"]["sha256"]), 64)
+        self.assertFalse(grounded_suggestions["prompt_artifact"]["deduplicated"])
+        self.assertFalse(grounded_suggestions["context_artifact"]["deduplicated"])
+        self.assertFalse(grounded_suggestions["output_artifact"]["deduplicated"])
+        self.assertEqual(model_artifact_manifest_after_suggestions["record_count"], 4)
+        self.assertTrue(model_artifact_manifest_after_suggestions["chain_valid"])
+        self.assertEqual(len(model_artifact_manifest_after_suggestions["latest_record_hash"]), 64)
+        self.assertEqual(
+            [record["artifact_type"] for record in model_artifact_manifest_after_suggestions["records"]],
+            ["context", "prompt", "context", "output"],
+        )
         self.assertEqual(grounded_suggestions["warnings"], [])
         self.assertTrue(grounded_suggestions["suggestions"])
+        self.assertEqual(decision["decision"], "accepted")
+        self.assertTrue(decision["chain_valid"])
+        self.assertEqual(decision["audit_event"]["action"], "grounded_suggestion_accepted")
+        self.assertEqual(decision["audit_event"]["details"]["prompt_hash"], grounded_suggestions["prompt_hash"])
+        self.assertEqual(decision["audit_event"]["details"]["context_hash"], grounded_suggestions["context_hash"])
+        self.assertTrue(workspace_audit["chain_valid"])
+        generated_event = workspace_audit["events"][1]
+        self.assertEqual(
+            generated_event["details"]["prompt_artifact_id"],
+            grounded_suggestions["prompt_artifact"]["artifact_id"],
+        )
+        self.assertEqual(
+            generated_event["details"]["prompt_artifact_sha256"],
+            grounded_suggestions["prompt_artifact"]["sha256"],
+        )
+        self.assertFalse(generated_event["details"]["prompt_artifact_deduplicated"])
+        self.assertEqual(
+            generated_event["details"]["context_artifact_id"],
+            grounded_suggestions["context_artifact"]["artifact_id"],
+        )
+        self.assertEqual(
+            generated_event["details"]["context_artifact_sha256"],
+            grounded_suggestions["context_artifact"]["sha256"],
+        )
+        self.assertFalse(generated_event["details"]["context_artifact_deduplicated"])
+        self.assertEqual(
+            generated_event["details"]["output_artifact_id"],
+            grounded_suggestions["output_artifact"]["artifact_id"],
+        )
+        self.assertEqual(
+            generated_event["details"]["output_artifact_sha256"],
+            grounded_suggestions["output_artifact"]["sha256"],
+        )
+        self.assertFalse(generated_event["details"]["output_artifact_deduplicated"])
+        self.assertEqual(
+            [event["action"] for event in workspace_audit["events"]],
+            [
+                "material_question_link_accepted",
+                "grounded_suggestions_generated",
+                "grounded_suggestion_accepted",
+            ],
+        )
         self.assertTrue(material_verification["verified"])
 
         with self.assertRaises(HTTPException) as caught:
@@ -174,6 +378,111 @@ class ApiAppTest(unittest.TestCase):
             )
 
         self.assertEqual(caught.exception.status_code, 400)
+
+    def test_grounded_suggestions_warn_when_artifact_isolation_is_missing(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
+        get_model_artifact_manifest = endpoint(app, "get_workspace_model_artifact_manifest")
+        get_workspace_audit = endpoint(app, "get_workspace_audit")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-missing-artifacts",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        grounded_suggestions = generate_grounded_suggestions(
+            "api-workspace-missing-artifacts",
+            case_id="case-001",
+            session_id=None,
+            question_id="q-001",
+            locale="en",
+        )
+        manifest = get_model_artifact_manifest("api-workspace-missing-artifacts")
+        workspace_audit = get_workspace_audit("api-workspace-missing-artifacts")
+
+        self.assertTrue(grounded_suggestions["suggestions"])
+        self.assertIsNone(grounded_suggestions["prompt_artifact"])
+        self.assertIsNone(grounded_suggestions["context_artifact"])
+        self.assertIsNone(grounded_suggestions["output_artifact"])
+        self.assertIn("not ready", grounded_suggestions["artifact_warning"])
+        self.assertEqual(manifest["record_count"], 0)
+        self.assertTrue(manifest["chain_valid"])
+        self.assertTrue(workspace_audit["chain_valid"])
+        self.assertEqual(workspace_audit["events"][0]["action"], "grounded_suggestions_generated")
+        self.assertIn("artifact_warning", workspace_audit["events"][0]["details"])
+        self.assertNotIn("context_artifact_id", workspace_audit["events"][0]["details"])
+
+    def test_grounded_suggestions_deduplicate_repeated_artifacts(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
+        generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
+        get_model_artifact_manifest = endpoint(app, "get_workspace_model_artifact_manifest")
+        get_workspace_audit = endpoint(app, "get_workspace_audit")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-dedup-artifacts",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+        ensure_model_artifacts(
+            "api-workspace-dedup-artifacts",
+            ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
+        )
+
+        first = generate_grounded_suggestions(
+            "api-workspace-dedup-artifacts",
+            case_id="case-001",
+            session_id=None,
+            question_id="q-001",
+            locale="en",
+        )
+        first_manifest = get_model_artifact_manifest("api-workspace-dedup-artifacts")
+        second = generate_grounded_suggestions(
+            "api-workspace-dedup-artifacts",
+            case_id="case-001",
+            session_id=None,
+            question_id="q-001",
+            locale="en",
+        )
+        second_manifest = get_model_artifact_manifest("api-workspace-dedup-artifacts")
+        workspace_audit = get_workspace_audit("api-workspace-dedup-artifacts")
+
+        self.assertEqual(first_manifest["record_count"], 3)
+        self.assertTrue(first_manifest["chain_valid"])
+        self.assertEqual(second_manifest["record_count"], 3)
+        self.assertTrue(second_manifest["chain_valid"])
+        self.assertEqual(
+            [record["artifact_type"] for record in second_manifest["records"]],
+            ["prompt", "context", "output"],
+        )
+        for key in ("prompt_artifact", "context_artifact", "output_artifact"):
+            self.assertEqual(second[key]["artifact_id"], first[key]["artifact_id"])
+            self.assertFalse(first[key]["deduplicated"])
+            self.assertTrue(second[key]["deduplicated"])
+
+        self.assertFalse(workspace_audit["events"][0]["details"]["prompt_artifact_deduplicated"])
+        self.assertTrue(workspace_audit["events"][1]["details"]["prompt_artifact_deduplicated"])
 
     def test_session_endpoint_flow(self) -> None:
         app = create_app()

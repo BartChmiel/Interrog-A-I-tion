@@ -2,17 +2,17 @@ import unittest
 import uuid
 from pathlib import Path
 
-from interigaition.analysis.credibility_indicators import generate_indicators
-from interigaition.analysis.evidence_map import TopicEvidenceStatus, build_evidence_map
-from interigaition.analysis.interview_review import review_case
-from interigaition.analysis.material_grounding import (
+from interrogaition.analysis.credibility_indicators import generate_indicators
+from interrogaition.analysis.evidence_map import TopicEvidenceStatus, build_evidence_map
+from interrogaition.analysis.interview_review import review_case
+from interrogaition.analysis.material_grounding import (
     MaterialText,
     infer_material_topic_signals,
     link_materials_to_questions,
 )
-from interigaition.security.case_workspace import CaseWorkspaceManager
-from interigaition.storage.json_case_loader import load_case_from_json
-from interigaition.storage.material_registry import MaterialRegistry
+from interrogaition.security.case_workspace import CaseWorkspaceManager
+from interrogaition.storage.json_case_loader import load_case_from_json
+from interrogaition.storage.material_registry import MaterialRegistry
 
 
 ROOT = Path(__file__).resolve().parents[1]

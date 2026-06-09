@@ -1,10 +1,10 @@
 import unittest
 from pathlib import Path
 
-from interigaition.ai.model_client import FakeModelClient
-from interigaition.ai.response_parser import ModelResponseError, parse_suggestion_response
-from interigaition.ai.suggestion_service import generate_followup_suggestions
-from interigaition.storage.json_case_loader import load_case_from_json
+from interrogaition.ai.model_client import FakeModelClient
+from interrogaition.ai.response_parser import ModelResponseError, parse_suggestion_response
+from interrogaition.ai.suggestion_service import generate_followup_suggestions
+from interrogaition.storage.json_case_loader import load_case_from_json
 
 
 ROOT = Path(__file__).resolve().parents[1]

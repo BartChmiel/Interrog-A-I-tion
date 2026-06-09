@@ -54,7 +54,7 @@ Success criteria:
 
 ## Milestone 3: Local Model Abstraction
 
-Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, and a deterministic grounding context pack for future model calls. A real local model has not been connected to the user workflow yet.
+Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, and a deterministic grounding context pack for future model calls. A real local model has not been connected to live suggestions yet.
 
 Tasks:
 
@@ -63,6 +63,8 @@ Tasks:
 - add prompt renderer,
 - add response schema validation,
 - add Ollama adapter behind the interface,
+- add local model runtime config,
+- add deterministic smoke endpoint and UI control,
 - add guardrail checks before returning suggestions,
 - add grounding pack prompt contract.
 
@@ -70,6 +72,7 @@ Success criteria:
 
 - tests run without Ollama,
 - Ollama can be enabled locally,
+- model readiness is visible without sending case data to a real model,
 - model output is validated and auditable.
 
 ## Milestone 4: FastAPI Prototype
@@ -113,7 +116,7 @@ Success criteria:
 
 ## Milestone 6: Security Path
 
-Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, export integrity manifests, a workspace material register, deterministic material-question grounding links, a first topic-level case evidence map, an AI grounding context pack, and live-visible grounded suggestions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
+Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, environment health reporting, workspace-local model artifact isolation with hash-chained deduplicating artifact write manifests, grounded suggestion prompt/context/output artifact capture, export integrity manifests with optional model artifact provenance references, a workspace material register, bounded material previews, deterministic material-question grounding links with matched-term audit details, audited material-question link decisions, a first topic-level case evidence map, an advisory Evidence Alignment Indicator, an AI grounding context pack, live-visible grounded suggestions, and audited grounded-suggestion decisions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
 
 Tasks:
 
@@ -121,14 +124,24 @@ Tasks:
 - append-only audit log,
 - export hash,
 - workspace material register,
+- bounded material preview,
 - material-question grounding links,
+- matched-term audit view,
+- audited accepted/rejected material-question link decisions,
 - topic-level case evidence map,
+- advisory evidence alignment indicator,
 - grounding context pack,
 - live-visible grounded suggestions,
 - citation validation warnings,
 - model/prompt/context/output audit metadata,
+- audited accepted/edited/rejected grounded-suggestion decisions,
 - SQLite storage,
 - SQLCipher research spike,
+- environment health check,
+- workspace-local model artifact isolation,
+- hash-chained model artifact write manifests,
+- prompt/context/output artifact capture with hash deduplication,
+- model artifact provenance references in export integrity manifests,
 - air-gapped mode policy.
 
 Success criteria:

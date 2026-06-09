@@ -20,15 +20,15 @@ Goal: make every future AI suggestion traceable.
 Implemented:
 
 - workspace material register,
+- material preview and matched-term audit view,
 - material verification by hash and size,
 - material-question grounding links,
+- audited accepted/rejected material-question link decisions,
 - topic-level case evidence map,
 - grounding context pack.
 
 Next:
 
-- human accept/reject controls for material-question links,
-- material preview and matched-term audit view,
 - evidence graph nodes for materials, answers, claims, questions, and findings,
 - stronger distinction between official evidence, working notes, and synthetic training material,
 - import metadata for source, author, timestamp, chain-of-custody status, and legal sensitivity.
@@ -55,17 +55,26 @@ Implemented:
 - grounded follow-up prompt draft,
 - `GroundingContextPack` API contract,
 - grounded prompt rendering from `GroundingContextPack`,
+- local model runtime configuration,
+- deterministic model smoke endpoint and UI control,
+- workspace-local model artifact isolation,
+- hash-chained deduplicating model artifact write manifests,
+- grounded suggestion prompt/context/output artifact capture,
+- model artifact provenance references in export integrity manifests,
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
-- audit metadata for prompt version, model id, context hash, and output hash,
-- React right-rail display with source ids and `use`, `edit`, and `reject` controls.
+- audit metadata for prompt version, model id, prompt/context/output hashes, and captured artifact ids,
+- React right-rail display with source ids and `use`, `edit`, and `reject` controls,
+- backend audit events for grounded suggestion `accepted`, `edited`, and `rejected` decisions.
 
 Next:
 
-- persist `use`, `edit`, and `reject` decisions in the backend audit trail,
-- connect Ollama behind the same grounded service in controlled test mode,
+- run a real Ollama smoke check in developer mode after STOP review,
+- connect Ollama behind the same grounded service in controlled test mode after runtime approval,
 - block institutional live use of real model output until a STOP review,
-- add a local model configuration panel or config file.
+- decide whether artifact capture should become mandatory before every real model call,
+- decide whether export integrity manifests should become signed or timestamped,
+- add model selection persistence and runtime policy configuration.
 
 Strategic risk:
 
@@ -116,10 +125,10 @@ Implemented:
 - narrative consistency from structured claims,
 - source-of-knowledge coverage,
 - aggregate credibility review summary with limitations.
+- evidence alignment indicator using registered materials and human-reviewed links.
 
 Next:
 
-- evidence alignment indicator using registered materials,
 - explicit confidence and data-quality indicators,
 - indicator provenance panel,
 - separate "process quality" from "material reliability",
@@ -145,18 +154,19 @@ Implemented:
 - audit chain,
 - export integrity manifest,
 - SQLCipher readiness gate,
+- environment health report,
+- workspace-local model artifact isolation,
 - synthetic-only safe prototype path.
 
 Next:
 
 - choose and document SQLCipher installation route,
 - implement encrypted workspace creation once runtime support is verified,
-- model cache and artifact isolation,
 - role-based UI affordances,
 - signed export manifests,
 - backup and archival policy,
 - offline installer path,
-- environment health check.
+- installer and deployment health checks.
 
 Strategic risk:
 
@@ -224,14 +234,14 @@ Design rule:
 
 ## Recommended Next Implementation Order
 
-1. Add backend audit events for grounded suggestion `use`, `edit`, and `reject` decisions.
-2. Add human accept/reject controls for material-question links.
-3. Add evidence alignment indicator based on registered materials.
-4. Add local model configuration and Ollama smoke mode behind deterministic tests.
-5. STOP before trusting real model-generated suggestions in institutional live mode.
-6. Add SQLCipher installation route and encrypted workspace creation.
-7. Add model artifact isolation and environment health checks.
-8. Add richer synthetic evaluation scenarios for thesis measurements.
+1. STOP before running real Ollama smoke or trusting real model-generated suggestions in live mode.
+2. Add SQLCipher installation route and encrypted workspace creation.
+3. Add installer/deployment health checks and hash-chain coverage for model artifact manifests.
+4. Add richer synthetic evaluation scenarios for thesis measurements.
+5. Add audit viewer and exportable audit summaries after legal/UX wording review.
+6. Add explicit confidence/data-quality indicators and indicator provenance panel.
+7. Add evidence graph nodes for materials, answers, claims, questions, and findings.
+8. Add model selection persistence and runtime policy configuration.
 
 ## STOP Questions Before Live AI Output
 

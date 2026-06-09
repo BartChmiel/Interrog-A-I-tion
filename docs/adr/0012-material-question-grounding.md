@@ -33,4 +33,4 @@ The React prototype displays linked materials on the active question and linked 
 - Future AI prompts can be grounded in specific registered material ids.
 - The operator can see why a material is relevant to a question before accepting AI help.
 - The current links are heuristic topic links, not legal relevance determinations.
-- Human acceptance/rejection of proposed links remains a future workflow.
+- Human acceptance/rejection of proposed links is now recorded separately as append-only audit events.

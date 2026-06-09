@@ -1,9 +1,9 @@
 import unittest
 from pathlib import Path
 
-from interigaition.analysis.interview_review import review_case
-from interigaition.export.markdown_report import render_review_markdown
-from interigaition.storage.json_case_loader import load_case_from_json
+from interrogaition.analysis.interview_review import review_case
+from interrogaition.export.markdown_report import render_review_markdown
+from interrogaition.storage.json_case_loader import load_case_from_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
