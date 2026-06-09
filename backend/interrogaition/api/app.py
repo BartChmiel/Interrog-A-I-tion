@@ -94,7 +94,7 @@ from interrogaition.ai.local_model_runtime import (
     run_local_model_smoke,
 )
 from interrogaition.ai.model_client import DeterministicGroundedModelClient, ModelClient
-from interrogaition.domain.models import Actor, Answer, AuditEvent, Claim, Case, SuggestionStatus
+from interrogaition.domain.models import Actor, Answer, AuditEvent, Claim, Case, Priority, SuggestionStatus
 from interrogaition.domain.session import (
     InterviewSession,
     ParticipantRole,
@@ -292,6 +292,15 @@ def create_app(
     @app.get("/locales")
     def locales() -> dict[str, list[str]]:
         return {"locales": ["en", "pl"]}
+
+    @app.get("/cases")
+    def list_cases(locale: str = Query(default="en")) -> dict[str, Any]:
+        return {
+            "cases": [
+                _case_catalog_item(case)
+                for case in _list_synthetic_cases(locale=locale)
+            ]
+        }
 
     @app.get("/security/encryption")
     def get_encryption_status() -> dict[str, Any]:
@@ -1091,6 +1100,29 @@ def _load_synthetic_case(case_id: str, locale: str) -> Case:
         raise HTTPException(status_code=404, detail="Synthetic case not found.")
 
     return load_case_from_json(path, locale=locale)
+
+
+def _list_synthetic_cases(locale: str) -> tuple[Case, ...]:
+    return tuple(
+        load_case_from_json(path, locale=locale)
+        for path in sorted(SYNTHETIC_CASES_ROOT.glob("*/case.json"))
+    )
+
+
+def _case_catalog_item(case: Case) -> dict[str, Any]:
+    answered_question_ids = {answer.question_id for answer in case.answers}
+    high_priority_topics = tuple(topic for topic in case.topics if topic.priority == Priority.HIGH)
+    return {
+        "id": case.id,
+        "title": case.title,
+        "description": case.description,
+        "created_at": case.created_at.isoformat(),
+        "topic_count": len(case.topics),
+        "high_priority_topic_count": len(high_priority_topics),
+        "question_count": len(case.questions),
+        "answer_count": len(case.answers),
+        "answered_question_count": len(answered_question_ids),
+    }
 
 
 def _session_audit_events(

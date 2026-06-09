@@ -7,6 +7,7 @@ from interrogaition.storage.json_case_loader import load_case_from_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SYNTHETIC_ROOT = ROOT / "data" / "synthetic"
 CASE_PATH = ROOT / "data" / "synthetic" / "case-001" / "case.json"
 
 
@@ -24,6 +25,29 @@ class CaseReviewPipelineTest(unittest.TestCase):
 
         self.assertIn("kradzieży roweru", case.title)
         self.assertEqual(case.topics[-1].label, "Potencjalne nagranie")
+
+    def test_loads_all_synthetic_scenarios(self) -> None:
+        case_paths = sorted(SYNTHETIC_ROOT.glob("case-*/case.json"))
+
+        cases = [load_case_from_json(path, locale="en") for path in case_paths]
+
+        self.assertGreaterEqual(len(cases), 3)
+        self.assertEqual({case.id for case in cases}, {"case-001", "case-002", "case-003"})
+        for case in cases:
+            self.assertGreaterEqual(len(case.topics), 5)
+            self.assertGreaterEqual(len(case.questions), 4)
+            self.assertGreaterEqual(len(case.answers), 3)
+
+    def test_localizes_question_answer_and_claim_text(self) -> None:
+        case_path = SYNTHETIC_ROOT / "case-002" / "case.json"
+
+        english_case = load_case_from_json(case_path, locale="en")
+        polish_case = load_case_from_json(case_path, locale="pl")
+
+        self.assertIn("late shift", english_case.questions[0].text)
+        self.assertIn("Prosz", polish_case.questions[0].text)
+        self.assertIn("service door", english_case.answers[0].claims[1].source_text)
+        self.assertIn("Drzwi", polish_case.answers[0].claims[1].source_text)
 
     def test_review_detects_missing_topic_neutrality_and_inconsistency(self) -> None:
         case = load_case_from_json(CASE_PATH)

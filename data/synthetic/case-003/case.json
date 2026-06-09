@@ -1,0 +1,330 @@
+{
+  "id": "case-003",
+  "title": "Synthetic care facility medication discrepancy",
+  "title_i18n": {
+    "en": "Synthetic care facility medication discrepancy",
+    "pl": "Syntetyczne przesłuchanie dotyczące rozbieżności lekowej w placówce opiekuńczej"
+  },
+  "description": "Synthetic training case. A care facility worker describes a missing medication dose. The scenario tests role-boundary handling, documentation grounding, and contradictions about timing and key access.",
+  "description_i18n": {
+    "en": "Synthetic training case. A care facility worker describes a missing medication dose. The scenario tests role-boundary handling, documentation grounding, and contradictions about timing and key access.",
+    "pl": "Syntetyczna sprawa treningowa. Pracownik placówki opiekuńczej opisuje brak dawki leku. Scenariusz testuje granice ról procesowych, oparcie relacji na dokumentacji oraz sprzeczności dotyczące czasu i dostępu do kluczy."
+  },
+  "created_at": "2026-05-07T10:15:00Z",
+  "topics": [
+    {
+      "id": "topic-care-chronology",
+      "label": "Medication timeline",
+      "label_i18n": {
+        "en": "Medication timeline",
+        "pl": "Chronologia podania leku"
+      },
+      "description": "When the missing dose was prepared, noticed, and reported.",
+      "description_i18n": {
+        "en": "When the missing dose was prepared, noticed, and reported.",
+        "pl": "Kiedy dawka została przygotowana, zauważona jako brakująca i zgłoszona."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-care-medication-log",
+      "label": "Medication log",
+      "label_i18n": {
+        "en": "Medication log",
+        "pl": "Dokumentacja lekowa"
+      },
+      "description": "What the medication log says and who made entries.",
+      "description_i18n": {
+        "en": "What the medication log says and who made entries.",
+        "pl": "Co wynika z dokumentacji lekowej i kto dokonywał wpisów."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-care-access",
+      "label": "Cabinet access",
+      "label_i18n": {
+        "en": "Cabinet access",
+        "pl": "Dostęp do szafki"
+      },
+      "description": "Who had keys or practical access to the medication cabinet.",
+      "description_i18n": {
+        "en": "Who had keys or practical access to the medication cabinet.",
+        "pl": "Kto miał klucze lub faktyczny dostęp do szafki z lekami."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-care-role-boundary",
+      "label": "Role boundary",
+      "label_i18n": {
+        "en": "Role boundary",
+        "pl": "Granica roli procesowej"
+      },
+      "description": "Whether the person remains a witness, may become a suspect, or is also a harmed party.",
+      "description_i18n": {
+        "en": "Whether the person remains a witness, may become a suspect, or is also a harmed party.",
+        "pl": "Czy osoba pozostaje świadkiem, może stać się podejrzanym albo jest również pokrzywdzona."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-care-source",
+      "label": "Source of knowledge",
+      "label_i18n": {
+        "en": "Source of knowledge",
+        "pl": "Źródło wiedzy"
+      },
+      "description": "Direct observation, documentation, or second-hand information.",
+      "description_i18n": {
+        "en": "Direct observation, documentation, or second-hand information.",
+        "pl": "Obserwacja bezpośrednia, dokumentacja lub informacje od innych osób."
+      },
+      "priority": "medium"
+    },
+    {
+      "id": "topic-care-inventory",
+      "label": "Inventory check",
+      "label_i18n": {
+        "en": "Inventory check",
+        "pl": "Kontrola stanu leków"
+      },
+      "description": "Whether inventory was reconciled after the discrepancy.",
+      "description_i18n": {
+        "en": "Whether inventory was reconciled after the discrepancy.",
+        "pl": "Czy po rozbieżności uzgodniono stan leków."
+      },
+      "priority": "medium"
+    },
+    {
+      "id": "topic-care-recording",
+      "label": "Potential monitoring",
+      "label_i18n": {
+        "en": "Potential monitoring",
+        "pl": "Potencjalny monitoring"
+      },
+      "description": "Whether corridor monitoring or access logs may exist.",
+      "description_i18n": {
+        "en": "Whether corridor monitoring or access logs may exist.",
+        "pl": "Czy mogą istnieć nagrania z korytarza lub logi dostępu."
+      },
+      "priority": "medium"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-301",
+      "text": "Please describe the medication discrepancy from the beginning.",
+      "text_i18n": {
+        "en": "Please describe the medication discrepancy from the beginning.",
+        "pl": "Proszę opisać rozbieżność dotyczącą leku od początku."
+      },
+      "source": "human",
+      "question_type": "open",
+      "topic_ids": [
+        "topic-care-chronology",
+        "topic-care-medication-log",
+        "topic-care-access"
+      ]
+    },
+    {
+      "id": "q-302",
+      "text": "At what exact moment did you first notice that the dose was missing?",
+      "text_i18n": {
+        "en": "At what exact moment did you first notice that the dose was missing?",
+        "pl": "W którym dokładnie momencie zauważyła Pani po raz pierwszy, że dawki brakuje?"
+      },
+      "source": "human",
+      "question_type": "chronological",
+      "topic_ids": [
+        "topic-care-chronology"
+      ]
+    },
+    {
+      "id": "q-303",
+      "text": "Which statements are based on your own observation and which are based on the medication log?",
+      "text_i18n": {
+        "en": "Which statements are based on your own observation and which are based on the medication log?",
+        "pl": "Które informacje wynikają z Pani własnej obserwacji, a które z dokumentacji lekowej?"
+      },
+      "source": "human",
+      "question_type": "source_of_knowledge",
+      "topic_ids": [
+        "topic-care-source",
+        "topic-care-medication-log"
+      ]
+    },
+    {
+      "id": "q-304",
+      "text": "Who had access to the medication cabinet during the evening round?",
+      "text_i18n": {
+        "en": "Who had access to the medication cabinet during the evening round?",
+        "pl": "Kto miał dostęp do szafki z lekami podczas wieczornego obchodu?"
+      },
+      "source": "human",
+      "question_type": "control",
+      "topic_ids": [
+        "topic-care-access"
+      ]
+    },
+    {
+      "id": "q-305",
+      "text": "How was the inventory reconciled after the missing dose was reported?",
+      "text_i18n": {
+        "en": "How was the inventory reconciled after the missing dose was reported?",
+        "pl": "W jaki sposób uzgodniono stan leków po zgłoszeniu brakującej dawki?"
+      },
+      "source": "ai",
+      "question_type": "clarifying",
+      "topic_ids": [
+        "topic-care-inventory"
+      ]
+    },
+    {
+      "id": "q-306",
+      "text": "You were the only person who could have moved the medication, correct?",
+      "text_i18n": {
+        "en": "You were the only person who could have moved the medication, correct?",
+        "pl": "To Pani była jedyną osobą, która mogła przenieść lek, prawda?"
+      },
+      "source": "human",
+      "question_type": "challenge",
+      "topic_ids": [
+        "topic-care-role-boundary",
+        "topic-care-access"
+      ]
+    }
+  ],
+  "answers": [
+    {
+      "id": "a-301",
+      "question_id": "q-301",
+      "text": "During the evening round at 18:40 I prepared the trolley. Before I entered room 12, I noticed the pain-medication dose was already missing.",
+      "text_i18n": {
+        "en": "During the evening round at 18:40 I prepared the trolley. Before I entered room 12, I noticed the pain-medication dose was already missing.",
+        "pl": "Podczas wieczornego obchodu o 18:40 przygotowałam wózek. Zanim weszłam do pokoju 12, zauważyłam, że dawki leku przeciwbólowego już brakuje."
+      },
+      "topic_ids": [
+        "topic-care-chronology",
+        "topic-care-medication-log",
+        "topic-care-access"
+      ],
+      "created_at": "2026-05-07T10:21:00Z",
+      "claims": [
+        {
+          "id": "c-301",
+          "subject": "missing_dose",
+          "attribute": "discovery_time",
+          "value": "18:40",
+          "source_text": "at 18:40... I noticed",
+          "source_text_i18n": {
+            "en": "at 18:40... I noticed",
+            "pl": "o 18:40... zauważyłam"
+          }
+        },
+        {
+          "id": "c-302",
+          "subject": "missing_dose",
+          "attribute": "state",
+          "value": "missing before room 12",
+          "source_text": "Before I entered room 12... already missing",
+          "source_text_i18n": {
+            "en": "Before I entered room 12... already missing",
+            "pl": "Zanim weszłam do pokoju 12... już brakuje"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a-302",
+      "question_id": "q-302",
+      "text": "I first noticed the discrepancy after giving medication, around 19:05, when I compared the tray with the paper log.",
+      "text_i18n": {
+        "en": "I first noticed the discrepancy after giving medication, around 19:05, when I compared the tray with the paper log.",
+        "pl": "Po raz pierwszy zauważyłam rozbieżność po podaniu leków, około 19:05, gdy porównałam tackę z papierową dokumentacją."
+      },
+      "topic_ids": [
+        "topic-care-chronology",
+        "topic-care-medication-log"
+      ],
+      "created_at": "2026-05-07T10:25:00Z",
+      "claims": [
+        {
+          "id": "c-303",
+          "subject": "missing_dose",
+          "attribute": "discovery_time",
+          "value": "19:05",
+          "source_text": "around 19:05",
+          "source_text_i18n": {
+            "en": "around 19:05",
+            "pl": "około 19:05"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a-303",
+      "question_id": "q-304",
+      "text": "The backup key was with the supervisor, but I also used my own key to open the cabinet earlier that evening.",
+      "text_i18n": {
+        "en": "The backup key was with the supervisor, but I also used my own key to open the cabinet earlier that evening.",
+        "pl": "Klucz zapasowy był u przełożonej, ale wcześniej tego wieczoru użyłam też własnego klucza do otwarcia szafki."
+      },
+      "topic_ids": [
+        "topic-care-access"
+      ],
+      "created_at": "2026-05-07T10:29:00Z",
+      "claims": [
+        {
+          "id": "c-304",
+          "subject": "medication_cabinet",
+          "attribute": "key_holder",
+          "value": "supervisor",
+          "source_text": "The backup key was with the supervisor",
+          "source_text_i18n": {
+            "en": "The backup key was with the supervisor",
+            "pl": "Klucz zapasowy był u przełożonej"
+          }
+        },
+        {
+          "id": "c-305",
+          "subject": "medication_cabinet",
+          "attribute": "key_holder",
+          "value": "witness",
+          "source_text": "I also used my own key",
+          "source_text_i18n": {
+            "en": "I also used my own key",
+            "pl": "użyłam też własnego klucza"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a-304",
+      "question_id": "q-303",
+      "text": "The missing dose is from my own observation. The signing time comes from the paper medication log.",
+      "text_i18n": {
+        "en": "The missing dose is from my own observation. The signing time comes from the paper medication log.",
+        "pl": "Brak dawki wynika z mojej własnej obserwacji. Godzina podpisu pochodzi z papierowej dokumentacji lekowej."
+      },
+      "topic_ids": [
+        "topic-care-source",
+        "topic-care-medication-log"
+      ],
+      "created_at": "2026-05-07T10:32:00Z",
+      "claims": [
+        {
+          "id": "c-306",
+          "subject": "worker",
+          "attribute": "source_of_knowledge",
+          "value": "direct observation and paper medication log",
+          "source_text": "own observation... paper medication log",
+          "source_text_i18n": {
+            "en": "own observation... paper medication log",
+            "pl": "własnej obserwacji... dokumentacji lekowej"
+          }
+        }
+      ]
+    }
+  ]
+}

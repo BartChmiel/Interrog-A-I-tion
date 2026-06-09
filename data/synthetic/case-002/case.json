@@ -1,0 +1,317 @@
+{
+  "id": "case-002",
+  "title": "Synthetic late-night pharmacy incident",
+  "title_i18n": {
+    "en": "Synthetic late-night pharmacy incident",
+    "pl": "Syntetyczne przesłuchanie dotyczące nocnego incydentu w aptece"
+  },
+  "description": "Synthetic training case. An employee witness describes a late-night alarm, a service corridor, and an unknown person. The scenario contains an uncovered recording topic and a deliberate inconsistency about the service door.",
+  "description_i18n": {
+    "en": "Synthetic training case. An employee witness describes a late-night alarm, a service corridor, and an unknown person. The scenario contains an uncovered recording topic and a deliberate inconsistency about the service door.",
+    "pl": "Syntetyczna sprawa treningowa. Pracownik opisuje nocny alarm, korytarz serwisowy i nieznaną osobę. Scenariusz zawiera niepokryty temat nagrań oraz celową niespójność dotyczącą drzwi serwisowych."
+  },
+  "created_at": "2026-05-06T08:30:00Z",
+  "topics": [
+    {
+      "id": "topic-pharmacy-chronology",
+      "label": "Chronology",
+      "label_i18n": {
+        "en": "Chronology",
+        "pl": "Chronologia"
+      },
+      "description": "Order and timing of the observed events.",
+      "description_i18n": {
+        "en": "Order and timing of the observed events.",
+        "pl": "Kolejność i czas zaobserwowanych zdarzeń."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-pharmacy-access",
+      "label": "Service access",
+      "label_i18n": {
+        "en": "Service access",
+        "pl": "Dostęp serwisowy"
+      },
+      "description": "Door status, corridor access, and who could enter.",
+      "description_i18n": {
+        "en": "Door status, corridor access, and who could enter.",
+        "pl": "Stan drzwi, dostęp do korytarza i możliwe osoby wchodzące."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-pharmacy-person",
+      "label": "Unknown person description",
+      "label_i18n": {
+        "en": "Unknown person description",
+        "pl": "Opis nieznanej osoby"
+      },
+      "description": "Observable features of the unknown person.",
+      "description_i18n": {
+        "en": "Observable features of the unknown person.",
+        "pl": "Obserwowalne cechy nieznanej osoby."
+      },
+      "priority": "medium"
+    },
+    {
+      "id": "topic-pharmacy-alarm",
+      "label": "Alarm event",
+      "label_i18n": {
+        "en": "Alarm event",
+        "pl": "Zdarzenie alarmowe"
+      },
+      "description": "Alarm timing and witness reaction.",
+      "description_i18n": {
+        "en": "Alarm timing and witness reaction.",
+        "pl": "Czas alarmu oraz reakcja świadka."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-pharmacy-recording",
+      "label": "Potential recording",
+      "label_i18n": {
+        "en": "Potential recording",
+        "pl": "Potencjalne nagranie"
+      },
+      "description": "Whether cameras, alarm logs, or access logs may corroborate the account.",
+      "description_i18n": {
+        "en": "Whether cameras, alarm logs, or access logs may corroborate the account.",
+        "pl": "Czy kamery, logi alarmowe lub logi dostępu mogą potwierdzać relację."
+      },
+      "priority": "high"
+    },
+    {
+      "id": "topic-pharmacy-source",
+      "label": "Source of knowledge",
+      "label_i18n": {
+        "en": "Source of knowledge",
+        "pl": "Źródło wiedzy"
+      },
+      "description": "How the witness knows each important fact.",
+      "description_i18n": {
+        "en": "How the witness knows each important fact.",
+        "pl": "Skąd świadek zna poszczególne istotne fakty."
+      },
+      "priority": "medium"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-201",
+      "text": "Please describe what happened during the late shift in your own words.",
+      "text_i18n": {
+        "en": "Please describe what happened during the late shift in your own words.",
+        "pl": "Proszę opisać własnymi słowami, co wydarzyło się podczas późnej zmiany."
+      },
+      "source": "human",
+      "question_type": "open",
+      "topic_ids": [
+        "topic-pharmacy-chronology",
+        "topic-pharmacy-access",
+        "topic-pharmacy-person",
+        "topic-pharmacy-alarm"
+      ]
+    },
+    {
+      "id": "q-202",
+      "text": "What was the sequence of events between 22:00 and the alarm activation?",
+      "text_i18n": {
+        "en": "What was the sequence of events between 22:00 and the alarm activation?",
+        "pl": "Jaka była kolejność zdarzeń między godziną 22:00 a uruchomieniem alarmu?"
+      },
+      "source": "human",
+      "question_type": "chronological",
+      "topic_ids": [
+        "topic-pharmacy-chronology",
+        "topic-pharmacy-alarm"
+      ]
+    },
+    {
+      "id": "q-203",
+      "text": "Which parts of this account did you see directly, and which parts come from logs or other people?",
+      "text_i18n": {
+        "en": "Which parts of this account did you see directly, and which parts come from logs or other people?",
+        "pl": "Które elementy tej relacji widział Pan bezpośrednio, a które pochodzą z logów albo od innych osób?"
+      },
+      "source": "human",
+      "question_type": "source_of_knowledge",
+      "topic_ids": [
+        "topic-pharmacy-source"
+      ]
+    },
+    {
+      "id": "q-204",
+      "text": "What was the status of the service door when you first checked it?",
+      "text_i18n": {
+        "en": "What was the status of the service door when you first checked it?",
+        "pl": "Jaki był stan drzwi serwisowych, gdy sprawdził je Pan po raz pierwszy?"
+      },
+      "source": "human",
+      "question_type": "control",
+      "topic_ids": [
+        "topic-pharmacy-access"
+      ]
+    },
+    {
+      "id": "q-205",
+      "text": "The door was definitely locked the whole time, correct?",
+      "text_i18n": {
+        "en": "The door was definitely locked the whole time, correct?",
+        "pl": "Drzwi na pewno były cały czas zamknięte, prawda?"
+      },
+      "source": "human",
+      "question_type": "challenge",
+      "topic_ids": [
+        "topic-pharmacy-access"
+      ]
+    },
+    {
+      "id": "q-206",
+      "text": "What details could help distinguish the unknown person from regular customers or staff?",
+      "text_i18n": {
+        "en": "What details could help distinguish the unknown person from regular customers or staff?",
+        "pl": "Jakie szczegóły mogłyby odróżnić nieznaną osobę od stałych klientów lub pracowników?"
+      },
+      "source": "ai",
+      "question_type": "clarifying",
+      "topic_ids": [
+        "topic-pharmacy-person"
+      ]
+    }
+  ],
+  "answers": [
+    {
+      "id": "a-201",
+      "question_id": "q-201",
+      "text": "Around 22:15 I saw a person in a dark hoodie near the service corridor. The service door was open and I heard the alarm later.",
+      "text_i18n": {
+        "en": "Around 22:15 I saw a person in a dark hoodie near the service corridor. The service door was open and I heard the alarm later.",
+        "pl": "Około 22:15 zobaczyłem osobę w ciemnej bluzie przy korytarzu serwisowym. Drzwi serwisowe były otwarte, a alarm usłyszałem później."
+      },
+      "topic_ids": [
+        "topic-pharmacy-chronology",
+        "topic-pharmacy-access",
+        "topic-pharmacy-person",
+        "topic-pharmacy-alarm"
+      ],
+      "created_at": "2026-05-06T08:36:00Z",
+      "claims": [
+        {
+          "id": "c-201",
+          "subject": "event",
+          "attribute": "time",
+          "value": "22:15",
+          "source_text": "Around 22:15 I saw a person",
+          "source_text_i18n": {
+            "en": "Around 22:15 I saw a person",
+            "pl": "Około 22:15 zobaczyłem osobę"
+          }
+        },
+        {
+          "id": "c-202",
+          "subject": "service_door",
+          "attribute": "status",
+          "value": "open",
+          "source_text": "The service door was open",
+          "source_text_i18n": {
+            "en": "The service door was open",
+            "pl": "Drzwi serwisowe były otwarte"
+          }
+        },
+        {
+          "id": "c-203",
+          "subject": "unknown_person",
+          "attribute": "clothing",
+          "value": "dark hoodie",
+          "source_text": "a person in a dark hoodie",
+          "source_text_i18n": {
+            "en": "a person in a dark hoodie",
+            "pl": "osobę w ciemnej bluzie"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a-202",
+      "question_id": "q-202",
+      "text": "I think the alarm sounded at 22:28. I was already in the back room when it started.",
+      "text_i18n": {
+        "en": "I think the alarm sounded at 22:28. I was already in the back room when it started.",
+        "pl": "Wydaje mi się, że alarm włączył się o 22:28. Byłem już wtedy na zapleczu."
+      },
+      "topic_ids": [
+        "topic-pharmacy-chronology",
+        "topic-pharmacy-alarm"
+      ],
+      "created_at": "2026-05-06T08:39:00Z",
+      "claims": [
+        {
+          "id": "c-204",
+          "subject": "alarm",
+          "attribute": "time",
+          "value": "22:28",
+          "source_text": "the alarm sounded at 22:28",
+          "source_text_i18n": {
+            "en": "the alarm sounded at 22:28",
+            "pl": "alarm włączył się o 22:28"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a-203",
+      "question_id": "q-204",
+      "text": "When I checked the service door, it was locked. I remember pulling the handle because I wanted to be sure.",
+      "text_i18n": {
+        "en": "When I checked the service door, it was locked. I remember pulling the handle because I wanted to be sure.",
+        "pl": "Kiedy sprawdziłem drzwi serwisowe, były zamknięte. Pamiętam, że pociągnąłem za klamkę, bo chciałem się upewnić."
+      },
+      "topic_ids": [
+        "topic-pharmacy-access"
+      ],
+      "created_at": "2026-05-06T08:43:00Z",
+      "claims": [
+        {
+          "id": "c-205",
+          "subject": "service_door",
+          "attribute": "status",
+          "value": "locked",
+          "source_text": "it was locked",
+          "source_text_i18n": {
+            "en": "it was locked",
+            "pl": "były zamknięte"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a-204",
+      "question_id": "q-203",
+      "text": "The person and the corridor are from my direct observation. The exact alarm time comes from the panel log I checked after the incident.",
+      "text_i18n": {
+        "en": "The person and the corridor are from my direct observation. The exact alarm time comes from the panel log I checked after the incident.",
+        "pl": "Osobę i korytarz widziałem bezpośrednio. Dokładny czas alarmu pochodzi z logu panelu, który sprawdziłem po zdarzeniu."
+      },
+      "topic_ids": [
+        "topic-pharmacy-source",
+        "topic-pharmacy-alarm"
+      ],
+      "created_at": "2026-05-06T08:46:00Z",
+      "claims": [
+        {
+          "id": "c-206",
+          "subject": "witness",
+          "attribute": "source_of_knowledge",
+          "value": "direct observation and alarm panel",
+          "source_text": "direct observation... panel log",
+          "source_text_i18n": {
+            "en": "direct observation... panel log",
+            "pl": "widziałem bezpośrednio... logu panelu"
+          }
+        }
+      ]
+    }
+  ]
+}

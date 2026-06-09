@@ -1,4 +1,83 @@
-import type { AnswerView, Indicator, QuestionView, ReviewFinding } from "./types";
+import type { AnswerView, CaseCatalogItem, Indicator, Locale, QuestionView, ReviewFinding } from "./types";
+
+export const seedCaseCatalog: Record<Locale, CaseCatalogItem[]> = {
+  pl: [
+    {
+      id: "case-001",
+      title: "Syntetyczne przesłuchanie dotyczące kradzieży roweru",
+      description:
+        "Scenariusz bazowy: świadek, kradzież roweru, luka w nagraniach i celowa niespójność czasu.",
+      created_at: "2026-05-05T12:00:00Z",
+      topic_count: 5,
+      high_priority_topic_count: 3,
+      question_count: 4,
+      answer_count: 3,
+      answered_question_count: 3,
+    },
+    {
+      id: "case-002",
+      title: "Syntetyczny nocny incydent w aptece",
+      description:
+        "Sprawa z alarmem, korytarzem serwisowym, opisem osoby oraz sprzecznością statusu drzwi.",
+      created_at: "2026-05-06T08:30:00Z",
+      topic_count: 6,
+      high_priority_topic_count: 4,
+      question_count: 6,
+      answer_count: 4,
+      answered_question_count: 4,
+    },
+    {
+      id: "case-003",
+      title: "Syntetyczna rozbieżność lekowa w placówce opiekuńczej",
+      description:
+        "Scenariusz z granicą roli procesowej, dokumentacją lekową, czasem odkrycia i dostępem do kluczy.",
+      created_at: "2026-05-07T10:15:00Z",
+      topic_count: 7,
+      high_priority_topic_count: 4,
+      question_count: 6,
+      answer_count: 4,
+      answered_question_count: 4,
+    },
+  ],
+  en: [
+    {
+      id: "case-001",
+      title: "Synthetic bicycle theft interview",
+      description:
+        "Baseline scenario: witness account, bicycle theft, recording gap, and deliberate time inconsistency.",
+      created_at: "2026-05-05T12:00:00Z",
+      topic_count: 5,
+      high_priority_topic_count: 3,
+      question_count: 4,
+      answer_count: 3,
+      answered_question_count: 3,
+    },
+    {
+      id: "case-002",
+      title: "Synthetic late-night pharmacy incident",
+      description:
+        "Alarm, service corridor, unknown person description, and service-door status contradiction.",
+      created_at: "2026-05-06T08:30:00Z",
+      topic_count: 6,
+      high_priority_topic_count: 4,
+      question_count: 6,
+      answer_count: 4,
+      answered_question_count: 4,
+    },
+    {
+      id: "case-003",
+      title: "Synthetic care facility medication discrepancy",
+      description:
+        "Role-boundary, medication documentation, discovery-time conflict, and cabinet-key access scenario.",
+      created_at: "2026-05-07T10:15:00Z",
+      topic_count: 7,
+      high_priority_topic_count: 4,
+      question_count: 6,
+      answer_count: 4,
+      answered_question_count: 4,
+    },
+  ],
+};
 
 export const seedQuestions: QuestionView[] = [
   {

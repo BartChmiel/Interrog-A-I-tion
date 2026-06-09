@@ -96,6 +96,22 @@ export type CaseReviewResponse = {
   report_markdown: string;
 };
 
+export type CaseCatalogItem = {
+  id: string;
+  title: string;
+  description: string;
+  created_at: string;
+  topic_count: number;
+  high_priority_topic_count: number;
+  question_count: number;
+  answer_count: number;
+  answered_question_count: number;
+};
+
+export type CaseCatalogResponse = {
+  cases: CaseCatalogItem[];
+};
+
 export type SessionReviewResponse = {
   session: InterviewSession;
   snapshot: {

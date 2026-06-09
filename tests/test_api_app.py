@@ -100,6 +100,19 @@ class ApiAppTest(unittest.TestCase):
         self.assertIn("indicators", response)
         self.assertIn("Decision-support indicators", response["report_markdown"])
 
+    def test_case_catalog_endpoint_lists_synthetic_cases(self) -> None:
+        app = create_app()
+        response = endpoint(app, "list_cases")(locale="en")
+
+        cases = {item["id"]: item for item in response["cases"]}
+
+        self.assertIn("case-001", cases)
+        self.assertIn("case-002", cases)
+        self.assertIn("case-003", cases)
+        self.assertEqual(cases["case-002"]["question_count"], 6)
+        self.assertEqual(cases["case-003"]["topic_count"], 7)
+        self.assertGreaterEqual(cases["case-003"]["high_priority_topic_count"], 4)
+
     def test_workspace_endpoint_flow(self) -> None:
         app = create_app(
             workspace_manager=CaseWorkspaceManager(

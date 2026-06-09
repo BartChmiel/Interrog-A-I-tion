@@ -1,4 +1,5 @@
 import type {
+  CaseCatalogResponse,
   CaseReviewResponse,
   EncryptionStatus,
   EnvironmentHealth,
@@ -67,6 +68,10 @@ export type MaterialQuestionLinkDecisionPayload = {
   decision: MaterialQuestionLinkDecision;
   link: MaterialQuestionLink;
 };
+
+export async function loadCaseCatalog(config: RuntimeConfig, locale: string): Promise<CaseCatalogResponse> {
+  return fetchJson(config, `/cases?locale=${locale}`);
+}
 
 export async function loadCaseReview(config: RuntimeConfig, locale: string): Promise<CaseReviewResponse> {
   return fetchJson(config, `/cases/${config.caseId}/review?locale=${locale}`);

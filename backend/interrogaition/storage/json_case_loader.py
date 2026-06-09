@@ -27,8 +27,8 @@ def load_case_from_json(path: Path, locale: str = "en") -> Case:
     normalized_locale = normalize_locale(locale)
 
     topics = tuple(_load_topic(item, normalized_locale) for item in data.get("topics", []))
-    questions = tuple(_load_question(item) for item in data.get("questions", []))
-    answers = tuple(_load_answer(item) for item in data.get("answers", []))
+    questions = tuple(_load_question(item, normalized_locale) for item in data.get("questions", []))
+    answers = tuple(_load_answer(item, normalized_locale) for item in data.get("answers", []))
 
     created_at = _parse_datetime(data.get("created_at"))
 
@@ -52,10 +52,10 @@ def _load_topic(data: dict[str, Any], locale: str) -> Topic:
     )
 
 
-def _load_question(data: dict[str, Any]) -> Question:
+def _load_question(data: dict[str, Any], locale: str) -> Question:
     return Question(
         id=data["id"],
-        text=data["text"],
+        text=_localized_value(data, "text", locale),
         source=QuestionSource(data.get("source", QuestionSource.HUMAN.value)),
         question_type=QuestionType(data["question_type"]),
         topic_ids=tuple(data.get("topic_ids", [])),
@@ -63,24 +63,24 @@ def _load_question(data: dict[str, Any]) -> Question:
     )
 
 
-def _load_answer(data: dict[str, Any]) -> Answer:
+def _load_answer(data: dict[str, Any], locale: str) -> Answer:
     return Answer(
         id=data["id"],
         question_id=data["question_id"],
-        text=data["text"],
+        text=_localized_value(data, "text", locale),
         topic_ids=tuple(data.get("topic_ids", [])),
-        claims=tuple(_load_claim(item) for item in data.get("claims", [])),
+        claims=tuple(_load_claim(item, locale) for item in data.get("claims", [])),
         created_at=_parse_datetime(data.get("created_at")),
     )
 
 
-def _load_claim(data: dict[str, Any]) -> Claim:
+def _load_claim(data: dict[str, Any], locale: str) -> Claim:
     return Claim(
         id=data["id"],
         subject=data["subject"],
         attribute=data["attribute"],
         value=data["value"],
-        source_text=data.get("source_text", ""),
+        source_text=_localized_value(data, "source_text", locale),
     )
 
 

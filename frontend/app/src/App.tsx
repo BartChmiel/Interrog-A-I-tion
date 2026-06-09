@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FileText,
   FolderArchive,
+  FolderOpen,
   KeyRound,
   Languages,
   ListChecks,
@@ -28,6 +29,7 @@ import {
   addAnswer,
   ensureModelArtifactIsolation,
   ensureWorkspace,
+  loadCaseCatalog,
   loadCaseReview,
   loadEncryptionStatus,
   loadEnvironmentHealth,
@@ -49,11 +51,12 @@ import {
   verifyWorkspaceMaterial,
   type ApiError,
 } from "./api";
-import { seedAnswers, seedFindings, seedIndicators, seedQuestions } from "./demoData";
+import { seedAnswers, seedCaseCatalog, seedFindings, seedIndicators, seedQuestions } from "./demoData";
 import { domainLabel, localize, text, type CopyKey } from "./i18n";
 import type {
   Answer,
   ApiMode,
+  CaseCatalogItem,
   CaseData,
   EncryptionStatus,
   EnvironmentHealth,
@@ -124,6 +127,7 @@ export function App() {
   const [apiMode, setApiMode] = useState<ApiMode>("offline");
   const [statusKey, setStatusKey] = useState<CopyKey>("localDemo");
   const [caseData, setCaseData] = useState<CaseData | null>(null);
+  const [caseCatalog, setCaseCatalog] = useState<CaseCatalogItem[]>(seedCaseCatalog[locale]);
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
@@ -215,11 +219,17 @@ export function App() {
     setStatusKey("connecting");
 
     try {
-      const caseReview = await loadCaseReview(config, locale);
+      const [catalog, caseReview] = await Promise.all([
+        loadCaseCatalog(config, locale).catch(() => ({ cases: seedCaseCatalog[locale] })),
+        loadCaseReview(config, locale),
+      ]);
+      const firstQuestionId = caseReview.case.questions[0]?.id ?? activeQuestionId;
+      setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
+      setActiveQuestionId(firstQuestionId);
       setIndicators(caseReview.indicators);
       setFindings(caseReview.review.findings);
-      await refreshSecurityState();
+      await refreshSecurityState(firstQuestionId);
       await startOrResumeSession(config);
       const sessionReview = await loadSessionReview(config, locale);
       setSession(sessionReview.session);
@@ -229,12 +239,13 @@ export function App() {
       setStatusKey("online");
     } catch (error) {
       console.warn("Local API unavailable, using static demo data.", error);
+      setCaseCatalog(seedCaseCatalog[locale]);
       setApiMode("offline");
       setStatusKey("offline");
     }
   }
 
-  async function refreshSecurityState() {
+  async function refreshSecurityState(questionId = activeQuestionId) {
     try {
       const [security, health, modelConfig, ensuredWorkspace] = await Promise.all([
         loadEncryptionStatus(config),
@@ -257,7 +268,7 @@ export function App() {
         loadWorkspaceMaterials(config),
         loadMaterialQuestionLinksOrEmpty(locale),
         loadEvidenceMapOrNull(locale),
-        loadGroundedSuggestionsOrEmpty(locale, activeQuestionId),
+        loadGroundedSuggestionsOrEmpty(locale, questionId),
       ]);
       setEncryptionStatus(security);
       setEnvironmentHealth(health);
@@ -384,19 +395,25 @@ export function App() {
 
     try {
       const [
+        catalog,
         caseReview,
         sessionReview,
         materialLinks,
         nextEvidenceMap,
         nextGroundedSuggestions,
       ] = await Promise.all([
+        loadCaseCatalog(config, nextLocale).catch(() => ({ cases: seedCaseCatalog[nextLocale] })),
         loadCaseReview(config, nextLocale),
         loadSessionReview(config, nextLocale),
         loadMaterialQuestionLinksOrEmpty(nextLocale),
         loadEvidenceMapOrNull(nextLocale),
         loadGroundedSuggestionsOrEmpty(nextLocale, activeQuestionId),
       ]);
+      setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
+      if (!caseReview.case.questions.some((question) => question.id === activeQuestionId)) {
+        setActiveQuestionId(caseReview.case.questions[0]?.id ?? activeQuestionId);
+      }
       setSession(sessionReview.session);
       setIndicators(sessionReview.indicators);
       setFindings(sessionReview.snapshot.review.findings);
@@ -407,6 +424,7 @@ export function App() {
       setStatusKey("reviewUpdated");
     } catch (error) {
       console.warn("Could not refresh localized API state.", error);
+      setCaseCatalog(seedCaseCatalog[nextLocale]);
       setApiMode("offline");
       setStatusKey("offline");
     }
@@ -704,7 +722,28 @@ export function App() {
 
   function changeLocale(nextLocale: Locale) {
     setLocale(nextLocale);
+    if (apiMode !== "online") {
+      setCaseCatalog(seedCaseCatalog[nextLocale]);
+    }
     void refreshLocalizedApiState(nextLocale);
+  }
+
+  function openCase(caseId: string) {
+    if (caseId === config.caseId) {
+      return;
+    }
+
+    const nextUrl = new URL(window.location.href);
+    const currentApiParam = new URLSearchParams(window.location.search).get("api");
+    const stamp = Date.now();
+    nextUrl.searchParams.set("case", caseId);
+    nextUrl.searchParams.set("session", `${caseId}-session-${stamp}`);
+    nextUrl.searchParams.set("workspace", `${caseId}-workspace-${stamp}`);
+    nextUrl.searchParams.set("participant", config.participantId);
+    if (currentApiParam) {
+      nextUrl.searchParams.set("api", currentApiParam);
+    }
+    window.location.assign(nextUrl.toString());
   }
 
   const operationsTabs: Array<{
@@ -717,7 +756,7 @@ export function App() {
       id: "monitor",
       label: text(locale, "operationsMonitor"),
       value: environmentHealth
-        ? text(locale, environmentHealth.state)
+        ? environmentStateShortLabel(environmentHealth.state, locale)
         : apiMode === "connecting"
           ? "..."
           : apiMode,
@@ -783,32 +822,40 @@ export function App() {
       </header>
 
       <main className="workspace">
-        <aside className="question-panel">
-          <PanelHeader
-            title={text(locale, "questions")}
-            meta={formatCount(questions.length, locale, {
-              singular: text(locale, "questionSingular"),
-              pluralFew: text(locale, "questionPluralFew"),
-              pluralMany: text(locale, "questionPluralMany"),
-            })}
+        <aside className="case-sidebar">
+          <CaseCatalogPanel
+            cases={caseCatalog}
+            currentCaseId={config.caseId}
+            locale={locale}
+            onOpenCase={openCase}
           />
-          <div className="question-list">
-            {questions.map((question) => (
-              <button
-                className={`question-item ${question.id === activeQuestionId ? "is-active" : ""}`}
-                key={question.id}
-                type="button"
-                onClick={() => selectActiveQuestion(question.id)}
-              >
-                <span className="question-type">{localize(question.type, locale)}</span>
-                <strong>{localize(question.text, locale)}</strong>
-                <span className="meta">{question.id}</span>
-                {question.risk ? (
-                  <span className="risk-tag">{localize(question.risk, locale)}</span>
-                ) : null}
-              </button>
-            ))}
-          </div>
+          <section className="question-panel">
+            <PanelHeader
+              title={text(locale, "questions")}
+              meta={formatCount(questions.length, locale, {
+                singular: text(locale, "questionSingular"),
+                pluralFew: text(locale, "questionPluralFew"),
+                pluralMany: text(locale, "questionPluralMany"),
+              })}
+            />
+            <div className="question-list">
+              {questions.map((question) => (
+                <button
+                  className={`question-item ${question.id === activeQuestionId ? "is-active" : ""}`}
+                  key={question.id}
+                  type="button"
+                  onClick={() => selectActiveQuestion(question.id)}
+                >
+                  <span className="question-type">{localize(question.type, locale)}</span>
+                  <strong>{localize(question.text, locale)}</strong>
+                  <span className="meta">{question.id}</span>
+                  {question.risk ? (
+                    <span className="risk-tag">{localize(question.risk, locale)}</span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </section>
         </aside>
 
         <section className="interview-panel">
@@ -997,6 +1044,71 @@ export function App() {
         </aside>
       </main>
     </div>
+  );
+}
+
+function CaseCatalogPanel({
+  cases,
+  currentCaseId,
+  locale,
+  onOpenCase,
+}: {
+  cases: CaseCatalogItem[];
+  currentCaseId: string;
+  locale: Locale;
+  onOpenCase: (caseId: string) => void;
+}) {
+  return (
+    <section className="case-catalog-panel">
+      <PanelHeader
+        title={text(locale, "caseCatalog")}
+        meta={formatCount(cases.length, locale, {
+          singular: text(locale, "caseSingular"),
+          pluralFew: text(locale, "casePluralFew"),
+          pluralMany: text(locale, "casePluralMany"),
+        })}
+      />
+      <div className="case-catalog-list">
+        {cases.map((caseItem) => {
+          const isActive = caseItem.id === currentCaseId;
+          return (
+            <button
+              aria-current={isActive ? "page" : undefined}
+              className={`case-catalog-item ${isActive ? "is-active" : ""}`}
+              key={caseItem.id}
+              type="button"
+              onClick={() => onOpenCase(caseItem.id)}
+            >
+              <span className="case-catalog-icon">
+                {isActive ? <FolderOpen size={16} /> : <FolderArchive size={16} />}
+              </span>
+              <span className="case-catalog-body">
+                <span className="case-catalog-kicker">
+                  {caseItem.id}
+                  <em>{isActive ? text(locale, "currentCase") : text(locale, "openCase")}</em>
+                </span>
+                <strong>{caseItem.title}</strong>
+                <span className="case-catalog-description">{caseItem.description}</span>
+                <span className="case-catalog-stats">
+                  <span>
+                    {caseItem.topic_count} {text(locale, "topics")}
+                  </span>
+                  <span>
+                    {caseItem.high_priority_topic_count} {text(locale, "highPriorityShort")}
+                  </span>
+                  <span>
+                    {caseItem.question_count} {text(locale, "questionPluralMany")}
+                  </span>
+                  <span>
+                    {caseItem.answered_question_count}/{caseItem.answer_count} {text(locale, "answered")}
+                  </span>
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1994,6 +2106,24 @@ function environmentStateLabel(state: EnvironmentHealthState, locale: Locale): s
     warning: "warning",
   };
   return text(locale, keys[state]);
+}
+
+function environmentStateShortLabel(state: EnvironmentHealthState, locale: Locale): string {
+  const labels: Record<Locale, Record<EnvironmentHealthState, string>> = {
+    pl: {
+      blocked: "blokada",
+      ready: "OK",
+      unknown: "n/d",
+      warning: "uwaga",
+    },
+    en: {
+      blocked: "blocked",
+      ready: "OK",
+      unknown: "n/a",
+      warning: "warn",
+    },
+  };
+  return labels[locale][state];
 }
 
 function storageModeLabel(
