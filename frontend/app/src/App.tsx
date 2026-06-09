@@ -100,6 +100,8 @@ type MaterialDraft = {
   sourceType: MaterialSourceType;
 };
 
+type OperationsTab = "monitor" | "ai" | "materials" | "review";
+
 const emptyMaterialDraft: MaterialDraft = {
   title: "",
   content: "",
@@ -158,6 +160,7 @@ export function App() {
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
+  const [activeOperationsTab, setActiveOperationsTab] = useState<OperationsTab>("monitor");
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -704,6 +707,42 @@ export function App() {
     void refreshLocalizedApiState(nextLocale);
   }
 
+  const operationsTabs: Array<{
+    id: OperationsTab;
+    label: string;
+    value: string;
+    icon: ReactNode;
+  }> = [
+    {
+      id: "monitor",
+      label: text(locale, "operationsMonitor"),
+      value: environmentHealth
+        ? text(locale, environmentHealth.state)
+        : apiMode === "connecting"
+          ? "..."
+          : apiMode,
+      icon: <ShieldCheck size={15} />,
+    },
+    {
+      id: "ai",
+      label: text(locale, "operationsAi"),
+      value: String(groundedSuggestions.length),
+      icon: <Sparkles size={15} />,
+    },
+    {
+      id: "materials",
+      label: text(locale, "operationsMaterials"),
+      value: String(workspaceMaterials.length),
+      icon: <FolderArchive size={15} />,
+    },
+    {
+      id: "review",
+      label: text(locale, "operationsReview"),
+      value: String(visibleFindings.length),
+      icon: <ListChecks size={15} />,
+    },
+  ];
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -820,102 +859,141 @@ export function App() {
         </section>
 
         <aside className="insight-panel">
-          <SecurityPanel
-            accessDecision={workspaceAccess}
-            encryptionStatus={encryptionStatus}
-            environmentHealth={environmentHealth}
-            isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
-            isModelSmokeRunning={isModelSmokeRunning}
-            locale={locale}
-            localModelConfig={localModelConfig}
-            localModelSmoke={localModelSmoke}
-            modelArtifactManifest={modelArtifactManifest}
-            modelArtifactIsolation={modelArtifactIsolation}
-            materials={workspaceMaterials}
-            onArtifactIsolation={() => void initializeModelArtifactIsolation()}
-            onModelSmoke={() => void smokeLocalModel()}
-            workspace={workspace}
-          />
-
-          <EvidenceMapPanel
-            evidenceMap={evidenceMap}
-            alignment={evidenceAlignment}
-            locale={locale}
-          />
-
-          <GroundedSuggestionsPanel
-            decisions={suggestionDecisions}
-            drafts={suggestionDrafts}
-            locale={locale}
-            meta={groundedSuggestionMeta}
-            suggestions={groundedSuggestions}
-            warnings={groundedSuggestionWarnings}
-            onDraftChange={(suggestionId, value) =>
-              setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
-            }
-            onEdit={startEditingSuggestion}
-            onReject={rejectSuggestion}
-            onSaveEdit={saveEditedSuggestion}
-            onUse={useSuggestion}
-          />
-
-          <MaterialsPanel
-            apiMode={apiMode}
-            decisions={materialQuestionLinkDecisions}
-            draft={materialDraft}
-            isSubmitting={isMaterialSubmitting}
-            locale={locale}
-            links={materialQuestionLinks}
-            materials={workspaceMaterials}
-            activePreviewId={activeMaterialPreviewId}
-            previews={materialPreviews}
-            verifications={materialVerifications}
-            onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
-            onDraftChange={setMaterialDraft}
-            onPreview={(materialId) => void toggleMaterialPreview(materialId)}
-            onSubmit={() => void registerMaterial()}
-            onVerify={(materialId) => void verifyMaterial(materialId)}
-          />
-
-          <section>
-            <PanelHeader title={text(locale, "indicators")} meta={text(locale, "visible")} compact />
-            <div className="indicator-list">
-              {visibleIndicators.map((indicator) => (
-                <IndicatorCard indicator={indicator} key={indicator.id} locale={locale} />
+          <div className="operations-rail-toolbar">
+            <div className="operations-rail-header">
+              <div>
+                <span>{text(locale, "operationsRail")}</span>
+                <strong>{text(locale, "noAutomatedVerdict")}</strong>
+              </div>
+              <span className="meta">{apiMode === "online" ? text(locale, "online") : text(locale, statusKey)}</span>
+            </div>
+            <div className="operations-tabs" role="tablist" aria-label={text(locale, "operationsRail")}>
+              {operationsTabs.map((tab) => (
+                <button
+                  aria-selected={activeOperationsTab === tab.id}
+                  className={activeOperationsTab === tab.id ? "is-active" : ""}
+                  key={tab.id}
+                  role="tab"
+                  type="button"
+                  onClick={() => setActiveOperationsTab(tab.id)}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  <strong>{tab.value}</strong>
+                </button>
               ))}
             </div>
-          </section>
+          </div>
 
-          <section>
-            <PanelHeader title={text(locale, "assistant")} meta={text(locale, "localOnly")} compact />
-            <div className="suggestion-list">
-              <SuggestionCard
-                title={text(locale, "clarifyTime")}
-                detail={text(locale, "clarifyTimeDetail")}
-              />
-              <SuggestionCard
-                title={text(locale, "checkRecording")}
-                detail={text(locale, "checkRecordingDetail")}
-              />
-            </div>
-          </section>
+          <div className="operations-content" data-tab={activeOperationsTab}>
+            {activeOperationsTab === "monitor" ? (
+              <>
+                <SecurityPanel
+                  accessDecision={workspaceAccess}
+                  encryptionStatus={encryptionStatus}
+                  environmentHealth={environmentHealth}
+                  isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
+                  isModelSmokeRunning={isModelSmokeRunning}
+                  locale={locale}
+                  localModelConfig={localModelConfig}
+                  localModelSmoke={localModelSmoke}
+                  modelArtifactManifest={modelArtifactManifest}
+                  modelArtifactIsolation={modelArtifactIsolation}
+                  materials={workspaceMaterials}
+                  onArtifactIsolation={() => void initializeModelArtifactIsolation()}
+                  onModelSmoke={() => void smokeLocalModel()}
+                  workspace={workspace}
+                />
+                <EvidenceMapPanel
+                  evidenceMap={evidenceMap}
+                  alignment={evidenceAlignment}
+                  locale={locale}
+                />
+              </>
+            ) : null}
 
-          <section>
-            <PanelHeader
-              title={text(locale, "findings")}
-              meta={formatCount(visibleFindings.length, locale, {
-                singular: text(locale, "findingSingular"),
-                pluralFew: text(locale, "findingPluralFew"),
-                pluralMany: text(locale, "findingPluralMany"),
-              })}
-              compact
-            />
-            <div className="finding-list">
-              {visibleFindings.map((finding) => (
-                <FindingCard finding={finding} key={`${finding.category}-${finding.title}`} locale={locale} />
-              ))}
-            </div>
-          </section>
+            {activeOperationsTab === "ai" ? (
+              <>
+                <GroundedSuggestionsPanel
+                  decisions={suggestionDecisions}
+                  drafts={suggestionDrafts}
+                  locale={locale}
+                  meta={groundedSuggestionMeta}
+                  suggestions={groundedSuggestions}
+                  warnings={groundedSuggestionWarnings}
+                  onDraftChange={(suggestionId, value) =>
+                    setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
+                  }
+                  onEdit={startEditingSuggestion}
+                  onReject={rejectSuggestion}
+                  onSaveEdit={saveEditedSuggestion}
+                  onUse={useSuggestion}
+                />
+                <section>
+                  <PanelHeader title={text(locale, "assistant")} meta={text(locale, "localOnly")} compact />
+                  <div className="suggestion-list">
+                    <SuggestionCard
+                      title={text(locale, "clarifyTime")}
+                      detail={text(locale, "clarifyTimeDetail")}
+                    />
+                    <SuggestionCard
+                      title={text(locale, "checkRecording")}
+                      detail={text(locale, "checkRecordingDetail")}
+                    />
+                  </div>
+                </section>
+              </>
+            ) : null}
+
+            {activeOperationsTab === "materials" ? (
+              <MaterialsPanel
+                apiMode={apiMode}
+                decisions={materialQuestionLinkDecisions}
+                draft={materialDraft}
+                isSubmitting={isMaterialSubmitting}
+                locale={locale}
+                links={materialQuestionLinks}
+                materials={workspaceMaterials}
+                activePreviewId={activeMaterialPreviewId}
+                previews={materialPreviews}
+                verifications={materialVerifications}
+                onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
+                onDraftChange={setMaterialDraft}
+                onPreview={(materialId) => void toggleMaterialPreview(materialId)}
+                onSubmit={() => void registerMaterial()}
+                onVerify={(materialId) => void verifyMaterial(materialId)}
+              />
+            ) : null}
+
+            {activeOperationsTab === "review" ? (
+              <>
+                <section>
+                  <PanelHeader title={text(locale, "indicators")} meta={text(locale, "visible")} compact />
+                  <div className="indicator-list">
+                    {visibleIndicators.map((indicator) => (
+                      <IndicatorCard indicator={indicator} key={indicator.id} locale={locale} />
+                    ))}
+                  </div>
+                </section>
+                <section>
+                  <PanelHeader
+                    title={text(locale, "findings")}
+                    meta={formatCount(visibleFindings.length, locale, {
+                      singular: text(locale, "findingSingular"),
+                      pluralFew: text(locale, "findingPluralFew"),
+                      pluralMany: text(locale, "findingPluralMany"),
+                    })}
+                    compact
+                  />
+                  <div className="finding-list">
+                    {visibleFindings.map((finding) => (
+                      <FindingCard finding={finding} key={`${finding.category}-${finding.title}`} locale={locale} />
+                    ))}
+                  </div>
+                </section>
+              </>
+            ) : null}
+          </div>
         </aside>
       </main>
     </div>
