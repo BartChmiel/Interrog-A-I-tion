@@ -1,13 +1,13 @@
 # Prompts
 
-Wersjonowane szablony promptow.
+Versioned prompt templates.
 
-Zasady:
+Rules:
 
-- prompty nie moga prosic modelu o ocene prawdomownosci osoby,
-- odpowiedzi modelu powinny miec format strukturalny,
-- kazdy prompt powinien miec opis celu i oczekiwanego wyjscia,
-- prompty musza wspierac neutralne pytania i human-in-the-loop.
+- prompts must not ask the model to judge truthfulness,
+- model responses should use structured output,
+- each prompt should describe its task and expected output,
+- prompts must support neutral questions and human-in-the-loop review.
 
 Current prompt files:
 

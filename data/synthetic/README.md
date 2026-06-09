@@ -1,13 +1,14 @@
-# Synthetic data
+# Synthetic Data
 
-Dane syntetyczne do testow i ewaluacji.
+Synthetic data for tests and evaluation.
 
-Kazdy scenariusz powinien zawierac:
+Each scenario should include:
 
-- opis sprawy,
-- oczekiwane tematy,
-- plan referencyjny pytan,
-- symulowane odpowiedzi,
-- oczekiwane luki,
-- oczekiwane potencjalne niespojnosci.
+- case description,
+- expected topics,
+- reference question plan,
+- simulated answers,
+- expected gaps,
+- expected potential inconsistencies.
 
+Only synthetic data may be committed to this directory.

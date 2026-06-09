@@ -1,14 +1,13 @@
 # Research
 
-Materialy badawcze zwiazane z praca magisterska.
+Research material for the InterrogA(I)tion prototype.
 
-Ten katalog sluzy do:
+This directory is intended for:
 
-- protokolow ewaluacji,
-- scenariuszy eksperckich,
-- notatek z literatury,
-- planu eksperymentow,
-- kryteriow oceny pytan i raportow.
+- evaluation protocols,
+- expert-review scenarios,
+- literature notes,
+- experiment plans,
+- question and report quality criteria.
 
-Nie przechowujemy tu danych wrazliwych.
-
+Do not store sensitive data here.

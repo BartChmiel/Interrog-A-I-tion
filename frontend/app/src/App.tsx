@@ -2126,14 +2126,14 @@ function findingTitle(finding: ReviewFinding, locale: Locale): string {
 
   if (finding.category === "missing_topic") {
     const topic = typeof finding.metadata?.topic_label === "string" ? finding.metadata.topic_label : "";
-    return `Niepokryty temat: ${topic}`.trim();
+    return `${text(locale, "missingTopicTitlePrefix")}: ${topic}`.trim();
   }
   if (finding.category === "question_neutrality") {
-    return "Pytanie może wymagać neutralizacji";
+    return text(locale, "questionNeutralityTitle");
   }
   if (finding.category === "potential_inconsistency") {
     const attribute = typeof finding.metadata?.attribute === "string" ? finding.metadata.attribute : "";
-    return `Potencjalna niespójność: ${attribute}`.trim();
+    return `${text(locale, "potentialInconsistencyTitlePrefix")}: ${attribute}`.trim();
   }
 
   return finding.title;
@@ -2145,13 +2145,13 @@ function findingDetail(finding: ReviewFinding, locale: Locale): string {
   }
 
   if (finding.category === "missing_topic") {
-    return "Temat nie został pokryty żadnym pytaniem ani odpowiedzią.";
+    return text(locale, "missingTopicDetail");
   }
   if (finding.category === "question_neutrality") {
-    return "Pytanie wymaga przeglądu pod kątem neutralności językowej.";
+    return text(locale, "questionNeutralityDetail");
   }
   if (finding.category === "potential_inconsistency") {
-    return "W materiale zapisano różne wartości dla tego samego elementu narracji. Wymaga to doprecyzowania, a nie automatycznego werdyktu.";
+    return text(locale, "potentialInconsistencyDetail");
   }
 
   return finding.detail;

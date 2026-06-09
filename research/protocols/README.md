@@ -1,12 +1,11 @@
-# Research protocols
+# Research Protocols
 
-Protokoly badawcze.
+Initial protocols to prepare:
 
-Pierwsze protokoly do przygotowania:
+- AI-generated question quality review,
+- topic coverage review,
+- question neutrality review,
+- gap-detection evaluation,
+- comparison of work with and without the tool.
 
-- ocena jakosci pytan wygenerowanych przez AI,
-- ocena pokrycia tematow,
-- ocena neutralnosci pytan,
-- ocena skutecznosci wykrywania luk,
-- porownanie pracy z narzedziem i bez narzedzia.
-
+Protocols should define objective scoring criteria before expert review starts.

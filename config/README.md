@@ -1,14 +1,13 @@
 # Config
 
-Konfiguracja lokalna projektu.
+Local project configuration.
 
-Docelowo:
+Expected future content:
 
-- profile modeli lokalnych,
-- ustawienia trybu bezpiecznego,
-- limity kontekstu,
-- zasady logowania,
-- polityki eksportu.
+- local model profiles,
+- security mode settings,
+- context limits,
+- logging rules,
+- export policies.
 
-Nie przechowujemy tu sekretow.
-
+Do not store secrets in this directory.

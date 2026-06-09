@@ -1,21 +1,22 @@
 # Backend
 
-Lokalny backend aplikacji InterrogA(I)tion.
+Local backend for InterrogA(I)tion.
 
-Docelowo odpowiada za:
+The backend is responsible for:
 
-- logike domenowa spraw i przesluchan,
-- integracje z lokalnym modelem AI,
-- analize pokrycia tematow i spojnosci,
-- zapis danych,
-- szyfrowanie i audyt,
-- eksport raportow.
+- case and interview domain logic,
+- local API endpoints,
+- deterministic analysis pipelines,
+- local model runtime boundaries,
+- topic coverage, consistency, and evidence-alignment analysis,
+- storage, workspace isolation, audit, and export integrity,
+- report generation.
 
-Pierwszy prototyp powinien pozostac prosty: Python, lokalne API i testowalna logika bez zaleznosci od docelowego UI.
+The backend must remain local-first and testable without real case data or a real model runtime.
 
-## Pierwszy cienki pipeline
+## CLI Review Pipeline
 
-Z katalogu `backend/`:
+From `backend/`:
 
 ```powershell
 python -m interrogaition.cli review ..\data\synthetic\case-001\case.json
@@ -43,46 +44,45 @@ python -m interrogaition.cli verify-export ..\test-output\manifest.json --root .
 
 Pipeline:
 
-1. Wczytuje syntetyczna sprawe z JSON.
-2. Liczy pokrycie tematow.
-3. Oznacza potencjalnie sugerujace pytania.
-4. Wykrywa proste konflikty w ustrukturyzowanych twierdzeniach.
-5. Generuje raport Markdown.
-6. Opcjonalnie zapisuje manifest integralnosci eksportu.
-7. Opcjonalnie dolacza referencje do hash-chain manifestu artefaktow modelu.
+1. Load a synthetic case from JSON.
+2. Compute topic coverage.
+3. Flag potentially leading questions.
+4. Detect simple conflicts in structured claims.
+5. Generate a Markdown report.
+6. Optionally write an export integrity manifest.
+7. Optionally include references to the hash-chained model artifact manifest.
 
-Testy:
+## Tests
+
+From `backend/`:
 
 ```powershell
 python -m unittest discover -s ..\tests
 ```
 
-## Local API prototype
+## Local API
 
-FastAPI dependencies can be installed into the current Python user site for the development prototype. The API module includes a minimal fallback router for tests in restricted environments, but normal development should use real FastAPI and Uvicorn.
-
-From repository root:
+Install FastAPI dependencies from the repository root:
 
 ```powershell
 python -m pip install --user fastapi==0.115.12 uvicorn==0.30.6
 ```
 
-From `backend/`:
+Run from `backend/`:
 
 ```powershell
-python -m interrogaition.api.app --help
 python -m interrogaition.api.app
 ```
 
-Enable reload explicitly when developing the API:
+Enable reload explicitly during API development:
 
 ```powershell
 python -m interrogaition.api.app --reload
 ```
 
-The prototype validates live answer payloads before adding them to a session. Empty answers, unknown question ids, unknown topic ids, malformed claims, and duplicate session ids return explicit HTTP errors instead of being accepted silently.
+The API includes a minimal fallback router for tests in restricted environments, but normal development should use FastAPI and Uvicorn.
 
-The API also returns `Access-Control-Allow-Private-Network: true` so local browser shells can call the loopback backend during air-gapped development.
+## Storage and Audit
 
 Live sessions are persisted in a local SQLite database when the API app is run normally. The default prototype database path is ignored by git:
 
@@ -90,40 +90,26 @@ Live sessions are persisted in a local SQLite database when the API app is run n
 backend/local-data/interrogaition.sqlite3
 ```
 
-Session start, answer creation, and review refresh events are also written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage. The storage boundary is designed so a later SQLCipher or encrypted-workspace adapter can replace the plain SQLite file.
+Session start, answer creation, review refresh, material-link decisions, and grounded-suggestion decisions are written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage.
 
-Markdown exports can be accompanied by an integrity manifest. The manifest stores SHA-256 hashes and sizes for exported files plus a hash of the manifest payload itself. Schema v2 can also include a workspace model-artifact manifest reference: manifest file hash, artifact record hashes, artifact file hashes, chain validity, and latest artifact record hash.
+Markdown exports can be accompanied by an integrity manifest. Schema v2 can include workspace model-artifact provenance: artifact manifest hash, record hashes, artifact file hashes, chain validity, and latest artifact record hash.
 
-## Case workspaces
+## Case Workspaces
 
-The security package includes a prototype per-case workspace boundary. A workspace has a `workspace.json` manifest and fixed subdirectories for imports, sessions, exports, audit, and model artifacts.
+The security package defines a per-case workspace boundary. A workspace has a `workspace.json` manifest and fixed subdirectories for imports, sessions, exports, audit, and model artifacts.
 
 Plain SQLite prototype workspaces are allowed for synthetic material only. Non-synthetic material is blocked unless the workspace declares encrypted storage as required.
 
-Encrypted workspace creation is also blocked until the local SQLite runtime reports SQLCipher support through `PRAGMA cipher_version`. The readiness status is exposed at:
+Encrypted workspace creation is blocked until the local SQLite runtime reports SQLCipher support through `PRAGMA cipher_version`.
+
+Readiness endpoints:
 
 ```text
 GET /security/encryption
 GET /environment/health
 ```
 
-The environment health endpoint summarizes local API readiness, synthetic fixtures,
-workspace root status, encrypted-storage readiness, and local model runtime gating.
-It is deterministic and does not run a real model or import sensitive data.
-
-Local model runtime readiness is exposed separately from the live suggestion workflow:
-
-```text
-GET /ai/local-model/config
-POST /ai/local-model/smoke
-```
-
-The default model runtime is deterministic. Ollama can be configured through
-environment variables, but real model execution requires explicit enablement and
-live suggestions still use the explicitly injected `ModelClient`. This prevents
-real LLM output from entering live workflows by configuration drift alone.
-
-The local API exposes prototype workspace creation, manifest loading, and access-policy decisions through:
+Workspace endpoints:
 
 ```text
 POST /workspaces
@@ -135,22 +121,22 @@ GET /workspaces/{workspace_id}/model-artifacts/manifest
 POST /workspaces/{workspace_id}/model-artifacts/items
 ```
 
-Model artifact isolation uses the workspace `models/` directory. The initializer
-creates dedicated prompt, context, output, cache, and evaluation directories plus
-`models/artifact-policy.json`. External cache and network artifacts remain disabled
-by default.
+## Local Model Runtime
 
-Model artifact writes are recorded in `models/artifact-manifest.json` with relative
-path, SHA-256, byte size, content type, source, creator, timestamp, and metadata.
-Supported artifact types are `prompt`, `context`, `output`, `cache`, and `evaluation`.
-Writes are deduplicated by `artifact_type` plus SHA-256, so repeated deterministic
-model calls can point to an existing prompt, context, or output record without
-growing the manifest. Manifest records are hash-chained with `previous_hash` and
-`record_hash`; `GET /workspaces/{workspace_id}/model-artifacts/manifest` returns
-`chain_valid` and `latest_record_hash`. Writes are blocked when an existing manifest
-chain is invalid.
+Local model runtime readiness is exposed separately from live suggestions:
 
-Workspace source materials can also be registered as controlled text records. The prototype stores each material under the workspace `imports/` directory, records metadata in `imports/materials.json`, and verifies SHA-256 plus file size:
+```text
+GET /ai/local-model/config
+POST /ai/local-model/smoke
+```
+
+The default runtime is deterministic. Ollama can be configured through environment variables, but real model execution requires explicit enablement and live suggestions still use the injected `ModelClient`. This prevents real LLM output from entering live workflows by configuration drift alone.
+
+## Materials, Grounding, and Suggestions
+
+Workspace materials are controlled text records stored under `imports/`, with metadata in `imports/materials.json` and SHA-256 verification.
+
+Relevant endpoints:
 
 ```text
 GET /workspaces/{workspace_id}/materials
@@ -166,36 +152,8 @@ POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
 GET /workspaces/{workspace_id}/audit
 ```
 
-The material preview endpoint returns a bounded text preview with line and character
-counts plus a `truncated` flag. It uses the workspace read policy and reads through
-the material registry, so callers do not need direct filesystem access.
+Grounded suggestions use the current grounding context pack, validate citations against `allowed_source_ids`, return citation warnings, and audit model id, prompt version, prompt hash, context hash, and output hash.
 
-The `evidence-map` endpoint also returns an `evidence_alignment` block: an advisory
-Evidence Alignment Indicator derived only from human-reviewed material-question links
-(see ADR 0017). It reports a priority-weighted alignment score, a confidence value based
-on review completeness (reduced by the rejection rate), and a band of `insufficient_review`,
-`low`, `medium`, or `high`, with explanation bullets. Rejected links never count as support,
-and with no reviewed links the band is `insufficient_review`. The indicator is advisory and
-does not assert truth, guilt, or credibility.
+If model artifact isolation is initialized, grounded suggestions also write workspace-local `prompt`, `context`, and `output` artifacts. Artifact records are deduplicated by `artifact_type + SHA-256`, hash-chained in `models/artifact-manifest.json`, and can be referenced by export integrity manifests.
 
-The grounded suggestions endpoint is the first live-visible AI workflow. It uses
-the current grounding context pack, validates every suggested `linked_evidence`
-entry against `allowed_source_ids`, returns citation warnings, and writes an
-audit event containing model id, prompt version, prompt hash, context hash, and
-output hash.
-If model artifact isolation is already initialized, it also writes workspace-local
-`prompt`, `context`, and `output` artifacts and links their ids/hashes and
-deduplication status in the audit event and API response. If isolation is missing,
-generation still succeeds in prototype mode with an explicit artifact warning.
-The default runtime is a deterministic fake model so the live workflow can be
-tested before connecting a real local model.
-
-The grounded suggestion decision endpoint records human `accepted`, `edited`,
-or `rejected` decisions as append-only audit events. Decision records preserve
-the original suggestion text, final operator text, linked source ids, model id,
-prompt version, and prompt/context/output hashes.
-
-The material-question link decision endpoint records human `accepted` or
-`rejected` decisions for deterministic material-question grounding links. These
-records are audit events only; the deterministic link algorithm remains
-unchanged in the prototype.
+The system never returns an automated guilt, truthfulness, or legal reliability verdict.

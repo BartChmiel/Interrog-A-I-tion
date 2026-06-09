@@ -1,13 +1,14 @@
 # Tests
 
-Testy projektu.
+Project test suite.
 
-Zakladane typy:
+Expected test categories:
 
-- testy logiki domenowej,
-- testy schematow JSON,
-- testy guardrails,
-- testy analizy pokrycia tematow,
-- testy analizy potencjalnych niespojnosci,
-- testy eksportu raportu.
-
+- domain logic,
+- JSON schemas,
+- guardrails,
+- topic coverage analysis,
+- potential inconsistency analysis,
+- model artifact provenance,
+- export integrity,
+- frontend type checks and builds.
