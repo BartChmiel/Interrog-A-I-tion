@@ -161,6 +161,8 @@ If model artifact isolation is initialized, grounded suggestions also write work
 The system never returns an automated guilt, truthfulness, or legal reliability verdict.
 
 Operator work-queue decisions are also captured through the workspace audit chain. The
-first UI integration records `opened` decisions when a user clicks a queue action, preserving
-the action metadata, linked source ids, target question/tab, and before/after UI state for
-later provenance review.
+first UI integration records `opened`, `skipped`, and `dismissed` decisions from the queue,
+preserving the action metadata, linked source ids, target question/tab, and before/after UI
+state for later provenance review.
+The decision-list endpoint returns the newest matching decision first for compact UI trails;
+the full workspace audit endpoint remains the chain-ordered integrity view.

@@ -89,9 +89,13 @@ Material cards also expose compact accept/reject controls and matched-term audit
 details for each material-question link. Online decisions are recorded through the
 backend audit chain; offline decisions remain local demo state.
 
-The operator work queue records an `opened` audit decision when the user clicks a
-queue action and shows a compact recent-decision trail. The trail is provenance
+The operator work queue records `opened`, `skipped`, and `dismissed` audit decisions
+from queue controls and shows a compact recent-decision trail. The trail is provenance
 support only; it does not turn prototype actions into official procedural records.
+
+The review tab includes a compact case-trace timeline. It merges workspace audit
+events and session audit events into a newest-first operational view while keeping
+the backend audit endpoints as the chain-ordered integrity sources of truth.
 
 ## Scripts
 

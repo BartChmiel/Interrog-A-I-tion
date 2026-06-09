@@ -1074,7 +1074,7 @@ def create_app(
             "workspace_id": workspace_id,
             "case_id": case_id or workspace.manifest.case_id,
             "session_id": session_id,
-            "decisions": [_operator_action_decision_from_event(event) for event in events],
+            "decisions": [_operator_action_decision_from_event(event) for event in reversed(events)],
             "chain_valid": store.verify_audit_chain(),
         }
 

@@ -244,6 +244,30 @@ export type WorkspaceAccessDecision = {
   reason: string;
 };
 
+export type AuditEvent = {
+  id: string;
+  timestamp: string;
+  actor: "human" | "ai" | "system";
+  action: string;
+  object_type: string;
+  object_id: string;
+  details: Record<string, unknown>;
+  previous_hash: string | null;
+  event_hash: string | null;
+};
+
+export type WorkspaceAuditResponse = {
+  workspace_id: string;
+  chain_valid: boolean;
+  events: AuditEvent[];
+};
+
+export type SessionAuditResponse = {
+  session_id: string;
+  chain_valid: boolean;
+  events: AuditEvent[];
+};
+
 export type MaterialSourceType =
   | "text_note"
   | "case_protocol"

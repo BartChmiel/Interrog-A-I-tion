@@ -25,13 +25,15 @@ POST /workspaces/{workspace_id}/operator-actions/decisions
 GET /workspaces/{workspace_id}/operator-actions/decisions?case_id=...&session_id=...
 ```
 
-The first UI integration records an `opened` decision when the operator clicks a queue action.
-The event preserves the action id, kind, title, detail, priority, target question/tab, linked
-source ids, before/after UI state, optional model/provenance hashes, and the operator identity
-used by the local UI.
+The first UI integration records `opened`, `skipped`, and `dismissed` decisions from queue
+controls. Each event preserves the action id, kind, title, detail, priority, target
+question/tab, linked source ids, before/after UI state, optional model/provenance hashes, and
+the operator identity used by the local UI.
 
 The initial UI shows a compact recent-decision trail near the queue. It is deliberately small:
 the queue remains an operational tool, not a compliance form.
+The decision-list endpoint returns newest matching decisions first for this compact trail. The
+workspace audit endpoint remains the chain-ordered integrity view.
 
 ## Boundaries
 

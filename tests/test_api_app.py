@@ -538,6 +538,99 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(denied.exception.status_code, 403)
         self.assertEqual(bad_question.exception.status_code, 400)
 
+    def test_operator_action_decisions_support_skip_and_dismiss_controls(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        record_operator_decision = endpoint(app, "record_workspace_operator_action_decision")
+        list_operator_decisions = endpoint(app, "list_workspace_operator_action_decisions")
+        get_workspace_audit = endpoint(app, "get_workspace_audit")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-003",
+                created_by="investigator-001",
+                workspace_id="api-workspace-operator-controls",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        skipped = record_operator_decision(
+            "api-workspace-operator-controls",
+            OperatorActionDecisionRequest(
+                action_id="ask-q-305",
+                action_kind="ask",
+                action_title="Ask the next question",
+                action_detail="q-305: Medication reconciliation follow-up",
+                action_priority="high",
+                decision_type="skipped",
+                created_by="investigator-001",
+                case_id="case-003",
+                session_id="session-operator-controls",
+                participant_id="person-001",
+                target_question_id="q-305",
+                source_object_ids=["q-305", "topic-documentation"],
+                before_state={"active_question_id": "q-301"},
+                after_state={
+                    "active_question_id": "q-301",
+                    "hidden_action_id": "ask-q-305",
+                },
+            ),
+        )
+        dismissed = record_operator_decision(
+            "api-workspace-operator-controls",
+            OperatorActionDecisionRequest(
+                action_id="materials-q-301",
+                action_kind="materials",
+                action_title="Check sources for this question",
+                action_detail="Monitoring memo, medication cabinet key handover",
+                action_priority="medium",
+                decision_type="dismissed",
+                created_by="investigator-001",
+                case_id="case-003",
+                session_id="session-operator-controls",
+                participant_id="person-001",
+                target_tab="materials",
+                source_object_ids=["material-monitoring", "material-key-handover"],
+                before_state={"active_operations_tab": "monitor"},
+                after_state={
+                    "active_operations_tab": "monitor",
+                    "hidden_action_id": "materials-q-301",
+                },
+            ),
+        )
+
+        decisions = list_operator_decisions(
+            "api-workspace-operator-controls",
+            case_id="case-003",
+            session_id="session-operator-controls",
+        )
+        workspace_audit = get_workspace_audit("api-workspace-operator-controls")
+
+        self.assertEqual(skipped["decision"]["decision_type"], "skipped")
+        self.assertEqual(skipped["audit_event"]["action"], "operator_action_skipped")
+        self.assertEqual(dismissed["decision"]["decision_type"], "dismissed")
+        self.assertEqual(dismissed["audit_event"]["action"], "operator_action_dismissed")
+        self.assertTrue(decisions["chain_valid"])
+        self.assertEqual(
+            [decision["decision_type"] for decision in decisions["decisions"]],
+            ["dismissed", "skipped"],
+        )
+        self.assertEqual(
+            decisions["decisions"][0]["event_hash"],
+            dismissed["decision"]["event_hash"],
+        )
+        self.assertEqual(
+            [event["action"] for event in workspace_audit["events"]],
+            ["operator_action_skipped", "operator_action_dismissed"],
+        )
+        self.assertTrue(workspace_audit["chain_valid"])
+
     def test_grounded_suggestions_warn_when_artifact_isolation_is_missing(self) -> None:
         app = create_app(
             workspace_manager=CaseWorkspaceManager(

@@ -26,7 +26,9 @@ import type {
   OperatorActionDecisionType,
   RuntimeConfig,
   SeedMaterialsResponse,
+  SessionAuditResponse,
   SessionReviewResponse,
+  WorkspaceAuditResponse,
   WorkspaceAccessDecision,
   WorkspaceResponse,
 } from "./types";
@@ -130,6 +132,10 @@ export async function loadSessionReview(
   return fetchJson(config, `/sessions/${config.sessionId}/review?locale=${locale}`);
 }
 
+export async function loadSessionAudit(config: RuntimeConfig): Promise<SessionAuditResponse> {
+  return fetchJson(config, `/sessions/${config.sessionId}/audit`);
+}
+
 export async function loadEncryptionStatus(config: RuntimeConfig): Promise<EncryptionStatus> {
   return fetchJson(config, "/security/encryption");
 }
@@ -192,6 +198,10 @@ export async function loadWorkspaceAccess(
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({ role, action });
   return fetchJson(config, `/workspaces/${workspaceId}/access?${query.toString()}`);
+}
+
+export async function loadWorkspaceAudit(config: RuntimeConfig): Promise<WorkspaceAuditResponse> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/audit`);
 }
 
 export async function loadModelArtifactIsolation(

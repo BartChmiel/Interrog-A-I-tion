@@ -10,6 +10,8 @@ import {
   FileText,
   FolderArchive,
   FolderOpen,
+  Fingerprint,
+  History,
   KeyRound,
   Languages,
   ListChecks,
@@ -40,9 +42,11 @@ import {
   loadModelArtifactManifest,
   loadModelArtifactIsolation,
   loadOperatorActionDecisions,
+  loadSessionAudit,
   loadWorkspaceMaterialPreview,
   loadSessionReview,
   loadWorkspaceAccess,
+  loadWorkspaceAudit,
   loadWorkspaceMaterials,
   recordGroundedSuggestionDecision,
   recordMaterialQuestionLinkDecision,
@@ -60,6 +64,7 @@ import type {
   Answer,
   AnswerView,
   ApiMode,
+  AuditEvent,
   CaseCatalogItem,
   CaseData,
   EncryptionStatus,
@@ -87,10 +92,13 @@ import type {
   MaterialSourceType,
   MaterialVerification,
   OperatorActionDecision,
+  OperatorActionDecisionType,
   QuestionView,
   ReviewFinding,
   RuntimeConfig,
+  SessionAuditResponse,
   WorkspaceAccessDecision,
+  WorkspaceAuditResponse,
   WorkspaceResponse,
 } from "./types";
 import {
@@ -157,6 +165,8 @@ export function App() {
   const [modelArtifactIsolation, setModelArtifactIsolation] = useState<ModelArtifactIsolationStatus | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
+  const [workspaceAudit, setWorkspaceAudit] = useState<WorkspaceAuditResponse | null>(null);
+  const [sessionAudit, setSessionAudit] = useState<SessionAuditResponse | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
   const [materialQuestionLinkDecisions, setMaterialQuestionLinkDecisions] = useState<Record<string, MaterialQuestionLinkDecision>>({});
@@ -184,6 +194,7 @@ export function App() {
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
   const [activeOperationsTab, setActiveOperationsTab] = useState<OperationsTab>("monitor");
+  const [dismissedOperatorActionIds, setDismissedOperatorActionIds] = useState<Set<string>>(new Set());
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -238,6 +249,10 @@ export function App() {
       workspaceMaterials,
     ],
   );
+  const visibleOperatorActions = useMemo(
+    () => operatorActions.filter((action) => !dismissedOperatorActionIds.has(action.id)),
+    [dismissedOperatorActionIds, operatorActions],
+  );
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -274,7 +289,9 @@ export function App() {
       await refreshSecurityState(firstQuestionId);
       await startOrResumeSession(config);
       const sessionReview = await loadSessionReview(config, locale);
+      const nextSessionAudit = await loadSessionAuditOrNull();
       setSession(sessionReview.session);
+      setSessionAudit(nextSessionAudit);
       setIndicators(sessionReview.indicators);
       setFindings(sessionReview.snapshot.review.findings);
       setApiMode("online");
@@ -318,11 +335,13 @@ export function App() {
         loadOperatorActionDecisionsOrEmpty(),
         loadGroundedSuggestionsOrEmpty(locale, questionId),
       ]);
+      const auditTrail = await loadWorkspaceAuditOrNull();
       setEncryptionStatus(security);
       setEnvironmentHealth(health);
       setLocalModelConfig(modelConfig);
       setModelArtifactManifest(artifactManifest);
       setModelArtifactIsolation(artifactIsolation);
+      setWorkspaceAudit(auditTrail);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
       setWorkspaceMaterials(sortMaterials(materialList.materials));
@@ -340,6 +359,8 @@ export function App() {
       setModelArtifactIsolation(null);
       setWorkspace(null);
       setWorkspaceAccess(null);
+      setWorkspaceAudit(null);
+      setSessionAudit(null);
       setWorkspaceMaterials([]);
       setMaterialQuestionLinks([]);
       setMaterialQuestionLinkDecisions({});
@@ -380,9 +401,40 @@ export function App() {
       const response = await loadOperatorActionDecisions(config);
       return response.decisions;
     } catch (error) {
+      const apiError = error as ApiError;
+      if (apiError.status === 404) {
+        return [];
+      }
       console.warn("Could not refresh operator action decisions.", error);
       return [];
     }
+  }
+
+  async function loadWorkspaceAuditOrNull(): Promise<WorkspaceAuditResponse | null> {
+    try {
+      return await loadWorkspaceAudit(config);
+    } catch (error) {
+      console.warn("Could not refresh workspace audit trail.", error);
+      return null;
+    }
+  }
+
+  async function loadSessionAuditOrNull(): Promise<SessionAuditResponse | null> {
+    try {
+      return await loadSessionAudit(config);
+    } catch (error) {
+      console.warn("Could not refresh session audit trail.", error);
+      return null;
+    }
+  }
+
+  async function refreshAuditTrails() {
+    const [nextWorkspaceAudit, nextSessionAudit] = await Promise.all([
+      loadWorkspaceAuditOrNull(),
+      loadSessionAuditOrNull(),
+    ]);
+    setWorkspaceAudit(nextWorkspaceAudit);
+    setSessionAudit(nextSessionAudit);
   }
 
   async function loadGroundedSuggestionsOrEmpty(
@@ -538,6 +590,7 @@ export function App() {
       applyGroundedSuggestions(nextGroundedSuggestions);
       setAnswerText("");
       setStatusKey("reviewUpdated");
+      void refreshAuditTrails();
     } catch (error) {
       console.error("Could not record answer.", error);
       setApiMode("offline");
@@ -703,6 +756,7 @@ export function App() {
     }));
     if (apiMode === "online") {
       void loadEvidenceMapOrNull(locale).then(setEvidenceMap);
+      void refreshAuditTrails();
     }
     setStatusKey(decision === "accepted" ? "linkAccepted" : "linkRejected");
   }
@@ -710,7 +764,10 @@ export function App() {
   function selectActiveQuestion(questionId: string) {
     setActiveQuestionId(questionId);
     if (apiMode === "online") {
-      void loadGroundedSuggestionsOrEmpty(locale, questionId).then(applyGroundedSuggestions);
+      void loadGroundedSuggestionsOrEmpty(locale, questionId).then((response) => {
+        applyGroundedSuggestions(response);
+        void refreshAuditTrails();
+      });
     }
   }
 
@@ -778,6 +835,9 @@ export function App() {
       setSuggestionDrafts((current) => ({ ...current, [suggestion.id]: finalText }));
     }
     setStatusKey(nextStatus);
+    if (apiMode === "online") {
+      void refreshAuditTrails();
+    }
   }
 
   function changeLocale(nextLocale: Locale) {
@@ -806,7 +866,11 @@ export function App() {
     window.location.assign(nextUrl.toString());
   }
 
-  async function recordOperatorActionOpened(action: OperatorAction, nextState: Record<string, unknown>) {
+  async function recordOperatorActionDecisionType(
+    action: OperatorAction,
+    decisionType: OperatorActionDecisionType,
+    nextState: Record<string, unknown>,
+  ) {
     if (apiMode !== "online") {
       return;
     }
@@ -820,7 +884,7 @@ export function App() {
         target_question_id: action.targetQuestionId ?? null,
         target_tab: action.targetTab ?? null,
         source_object_ids: action.sourceObjectIds ?? [],
-        decision_type: "opened",
+        decision_type: decisionType,
         before_state: {
           active_question_id: activeQuestionId,
           active_operations_tab: activeOperationsTab,
@@ -833,6 +897,7 @@ export function App() {
         output_hash: groundedSuggestionMeta?.outputHash ?? "",
       });
       setOperatorActionDecisions((current) => [response.decision, ...current].slice(0, 8));
+      void refreshAuditTrails();
     } catch (error) {
       console.warn("Could not audit operator action decision.", error);
     }
@@ -843,13 +908,23 @@ export function App() {
       active_question_id: action.targetQuestionId ?? activeQuestionId,
       active_operations_tab: action.targetTab ?? activeOperationsTab,
     };
-    void recordOperatorActionOpened(action, nextState);
+    void recordOperatorActionDecisionType(action, "opened", nextState);
     if (action.targetQuestionId) {
       selectActiveQuestion(action.targetQuestionId);
     }
     if (action.targetTab) {
       setActiveOperationsTab(action.targetTab);
     }
+  }
+
+  function markOperatorAction(action: OperatorAction, decisionType: "skipped" | "dismissed") {
+    const nextState = {
+      active_question_id: activeQuestionId,
+      active_operations_tab: activeOperationsTab,
+      hidden_action_id: action.id,
+    };
+    setDismissedOperatorActionIds((current) => new Set([...current, action.id]));
+    void recordOperatorActionDecisionType(action, decisionType, nextState);
   }
 
   const operationsTabs: Array<{
@@ -967,7 +1042,7 @@ export function App() {
         <section className="interview-panel">
           <PanelHeader title={text(locale, "session")} meta={text(locale, "roleLine")} />
           <OperatorWorkflowPanel
-            actions={operatorActions}
+            actions={visibleOperatorActions}
             answeredCount={new Set(answerViews.map((answer) => answer.questionId)).size}
             findingCount={visibleFindings.length}
             locale={locale}
@@ -975,6 +1050,7 @@ export function App() {
             questionCount={questions.length}
             recentDecisions={operatorActionDecisions.slice(0, 4)}
             onAction={runOperatorAction}
+            onDecision={markOperatorAction}
           />
           <section className="active-question">
             <strong>{text(locale, "activeQuestion")}</strong>
@@ -1130,6 +1206,11 @@ export function App() {
 
             {activeOperationsTab === "review" ? (
               <>
+                <ProvenanceTimelinePanel
+                  locale={locale}
+                  sessionAudit={sessionAudit}
+                  workspaceAudit={workspaceAudit}
+                />
                 <section>
                   <PanelHeader title={text(locale, "indicators")} meta={text(locale, "visible")} compact />
                   <div className="indicator-list">
@@ -1170,6 +1251,7 @@ function OperatorWorkflowPanel({
   locale,
   materialCount,
   onAction,
+  onDecision,
   questionCount,
   recentDecisions,
 }: {
@@ -1179,6 +1261,7 @@ function OperatorWorkflowPanel({
   locale: Locale;
   materialCount: number;
   onAction: (action: OperatorAction) => void;
+  onDecision: (action: OperatorAction, decisionType: "skipped" | "dismissed") => void;
   questionCount: number;
   recentDecisions: OperatorActionDecision[];
 }) {
@@ -1206,24 +1289,37 @@ function OperatorWorkflowPanel({
           actions.map((action) => {
             const priorityLabel = operatorPriorityLabel(action.priority, locale);
             return (
-              <button
-                aria-label={`${action.title}: ${action.detail} (${priorityLabel})`}
-                className="operator-action"
-                data-action-id={action.id}
-                data-kind={action.kind}
-                data-priority={action.priority}
-                data-target-question-id={action.targetQuestionId}
-                key={action.id}
-                type="button"
-                onClick={() => onAction(action)}
-              >
-                <span className="operator-action-icon">{operatorActionIcon(action.kind)}</span>
-                <span className="operator-action-body">
-                  <strong>{action.title}</strong>
-                  <em>{action.detail}</em>
-                </span>
-                <span className="operator-action-priority">{priorityLabel}</span>
-              </button>
+              <div className="operator-action-row" key={action.id}>
+                <button
+                  aria-label={`${action.title}: ${action.detail} (${priorityLabel})`}
+                  className="operator-action"
+                  data-action-id={action.id}
+                  data-kind={action.kind}
+                  data-priority={action.priority}
+                  data-target-question-id={action.targetQuestionId}
+                  type="button"
+                  onClick={() => onAction(action)}
+                >
+                  <span className="operator-action-icon">{operatorActionIcon(action.kind)}</span>
+                  <span className="operator-action-body">
+                    <strong>{action.title}</strong>
+                    <em>{action.detail}</em>
+                  </span>
+                  <span className="operator-action-priority">{priorityLabel}</span>
+                </button>
+                <div className="operator-action-controls">
+                  <button type="button" onClick={() => onDecision(action, "skipped")}>
+                    {text(locale, "operatorSkipAction")}
+                  </button>
+                  <button
+                    aria-label={`${text(locale, "operatorDismissAction")}: ${action.title}`}
+                    type="button"
+                    onClick={() => onDecision(action, "dismissed")}
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              </div>
             );
           })
         ) : (
@@ -1244,6 +1340,270 @@ function OperatorWorkflowPanel({
       ) : null}
     </section>
   );
+}
+
+function ProvenanceTimelinePanel({
+  locale,
+  sessionAudit,
+  workspaceAudit,
+}: {
+  locale: Locale;
+  sessionAudit: SessionAuditResponse | null;
+  workspaceAudit: WorkspaceAuditResponse | null;
+}) {
+  const events = [
+    ...(workspaceAudit?.events ?? []).map((event) => ({ event, scope: "workspace" as const })),
+    ...(sessionAudit?.events ?? []).map((event) => ({ event, scope: "session" as const })),
+  ]
+    .sort((left, right) => Date.parse(right.event.timestamp) - Date.parse(left.event.timestamp))
+    .slice(0, 10);
+  const totalEvents = (workspaceAudit?.events.length ?? 0) + (sessionAudit?.events.length ?? 0);
+
+  return (
+    <section className="provenance-panel">
+      <PanelHeader
+        title={text(locale, "provenanceTimeline")}
+        meta={`${totalEvents} ${text(locale, "auditEvents")}`}
+        compact
+      />
+      <div className="provenance-summary">
+        <AuditChainSummaryCard
+          chainValid={workspaceAudit?.chain_valid}
+          count={workspaceAudit?.events.length ?? 0}
+          icon={<Fingerprint size={15} />}
+          label={text(locale, "workspaceAudit")}
+          locale={locale}
+        />
+        <AuditChainSummaryCard
+          chainValid={sessionAudit?.chain_valid}
+          count={sessionAudit?.events.length ?? 0}
+          icon={<History size={15} />}
+          label={text(locale, "sessionAudit")}
+          locale={locale}
+        />
+      </div>
+      <div className="provenance-timeline">
+        {events.length ? (
+          events.map(({ event, scope }) => (
+            <article className="audit-event-card" data-actor={event.actor} key={`${scope}-${event.id}`}>
+              <span className="audit-event-icon">
+                {event.actor === "human" ? <Activity size={14} /> : <History size={14} />}
+              </span>
+              <div className="audit-event-body">
+                <div className="audit-event-header">
+                  <strong>{auditActionLabel(event.action, locale)}</strong>
+                  <span>{formatDecisionTime(event.timestamp)}</span>
+                </div>
+                <p>
+                  {auditScopeLabel(scope, locale)} / {event.object_type} / {event.object_id}
+                </p>
+                <div className="audit-event-details">
+                  {auditEventDetailPairs(event).map(([key, value]) => (
+                    <span key={`${event.id}-${key}`}>
+                      {auditDetailLabel(key, locale)}: <strong>{formatAuditDetailValue(value)}</strong>
+                    </span>
+                  ))}
+                </div>
+                <div className="audit-event-footer">
+                  <span>{auditActorLabel(event.actor, locale)}</span>
+                  {event.event_hash ? <span>{shortHash(event.event_hash)}</span> : null}
+                </div>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className="empty-state">{text(locale, "noAuditEvents")}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AuditChainSummaryCard({
+  chainValid,
+  count,
+  icon,
+  label,
+  locale,
+}: {
+  chainValid: boolean | undefined;
+  count: number;
+  icon: ReactNode;
+  label: string;
+  locale: Locale;
+}) {
+  const state = chainValid === undefined ? "unknown" : chainValid ? "ready" : "blocked";
+  return (
+    <article className="audit-chain-card" data-state={state}>
+      <span>{icon}</span>
+      <div>
+        <strong>{label}</strong>
+        <em>{auditChainLabel(chainValid, locale)}</em>
+      </div>
+      <b>{count}</b>
+    </article>
+  );
+}
+
+function auditEventDetailPairs(event: AuditEvent): Array<[string, unknown]> {
+  const preferredKeys = [
+    "case_id",
+    "session_id",
+    "participant_id",
+    "question_id",
+    "target_question_id",
+    "target_tab",
+    "material_id",
+    "decision",
+    "decision_type",
+    "action_title",
+    "model_id",
+    "prompt_version",
+    "prompt_hash",
+    "context_hash",
+    "output_hash",
+    "artifact_warning",
+    "finding_count",
+    "indicator_count",
+  ];
+  return preferredKeys
+    .filter((key) => event.details[key] !== undefined && event.details[key] !== null && event.details[key] !== "")
+    .slice(0, 5)
+    .map((key) => [key, event.details[key]]);
+}
+
+function auditActionLabel(action: string, locale: Locale): string {
+  const labels: Record<Locale, Record<string, string>> = {
+    pl: {
+      session_started: "Rozpoczęto sesję",
+      answer_added: "Dodano odpowiedź",
+      review_refreshed: "Odświeżono review",
+      material_question_link_accepted: "Zaakceptowano link materiału",
+      material_question_link_rejected: "Odrzucono link materiału",
+      grounded_suggestions_generated: "Wygenerowano sugestie grounded",
+      grounded_suggestion_accepted: "Zaakceptowano sugestię AI",
+      grounded_suggestion_edited: "Edytowano sugestię AI",
+      grounded_suggestion_rejected: "Odrzucono sugestię AI",
+      operator_action_opened: "Otwarto akcję operatora",
+      operator_action_skipped: "Pominięto akcję operatora",
+      operator_action_dismissed: "Zamknięto akcję operatora",
+    },
+    en: {
+      session_started: "Session started",
+      answer_added: "Answer added",
+      review_refreshed: "Review refreshed",
+      material_question_link_accepted: "Material link accepted",
+      material_question_link_rejected: "Material link rejected",
+      grounded_suggestions_generated: "Grounded suggestions generated",
+      grounded_suggestion_accepted: "AI suggestion accepted",
+      grounded_suggestion_edited: "AI suggestion edited",
+      grounded_suggestion_rejected: "AI suggestion rejected",
+      operator_action_opened: "Operator action opened",
+      operator_action_skipped: "Operator action skipped",
+      operator_action_dismissed: "Operator action dismissed",
+    },
+  };
+  return labels[locale][action] ?? action.replaceAll("_", " ");
+}
+
+function auditActorLabel(actor: AuditEvent["actor"], locale: Locale): string {
+  const labels: Record<Locale, Record<AuditEvent["actor"], string>> = {
+    pl: {
+      ai: "AI",
+      human: "człowiek",
+      system: "system",
+    },
+    en: {
+      ai: "AI",
+      human: "human",
+      system: "system",
+    },
+  };
+  return labels[locale][actor];
+}
+
+function auditScopeLabel(scope: "workspace" | "session", locale: Locale): string {
+  const labels: Record<Locale, Record<"workspace" | "session", string>> = {
+    pl: {
+      session: "sesja",
+      workspace: "workspace",
+    },
+    en: {
+      session: "session",
+      workspace: "workspace",
+    },
+  };
+  return labels[locale][scope];
+}
+
+function auditChainLabel(chainValid: boolean | undefined, locale: Locale): string {
+  if (chainValid === undefined) {
+    return text(locale, "unknown");
+  }
+  return chainValid ? text(locale, "chainValid") : text(locale, "chainInvalid");
+}
+
+function auditDetailLabel(key: string, locale: Locale): string {
+  const labels: Record<Locale, Record<string, string>> = {
+    pl: {
+      action_title: "akcja",
+      artifact_warning: "artefakty",
+      case_id: "sprawa",
+      context_hash: "context",
+      decision: "decyzja",
+      decision_type: "typ decyzji",
+      finding_count: "ustalenia",
+      indicator_count: "wskaźniki",
+      material_id: "materiał",
+      model_id: "model",
+      output_hash: "output",
+      participant_id: "osoba",
+      prompt_hash: "prompt",
+      prompt_version: "wersja promptu",
+      question_id: "pytanie",
+      session_id: "sesja",
+      target_question_id: "cel pytania",
+      target_tab: "zakładka",
+    },
+    en: {
+      action_title: "action",
+      artifact_warning: "artifacts",
+      case_id: "case",
+      context_hash: "context",
+      decision: "decision",
+      decision_type: "decision type",
+      finding_count: "findings",
+      indicator_count: "indicators",
+      material_id: "material",
+      model_id: "model",
+      output_hash: "output",
+      participant_id: "participant",
+      prompt_hash: "prompt",
+      prompt_version: "prompt version",
+      question_id: "question",
+      session_id: "session",
+      target_question_id: "target question",
+      target_tab: "tab",
+    },
+  };
+  return labels[locale][key] ?? key.replaceAll("_", " ");
+}
+
+function formatAuditDetailValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value.length === 64 ? shortHash(value) : truncateAuditText(value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return truncateAuditText(value.join(", "));
+  }
+  return truncateAuditText(JSON.stringify(value) ?? String(value));
+}
+
+function truncateAuditText(value: string): string {
+  return value.length > 72 ? `${value.slice(0, 72)}...` : value;
 }
 
 function operatorDecisionLabel(decision: OperatorActionDecision["decision_type"], locale: Locale): string {
@@ -1795,8 +2155,8 @@ function GroundedSuggestionCard({
       <p>{suggestion.reason}</p>
       <div className="grounded-source-list">
         <span>{text(locale, "sourceIds")}</span>
-        {suggestion.linked_evidence.map((sourceId) => (
-          <em key={sourceId}>{sourceId}</em>
+        {suggestion.linked_evidence.map((sourceId, index) => (
+          <em key={`${sourceId}-${index}`}>{sourceId}</em>
         ))}
       </div>
       {warnings.length ? (
@@ -2142,7 +2502,9 @@ function MaterialQuestionChips({
             </summary>
             <div className="matched-term-list">
               {link.matched_terms.length ? (
-                link.matched_terms.map((term) => <span key={`${link.question_id}-${term}`}>{term}</span>)
+                link.matched_terms.map((term, index) => (
+                  <span key={`${materialQuestionLinkKey(link)}-${term}-${index}`}>{term}</span>
+                ))
               ) : (
                 <em>{text(locale, "noMatchedTerms")}</em>
               )}

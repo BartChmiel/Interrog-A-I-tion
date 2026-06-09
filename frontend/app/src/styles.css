@@ -132,6 +132,11 @@ p {
 .environment-health-checks summary,
 .operator-workflow-header,
 .operator-workflow-metrics,
+.provenance-summary,
+.audit-chain-card,
+.audit-event-header,
+.audit-event-details,
+.audit-event-footer,
 .material-add-panel summary,
 .material-overview-grid,
 .material-overview-grid span {
@@ -696,6 +701,12 @@ h2 {
   gap: 8px;
 }
 
+.operator-action-row {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
 .operator-action {
   width: 100%;
   min-height: 72px;
@@ -775,6 +786,33 @@ h2 {
   font-weight: 650;
 }
 
+.operator-action-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.operator-action-controls button {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted-strong);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+}
+
+.operator-action-controls button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
 .operator-decision-trail {
   display: grid;
   gap: 6px;
@@ -819,6 +857,143 @@ h2 {
 .operator-decision-trail small {
   color: var(--muted);
   font-size: 11px;
+}
+
+.provenance-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.provenance-summary {
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 11px;
+}
+
+.audit-chain-card {
+  flex: 1 1 190px;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  padding: 9px;
+}
+
+.audit-chain-card > span,
+.audit-event-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  color: var(--accent-strong);
+}
+
+.audit-chain-card[data-state="ready"] > span,
+.audit-event-card[data-actor="human"] .audit-event-icon {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.audit-chain-card[data-state="blocked"] > span {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.audit-chain-card div {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.audit-chain-card strong,
+.audit-event-header strong {
+  color: var(--heading);
+  font-size: 12px;
+}
+
+.audit-chain-card em,
+.audit-event-card p,
+.audit-event-header span,
+.audit-event-details,
+.audit-event-footer {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.audit-chain-card b {
+  margin-left: auto;
+  color: var(--heading);
+  font-size: 18px;
+}
+
+.provenance-timeline {
+  display: grid;
+  gap: 8px;
+  padding: 0 11px 11px;
+}
+
+.audit-event-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 9px;
+}
+
+.audit-event-card[data-actor="ai"] .audit-event-icon {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.audit-event-card[data-actor="system"] .audit-event-icon {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.audit-event-body {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.audit-event-header,
+.audit-event-footer {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.audit-event-header strong,
+.audit-event-card p {
+  overflow-wrap: anywhere;
+}
+
+.audit-event-card p {
+  margin: 0;
+}
+
+.audit-event-details {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.audit-event-details span,
+.audit-event-footer span {
+  min-width: 0;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  padding: 3px 7px;
+  overflow-wrap: anywhere;
+}
+
+.audit-event-details strong {
+  color: var(--muted-strong);
+  font-weight: 650;
 }
 
 .active-question {
