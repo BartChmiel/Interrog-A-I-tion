@@ -21,6 +21,9 @@ import type {
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
+  OperatorActionDecisionListResponse,
+  OperatorActionDecisionResponse,
+  OperatorActionDecisionType,
   RuntimeConfig,
   SeedMaterialsResponse,
   SessionReviewResponse,
@@ -68,6 +71,26 @@ export type GroundedSuggestionDecisionPayload = {
 export type MaterialQuestionLinkDecisionPayload = {
   decision: MaterialQuestionLinkDecision;
   link: MaterialQuestionLink;
+};
+
+export type OperatorActionDecisionPayload = {
+  action_id: string;
+  action_kind: string;
+  action_title: string;
+  action_detail: string;
+  action_priority: "high" | "medium" | "low";
+  target_question_id?: string | null;
+  target_tab?: string | null;
+  source_object_ids?: string[];
+  decision_type: OperatorActionDecisionType;
+  operator_note?: string;
+  before_state?: Record<string, unknown>;
+  after_state?: Record<string, unknown>;
+  model_id?: string;
+  prompt_version?: string;
+  prompt_hash?: string;
+  context_hash?: string;
+  output_hash?: string;
 };
 
 export async function loadCaseCatalog(config: RuntimeConfig, locale: string): Promise<CaseCatalogResponse> {
@@ -304,6 +327,35 @@ export async function recordGroundedSuggestionDecision(
       }),
     },
   );
+}
+
+export async function loadOperatorActionDecisions(
+  config: RuntimeConfig,
+): Promise<OperatorActionDecisionListResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({
+    case_id: config.caseId,
+    session_id: config.sessionId,
+  });
+  return fetchJson(config, `/workspaces/${workspaceId}/operator-actions/decisions?${query.toString()}`);
+}
+
+export async function recordOperatorActionDecision(
+  config: RuntimeConfig,
+  payload: OperatorActionDecisionPayload,
+): Promise<OperatorActionDecisionResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  return fetchJson(config, `/workspaces/${workspaceId}/operator-actions/decisions`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      case_id: config.caseId,
+      session_id: config.sessionId,
+      participant_id: config.participantId,
+      created_by: "local-ui",
+      role: "investigator",
+    }),
+  });
 }
 
 export async function registerWorkspaceMaterial(

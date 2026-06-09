@@ -15,3 +15,4 @@ Current schemas:
 - `grounded-suggestions.schema.json`
 - `indicator.schema.json`
 - `material-question-link-decision.schema.json`
+- `operator-action-decision.schema.json`

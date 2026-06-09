@@ -10,6 +10,7 @@ from interrogaition.api.app import (
     MaterialQuestionLinkDecisionRequest,
     ModelArtifactIsolationRequest,
     ModelArtifactWriteRequest,
+    OperatorActionDecisionRequest,
     RegisterMaterialRequest,
     SeedWorkspaceMaterialsRequest,
     StartSessionRequest,
@@ -190,6 +191,8 @@ class ApiAppTest(unittest.TestCase):
         get_grounding_pack = endpoint(app, "get_workspace_grounding_pack")
         generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
         record_suggestion_decision = endpoint(app, "record_workspace_grounded_suggestion_decision")
+        record_operator_decision = endpoint(app, "record_workspace_operator_action_decision")
+        list_operator_decisions = endpoint(app, "list_workspace_operator_action_decisions")
         get_workspace_audit = endpoint(app, "get_workspace_audit")
         verify_material = endpoint(app, "verify_workspace_material")
 
@@ -305,6 +308,33 @@ class ApiAppTest(unittest.TestCase):
                 question_id="q-001",
             ),
         )
+        operator_decision = record_operator_decision(
+            "api-workspace-001",
+            OperatorActionDecisionRequest(
+                action_id="ask-q-002",
+                action_kind="ask",
+                action_title="Ask the next question",
+                action_detail="q-002: What happened next?",
+                action_priority="high",
+                decision_type="opened",
+                created_by="investigator-001",
+                case_id="case-001",
+                session_id=None,
+                participant_id="person-001",
+                target_question_id="q-002",
+                source_object_ids=["q-002", "topic-location"],
+                before_state={"active_question_id": "q-001"},
+                after_state={"active_question_id": "q-002"},
+                prompt_hash=grounded_suggestions["prompt_hash"],
+                context_hash=grounded_suggestions["context_hash"],
+                output_hash=grounded_suggestions["output_hash"],
+            ),
+        )
+        operator_decisions = list_operator_decisions(
+            "api-workspace-001",
+            case_id="case-001",
+            session_id=None,
+        )
         workspace_audit = get_workspace_audit("api-workspace-001")
         material_verification = verify_material("api-workspace-001", "api-material-001")
 
@@ -393,6 +423,14 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(decision["audit_event"]["action"], "grounded_suggestion_accepted")
         self.assertEqual(decision["audit_event"]["details"]["prompt_hash"], grounded_suggestions["prompt_hash"])
         self.assertEqual(decision["audit_event"]["details"]["context_hash"], grounded_suggestions["context_hash"])
+        self.assertEqual(operator_decision["decision"]["decision_type"], "opened")
+        self.assertEqual(operator_decision["decision"]["action_id"], "ask-q-002")
+        self.assertEqual(operator_decision["decision"]["target_question_id"], "q-002")
+        self.assertEqual(operator_decision["audit_event"]["action"], "operator_action_opened")
+        self.assertTrue(operator_decision["chain_valid"])
+        self.assertTrue(operator_decisions["chain_valid"])
+        self.assertEqual(len(operator_decisions["decisions"]), 1)
+        self.assertEqual(operator_decisions["decisions"][0]["event_hash"], operator_decision["decision"]["event_hash"])
         self.assertTrue(workspace_audit["chain_valid"])
         generated_event = workspace_audit["events"][1]
         self.assertEqual(
@@ -428,6 +466,7 @@ class ApiAppTest(unittest.TestCase):
                 "material_question_link_accepted",
                 "grounded_suggestions_generated",
                 "grounded_suggestion_accepted",
+                "operator_action_opened",
             ],
         )
         self.assertTrue(material_verification["verified"])
@@ -444,6 +483,60 @@ class ApiAppTest(unittest.TestCase):
             )
 
         self.assertEqual(caught.exception.status_code, 400)
+
+    def test_operator_action_decision_validates_access_and_question_target(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        record_operator_decision = endpoint(app, "record_workspace_operator_action_decision")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-operator-access",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        with self.assertRaises(HTTPException) as denied:
+            record_operator_decision(
+                "api-workspace-operator-access",
+                OperatorActionDecisionRequest(
+                    action_id="ask-q-001",
+                    action_kind="ask",
+                    action_title="Ask the next question",
+                    action_detail="q-001",
+                    action_priority="high",
+                    decision_type="opened",
+                    case_id="case-001",
+                    target_question_id="q-001",
+                    role=WorkspaceRole.OBSERVER,
+                ),
+            )
+
+        with self.assertRaises(HTTPException) as bad_question:
+            record_operator_decision(
+                "api-workspace-operator-access",
+                OperatorActionDecisionRequest(
+                    action_id="ask-unknown",
+                    action_kind="ask",
+                    action_title="Ask the next question",
+                    action_detail="unknown",
+                    action_priority="high",
+                    decision_type="opened",
+                    case_id="case-001",
+                    target_question_id="q-missing",
+                ),
+            )
+
+        self.assertEqual(denied.exception.status_code, 403)
+        self.assertEqual(bad_question.exception.status_code, 400)
 
     def test_grounded_suggestions_warn_when_artifact_isolation_is_missing(self) -> None:
         app = create_app(

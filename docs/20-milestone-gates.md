@@ -246,6 +246,18 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Operator action decision audit has reached its first review point.
+
+The project owner should evaluate:
+
+- whether recording `opened` decisions on queue clicks is the right first audit granularity,
+- whether `skipped`, `dismissed`, and `converted_to_question` should be exposed as explicit UI controls,
+- whether recent operator decisions should remain near the queue or move to a dedicated provenance view,
+- whether operator action decisions should be included in future export integrity manifests,
+- whether the UI wording is clear that these are prototype provenance records, not official procedural records.
+
+## Current STOP
+
 Milestone 6: Export integrity model artifact provenance has reached its first review point.
 
 The project owner should evaluate:

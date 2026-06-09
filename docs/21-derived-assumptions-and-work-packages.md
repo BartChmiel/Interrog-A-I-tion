@@ -65,7 +65,8 @@ Implemented:
 - citation validation against `allowed_source_ids`,
 - audit metadata for prompt version, model id, prompt/context/output hashes, and captured artifact ids,
 - React right-rail display with source ids and `use`, `edit`, and `reject` controls,
-- backend audit events for grounded suggestion `accepted`, `edited`, and `rejected` decisions.
+- backend audit events for grounded suggestion `accepted`, `edited`, and `rejected` decisions,
+- operator work-queue `opened` decisions recorded in the workspace audit chain.
 
 Next:
 
@@ -73,6 +74,7 @@ Next:
 - connect Ollama behind the same grounded service in controlled test mode after runtime approval,
 - block institutional live use of real model output until a STOP review,
 - decide whether artifact capture should become mandatory before every real model call,
+- decide whether operator queue `skipped`, `dismissed`, and `converted_to_question` controls should be exposed,
 - decide whether export integrity manifests should become signed or timestamped,
 - add model selection persistence and runtime policy configuration.
 

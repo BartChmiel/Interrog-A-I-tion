@@ -456,6 +456,64 @@ export type GroundedSuggestionsResponse = {
   artifact_warning?: string | null;
 };
 
+export type OperatorActionDecisionType =
+  | "opened"
+  | "accepted"
+  | "edited"
+  | "rejected"
+  | "skipped"
+  | "dismissed"
+  | "converted_to_question";
+
+export type OperatorActionDecision = {
+  decision_id: string;
+  audit_event_id: string;
+  event_hash: string;
+  workspace_id: string;
+  case_id: string;
+  session_id: string | null;
+  participant_id: string | null;
+  created_at: string;
+  created_by: string;
+  action_id: string;
+  action_kind: string;
+  action_title: string;
+  action_detail: string;
+  action_priority: "high" | "medium" | "low";
+  target_question_id: string | null;
+  target_tab: string | null;
+  source_object_ids: string[];
+  decision_type: OperatorActionDecisionType;
+  operator_note: string;
+  before_state: Record<string, unknown>;
+  after_state: Record<string, unknown>;
+  model_id: string;
+  prompt_version: string;
+  prompt_hash: string;
+  context_hash: string;
+  output_hash: string;
+};
+
+export type OperatorActionDecisionResponse = {
+  decision: OperatorActionDecision;
+  audit_event: {
+    id: string;
+    action: string;
+    object_type: string;
+    object_id: string;
+    event_hash: string;
+  };
+  chain_valid: boolean;
+};
+
+export type OperatorActionDecisionListResponse = {
+  workspace_id: string;
+  case_id: string;
+  session_id: string | null;
+  decisions: OperatorActionDecision[];
+  chain_valid: boolean;
+};
+
 export type QuestionView = {
   id: string;
   text: LocalizedText;

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interrogaition.local/schemas/operator-action-decision.schema.json",
+  "title": "OperatorActionDecisionRequest",
+  "type": "object",
+  "required": [
+    "action_id",
+    "action_kind",
+    "action_title",
+    "action_detail",
+    "action_priority",
+    "decision_type"
+  ],
+  "properties": {
+    "action_id": { "type": "string", "minLength": 1 },
+    "action_kind": {
+      "type": "string",
+      "enum": ["ask", "materials", "review"]
+    },
+    "action_title": { "type": "string", "minLength": 1 },
+    "action_detail": { "type": "string", "minLength": 1 },
+    "action_priority": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "decision_type": {
+      "type": "string",
+      "enum": ["opened", "accepted", "edited", "rejected", "skipped", "dismissed", "converted_to_question"]
+    },
+    "created_by": { "type": "string" },
+    "case_id": { "type": ["string", "null"] },
+    "session_id": { "type": ["string", "null"] },
+    "participant_id": { "type": ["string", "null"] },
+    "target_question_id": { "type": ["string", "null"] },
+    "target_tab": {
+      "type": ["string", "null"],
+      "enum": ["monitor", "ai", "materials", "review", null]
+    },
+    "source_object_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "operator_note": { "type": "string" },
+    "before_state": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "after_state": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "model_id": { "type": "string" },
+    "prompt_version": { "type": "string" },
+    "prompt_hash": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "context_hash": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "output_hash": {
+      "type": "string",
+      "pattern": "^$|^[a-f0-9]{64}$"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["investigator", "prosecutor", "defense_counsel", "observer", "admin"]
+    }
+  }
+}

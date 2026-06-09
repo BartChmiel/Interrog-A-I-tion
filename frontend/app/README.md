@@ -89,6 +89,10 @@ Material cards also expose compact accept/reject controls and matched-term audit
 details for each material-question link. Online decisions are recorded through the
 backend audit chain; offline decisions remain local demo state.
 
+The operator work queue records an `opened` audit decision when the user clicks a
+queue action and shows a compact recent-decision trail. The trail is provenance
+support only; it does not turn prototype actions into official procedural records.
+
 ## Scripts
 
 - `npm run dev` - local Vite server,

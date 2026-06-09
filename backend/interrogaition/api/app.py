@@ -233,6 +233,32 @@ class GroundedSuggestionDecisionRequest:
 
 
 @dataclass(frozen=True)
+class OperatorActionDecisionRequest:
+    action_id: str
+    action_kind: str
+    action_title: str
+    action_detail: str
+    action_priority: str
+    decision_type: str
+    created_by: str = "local-ui"
+    case_id: str | None = None
+    session_id: str | None = None
+    participant_id: str | None = None
+    target_question_id: str | None = None
+    target_tab: str | None = None
+    source_object_ids: list[str] = field(default_factory=list)
+    operator_note: str = ""
+    before_state: dict[str, Any] = field(default_factory=dict)
+    after_state: dict[str, Any] = field(default_factory=dict)
+    model_id: str = ""
+    prompt_version: str = ""
+    prompt_hash: str = ""
+    context_hash: str = ""
+    output_hash: str = ""
+    role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
+@dataclass(frozen=True)
 class MaterialQuestionLinkDecisionRequest:
     decision: str
     case_id: str
@@ -966,6 +992,92 @@ def create_app(
             "chain_valid": store.verify_audit_chain(),
         }
 
+    @app.post("/workspaces/{workspace_id}/operator-actions/decisions")
+    def record_workspace_operator_action_decision(
+        workspace_id: str,
+        request: OperatorActionDecisionRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.WRITE_INTERVIEW,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        case_id = request.case_id or workspace.manifest.case_id
+        if case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+        case = _load_synthetic_case(case_id, locale="en")
+        _validate_operator_action_decision(request, question_ids={question.id for question in case.questions})
+
+        audit_event = store.append_audit_event(
+            actor=Actor.HUMAN,
+            action=f"operator_action_{request.decision_type}",
+            object_type="operator_action",
+            object_id=request.action_id,
+            details={
+                "workspace_id": workspace_id,
+                "case_id": case_id,
+                "session_id": request.session_id,
+                "participant_id": request.participant_id,
+                "created_by": request.created_by,
+                "action_id": request.action_id,
+                "action_kind": request.action_kind,
+                "action_title": request.action_title.strip(),
+                "action_detail": request.action_detail.strip(),
+                "action_priority": request.action_priority,
+                "target_question_id": request.target_question_id,
+                "target_tab": request.target_tab,
+                "source_object_ids": list(request.source_object_ids),
+                "decision_type": request.decision_type,
+                "operator_note": request.operator_note.strip(),
+                "before_state": dict(request.before_state),
+                "after_state": dict(request.after_state),
+                "model_id": request.model_id,
+                "prompt_version": request.prompt_version,
+                "prompt_hash": request.prompt_hash,
+                "context_hash": request.context_hash,
+                "output_hash": request.output_hash,
+            },
+        )
+        return {
+            "decision": _operator_action_decision_from_event(audit_event),
+            "audit_event": _to_jsonable(audit_event),
+            "chain_valid": store.verify_audit_chain(),
+        }
+
+    @app.get("/workspaces/{workspace_id}/operator-actions/decisions")
+    def list_workspace_operator_action_decisions(
+        workspace_id: str,
+        case_id: str | None = Query(default=None),
+        session_id: str | None = Query(default=None),
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        if case_id and case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+        events = _operator_action_decision_events(
+            _workspace_audit_events(store.list_audit_events(), workspace_id),
+            case_id=case_id or workspace.manifest.case_id,
+            session_id=session_id,
+        )
+        return {
+            "workspace_id": workspace_id,
+            "case_id": case_id or workspace.manifest.case_id,
+            "session_id": session_id,
+            "decisions": [_operator_action_decision_from_event(event) for event in events],
+            "chain_valid": store.verify_audit_chain(),
+        }
+
     @app.get("/workspaces/{workspace_id}/audit")
     def get_workspace_audit(workspace_id: str) -> dict[str, Any]:
         try:
@@ -1246,6 +1358,54 @@ def _workspace_audit_events(
     )
 
 
+def _operator_action_decision_events(
+    events: tuple[AuditEvent, ...],
+    *,
+    case_id: str | None,
+    session_id: str | None,
+) -> tuple[AuditEvent, ...]:
+    return tuple(
+        event
+        for event in events
+        if event.object_type == "operator_action"
+        and event.action.startswith("operator_action_")
+        and (case_id is None or event.details.get("case_id") == case_id)
+        and (session_id is None or event.details.get("session_id") == session_id)
+    )
+
+
+def _operator_action_decision_from_event(event: AuditEvent) -> dict[str, Any]:
+    details = event.details
+    return {
+        "decision_id": event.id,
+        "audit_event_id": event.id,
+        "event_hash": event.event_hash,
+        "workspace_id": details.get("workspace_id"),
+        "case_id": details.get("case_id"),
+        "session_id": details.get("session_id"),
+        "participant_id": details.get("participant_id"),
+        "created_at": event.timestamp.isoformat(),
+        "created_by": details.get("created_by"),
+        "action_id": details.get("action_id", event.object_id),
+        "action_kind": details.get("action_kind"),
+        "action_title": details.get("action_title"),
+        "action_detail": details.get("action_detail"),
+        "action_priority": details.get("action_priority"),
+        "target_question_id": details.get("target_question_id"),
+        "target_tab": details.get("target_tab"),
+        "source_object_ids": list(details.get("source_object_ids", ())),
+        "decision_type": details.get("decision_type"),
+        "operator_note": details.get("operator_note", ""),
+        "before_state": dict(details.get("before_state", {})),
+        "after_state": dict(details.get("after_state", {})),
+        "model_id": details.get("model_id", ""),
+        "prompt_version": details.get("prompt_version", ""),
+        "prompt_hash": details.get("prompt_hash", ""),
+        "context_hash": details.get("context_hash", ""),
+        "output_hash": details.get("output_hash", ""),
+    }
+
+
 def _workspace_response(workspace: CaseWorkspace) -> dict[str, Any]:
     return {
         "root_path": str(workspace.root_path),
@@ -1348,6 +1508,38 @@ def _validate_grounded_suggestion_decision(
         raise HTTPException(status_code=400, detail="Unsupported grounded suggestion decision.")
     if request.decision in {SuggestionStatus.ACCEPTED, SuggestionStatus.EDITED}:
         _require_non_empty("final_text", request.final_text or request.original_text)
+    _validate_optional_sha256("prompt_hash", request.prompt_hash)
+    _validate_optional_sha256("context_hash", request.context_hash)
+    _validate_optional_sha256("output_hash", request.output_hash)
+
+
+def _validate_operator_action_decision(
+    request: OperatorActionDecisionRequest,
+    *,
+    question_ids: set[str],
+) -> None:
+    _require_non_empty("action_id", request.action_id)
+    _require_non_empty("action_kind", request.action_kind)
+    _require_non_empty("action_title", request.action_title)
+    _require_non_empty("action_detail", request.action_detail)
+    if request.action_kind not in {"ask", "materials", "review"}:
+        raise HTTPException(status_code=400, detail="Unsupported operator action kind.")
+    if request.action_priority not in {"high", "medium", "low"}:
+        raise HTTPException(status_code=400, detail="Unsupported operator action priority.")
+    if request.decision_type not in {
+        "opened",
+        "accepted",
+        "edited",
+        "rejected",
+        "skipped",
+        "dismissed",
+        "converted_to_question",
+    }:
+        raise HTTPException(status_code=400, detail="Unsupported operator action decision type.")
+    if request.target_question_id:
+        _require_known_id("target_question_id", request.target_question_id, question_ids)
+    if request.target_tab and request.target_tab not in {"monitor", "ai", "materials", "review"}:
+        raise HTTPException(status_code=400, detail="Unsupported operator action target tab.")
     _validate_optional_sha256("prompt_hash", request.prompt_hash)
     _validate_optional_sha256("context_hash", request.context_hash)
     _validate_optional_sha256("output_hash", request.output_hash)

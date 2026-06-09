@@ -39,12 +39,14 @@ import {
   loadMaterialQuestionLinks,
   loadModelArtifactManifest,
   loadModelArtifactIsolation,
+  loadOperatorActionDecisions,
   loadWorkspaceMaterialPreview,
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceMaterials,
   recordGroundedSuggestionDecision,
   recordMaterialQuestionLinkDecision,
+  recordOperatorActionDecision,
   registerWorkspaceMaterial,
   runLocalModelSmoke,
   seedWorkspaceMaterials,
@@ -84,6 +86,7 @@ import type {
   MaterialRecord,
   MaterialSourceType,
   MaterialVerification,
+  OperatorActionDecision,
   QuestionView,
   ReviewFinding,
   RuntimeConfig,
@@ -117,6 +120,7 @@ type OperatorAction = {
   priority: "high" | "medium" | "low";
   targetQuestionId?: string;
   targetTab?: OperationsTab;
+  sourceObjectIds?: string[];
 };
 
 const emptyMaterialDraft: MaterialDraft = {
@@ -160,6 +164,7 @@ export function App() {
   const [activeMaterialPreviewId, setActiveMaterialPreviewId] = useState<string | null>(null);
   const [evidenceMap, setEvidenceMap] = useState<EvidenceMap | null>(null);
   const [evidenceAlignment, setEvidenceAlignment] = useState<EvidenceAlignment | null>(null);
+  const [operatorActionDecisions, setOperatorActionDecisions] = useState<OperatorActionDecision[]>([]);
   const [groundedSuggestions, setGroundedSuggestions] = useState<GroundedSuggestion[]>([]);
   const [groundedSuggestionWarnings, setGroundedSuggestionWarnings] = useState<GroundedSuggestionWarning[]>([]);
   const [groundedSuggestionMeta, setGroundedSuggestionMeta] = useState<{
@@ -301,6 +306,7 @@ export function App() {
         materialList,
         materialLinks,
         nextEvidenceMap,
+        operatorDecisions,
         nextGroundedSuggestions,
       ] = await Promise.all([
         loadWorkspaceAccess(config),
@@ -309,6 +315,7 @@ export function App() {
         loadWorkspaceMaterials(config),
         loadMaterialQuestionLinksOrEmpty(locale),
         loadEvidenceMapOrNull(locale),
+        loadOperatorActionDecisionsOrEmpty(),
         loadGroundedSuggestionsOrEmpty(locale, questionId),
       ]);
       setEncryptionStatus(security);
@@ -321,6 +328,7 @@ export function App() {
       setWorkspaceMaterials(sortMaterials(materialList.materials));
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
+      setOperatorActionDecisions(operatorDecisions);
       applyGroundedSuggestions(nextGroundedSuggestions);
     } catch (error) {
       console.warn("Could not refresh local workspace security state.", error);
@@ -339,6 +347,7 @@ export function App() {
       setActiveMaterialPreviewId(null);
       setEvidenceMap(null);
       setEvidenceAlignment(null);
+      setOperatorActionDecisions([]);
       applyGroundedSuggestions(null);
       setMaterialVerifications({});
     }
@@ -363,6 +372,16 @@ export function App() {
       console.warn("Could not refresh evidence map.", error);
       setEvidenceAlignment(null);
       return null;
+    }
+  }
+
+  async function loadOperatorActionDecisionsOrEmpty(): Promise<OperatorActionDecision[]> {
+    try {
+      const response = await loadOperatorActionDecisions(config);
+      return response.decisions;
+    } catch (error) {
+      console.warn("Could not refresh operator action decisions.", error);
+      return [];
     }
   }
 
@@ -787,7 +806,44 @@ export function App() {
     window.location.assign(nextUrl.toString());
   }
 
+  async function recordOperatorActionOpened(action: OperatorAction, nextState: Record<string, unknown>) {
+    if (apiMode !== "online") {
+      return;
+    }
+    try {
+      const response = await recordOperatorActionDecision(config, {
+        action_id: action.id,
+        action_kind: action.kind,
+        action_title: action.title,
+        action_detail: action.detail,
+        action_priority: action.priority,
+        target_question_id: action.targetQuestionId ?? null,
+        target_tab: action.targetTab ?? null,
+        source_object_ids: action.sourceObjectIds ?? [],
+        decision_type: "opened",
+        before_state: {
+          active_question_id: activeQuestionId,
+          active_operations_tab: activeOperationsTab,
+        },
+        after_state: nextState,
+        model_id: groundedSuggestionMeta?.model ?? "",
+        prompt_version: groundedSuggestionMeta?.promptVersion ?? "",
+        prompt_hash: groundedSuggestionMeta?.promptHash ?? "",
+        context_hash: groundedSuggestionMeta?.contextHash ?? "",
+        output_hash: groundedSuggestionMeta?.outputHash ?? "",
+      });
+      setOperatorActionDecisions((current) => [response.decision, ...current].slice(0, 8));
+    } catch (error) {
+      console.warn("Could not audit operator action decision.", error);
+    }
+  }
+
   function runOperatorAction(action: OperatorAction) {
+    const nextState = {
+      active_question_id: action.targetQuestionId ?? activeQuestionId,
+      active_operations_tab: action.targetTab ?? activeOperationsTab,
+    };
+    void recordOperatorActionOpened(action, nextState);
     if (action.targetQuestionId) {
       selectActiveQuestion(action.targetQuestionId);
     }
@@ -917,6 +973,7 @@ export function App() {
             locale={locale}
             materialCount={workspaceMaterials.length}
             questionCount={questions.length}
+            recentDecisions={operatorActionDecisions.slice(0, 4)}
             onAction={runOperatorAction}
           />
           <section className="active-question">
@@ -1114,6 +1171,7 @@ function OperatorWorkflowPanel({
   materialCount,
   onAction,
   questionCount,
+  recentDecisions,
 }: {
   actions: OperatorAction[];
   answeredCount: number;
@@ -1122,6 +1180,7 @@ function OperatorWorkflowPanel({
   materialCount: number;
   onAction: (action: OperatorAction) => void;
   questionCount: number;
+  recentDecisions: OperatorActionDecision[];
 }) {
   return (
     <section className="operator-workflow">
@@ -1171,8 +1230,44 @@ function OperatorWorkflowPanel({
           <p className="empty-state">{text(locale, "operatorNoActions")}</p>
         )}
       </div>
+      {recentDecisions.length ? (
+        <div className="operator-decision-trail">
+          <span>{text(locale, "operatorDecisionTrail")}</span>
+          {recentDecisions.map((decision) => (
+            <article key={decision.decision_id}>
+              <strong>{operatorDecisionLabel(decision.decision_type, locale)}</strong>
+              <em>{decision.action_title}</em>
+              <small>{formatDecisionTime(decision.created_at)}</small>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function operatorDecisionLabel(decision: OperatorActionDecision["decision_type"], locale: Locale): string {
+  const labels: Record<Locale, Record<OperatorActionDecision["decision_type"], string>> = {
+    pl: {
+      opened: "otwarte",
+      accepted: "zaakceptowane",
+      edited: "edytowane",
+      rejected: "odrzucone",
+      skipped: "pominięte",
+      dismissed: "zamknięte",
+      converted_to_question: "zamienione w pytanie",
+    },
+    en: {
+      opened: "opened",
+      accepted: "accepted",
+      edited: "edited",
+      rejected: "rejected",
+      skipped: "skipped",
+      dismissed: "dismissed",
+      converted_to_question: "converted to question",
+    },
+  };
+  return labels[locale][decision];
 }
 
 function operatorActionIcon(kind: OperatorActionKind): ReactNode {
@@ -1231,6 +1326,7 @@ function buildOperatorActions({
       detail: `${nextUnansweredQuestion.id}: ${localize(nextUnansweredQuestion.text, locale)}`,
       priority: "high",
       targetQuestionId: nextUnansweredQuestion.id,
+      sourceObjectIds: [nextUnansweredQuestion.id, ...nextUnansweredQuestion.topicIds],
     });
   }
 
@@ -1249,6 +1345,10 @@ function buildOperatorActions({
       detail: linkedMaterialTitles || text(locale, "groundedMaterials"),
       priority: nextUnansweredQuestion ? "medium" : "high",
       targetTab: "materials",
+      sourceObjectIds: [
+        ...(activeQuestionId ? [activeQuestionId] : []),
+        ...activeQuestionLinks.flatMap((link) => [link.material_id, ...link.topic_ids]),
+      ],
     });
   }
 
@@ -1269,6 +1369,7 @@ function buildOperatorActions({
       priority: urgentFinding.severity === "high" ? "high" : "medium",
       targetQuestionId: targetQuestionId ?? questionForTopic?.id,
       targetTab: targetQuestionId || questionForTopic ? undefined : "review",
+      sourceObjectIds: urgentFinding.linked_ids,
     });
   }
 
@@ -1280,6 +1381,9 @@ function buildOperatorActions({
       detail: `${evidenceMap.summary.material_only_topics} ${text(locale, "statusMaterialOnly")}`,
       priority: "medium",
       targetTab: "materials",
+      sourceObjectIds: evidenceMap.topic_nodes
+        .filter((node) => node.status === "material_only")
+        .flatMap((node) => [node.topic_id, ...node.material_ids]),
     });
   }
 
@@ -2505,6 +2609,17 @@ function shortHash(value: string): string {
 
 function shortArtifact(artifact: ModelArtifactSummary): string {
   return `${artifact.artifact_id} / ${shortHash(artifact.sha256)}`;
+}
+
+function formatDecisionTime(value: string): string {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    return value;
+  }
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function formatBytes(value: number): string {

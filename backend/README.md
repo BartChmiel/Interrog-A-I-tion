@@ -149,6 +149,8 @@ GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=demo-ses
 GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-session&question_id=q-001
 POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=demo-session&question_id=q-001
 POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
+POST /workspaces/{workspace_id}/operator-actions/decisions
+GET /workspaces/{workspace_id}/operator-actions/decisions?case_id=case-001&session_id=demo-session
 GET /workspaces/{workspace_id}/audit
 ```
 
@@ -157,3 +159,8 @@ Grounded suggestions use the current grounding context pack, validate citations 
 If model artifact isolation is initialized, grounded suggestions also write workspace-local `prompt`, `context`, and `output` artifacts. Artifact records are deduplicated by `artifact_type + SHA-256`, hash-chained in `models/artifact-manifest.json`, and can be referenced by export integrity manifests.
 
 The system never returns an automated guilt, truthfulness, or legal reliability verdict.
+
+Operator work-queue decisions are also captured through the workspace audit chain. The
+first UI integration records `opened` decisions when a user clicks a queue action, preserving
+the action metadata, linked source ids, target question/tab, and before/after UI state for
+later provenance review.

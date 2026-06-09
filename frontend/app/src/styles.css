@@ -775,6 +775,52 @@ h2 {
   font-weight: 650;
 }
 
+.operator-decision-trail {
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.operator-decision-trail > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.operator-decision-trail article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  padding: 7px 8px;
+}
+
+.operator-decision-trail strong {
+  color: var(--accent-strong);
+  font-size: 12px;
+}
+
+.operator-decision-trail em {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--heading);
+  font-size: 12px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.operator-decision-trail small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .active-question {
   display: grid;
   gap: 8px;
