@@ -56,6 +56,7 @@ import { seedAnswers, seedCaseCatalog, seedFindings, seedIndicators, seedQuestio
 import { domainLabel, localize, text, type CopyKey } from "./i18n";
 import type {
   Answer,
+  AnswerView,
   ApiMode,
   CaseCatalogItem,
   CaseData,
@@ -105,6 +106,18 @@ type MaterialDraft = {
 };
 
 type OperationsTab = "monitor" | "ai" | "materials" | "review";
+
+type OperatorActionKind = "ask" | "materials" | "review";
+
+type OperatorAction = {
+  id: string;
+  kind: OperatorActionKind;
+  title: string;
+  detail: string;
+  priority: "high" | "medium" | "low";
+  targetQuestionId?: string;
+  targetTab?: OperationsTab;
+};
 
 const emptyMaterialDraft: MaterialDraft = {
   title: "",
@@ -197,6 +210,29 @@ export function App() {
 
   const visibleIndicators = indicators.length ? indicators : seedIndicators;
   const visibleFindings = findings.length ? findings : seedFindings;
+  const operatorActions = useMemo(
+    () =>
+      buildOperatorActions({
+        activeQuestionId: activeQuestion?.id,
+        answerViews,
+        evidenceMap,
+        findings: visibleFindings,
+        links: materialQuestionLinks,
+        locale,
+        materials: workspaceMaterials,
+        questions,
+      }),
+    [
+      activeQuestion?.id,
+      answerViews,
+      evidenceMap,
+      materialQuestionLinks,
+      locale,
+      questions,
+      visibleFindings,
+      workspaceMaterials,
+    ],
+  );
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -751,6 +787,15 @@ export function App() {
     window.location.assign(nextUrl.toString());
   }
 
+  function runOperatorAction(action: OperatorAction) {
+    if (action.targetQuestionId) {
+      selectActiveQuestion(action.targetQuestionId);
+    }
+    if (action.targetTab) {
+      setActiveOperationsTab(action.targetTab);
+    }
+  }
+
   const operationsTabs: Array<{
     id: OperationsTab;
     label: string;
@@ -865,6 +910,15 @@ export function App() {
 
         <section className="interview-panel">
           <PanelHeader title={text(locale, "session")} meta={text(locale, "roleLine")} />
+          <OperatorWorkflowPanel
+            actions={operatorActions}
+            answeredCount={new Set(answerViews.map((answer) => answer.questionId)).size}
+            findingCount={visibleFindings.length}
+            locale={locale}
+            materialCount={workspaceMaterials.length}
+            questionCount={questions.length}
+            onAction={runOperatorAction}
+          />
           <section className="active-question">
             <strong>{text(locale, "activeQuestion")}</strong>
             <p>{localize(activeQuestion?.text, locale)}</p>
@@ -1050,6 +1104,203 @@ export function App() {
       </main>
     </div>
   );
+}
+
+function OperatorWorkflowPanel({
+  actions,
+  answeredCount,
+  findingCount,
+  locale,
+  materialCount,
+  onAction,
+  questionCount,
+}: {
+  actions: OperatorAction[];
+  answeredCount: number;
+  findingCount: number;
+  locale: Locale;
+  materialCount: number;
+  onAction: (action: OperatorAction) => void;
+  questionCount: number;
+}) {
+  return (
+    <section className="operator-workflow">
+      <div className="operator-workflow-header">
+        <div>
+          <span>{text(locale, "operatorQueue")}</span>
+          <strong>{text(locale, "operatorQueueDetail")}</strong>
+        </div>
+        <div className="operator-workflow-metrics">
+          <span>
+            {answeredCount}/{questionCount} {text(locale, "operatorAnswered")}
+          </span>
+          <span>
+            {materialCount} {text(locale, "materialRecordCount")}
+          </span>
+          <span>
+            {findingCount} {text(locale, "findingPluralMany")}
+          </span>
+        </div>
+      </div>
+      <div className="operator-action-list">
+        {actions.length ? (
+          actions.map((action) => {
+            const priorityLabel = operatorPriorityLabel(action.priority, locale);
+            return (
+              <button
+                aria-label={`${action.title}: ${action.detail} (${priorityLabel})`}
+                className="operator-action"
+                data-action-id={action.id}
+                data-kind={action.kind}
+                data-priority={action.priority}
+                data-target-question-id={action.targetQuestionId}
+                key={action.id}
+                type="button"
+                onClick={() => onAction(action)}
+              >
+                <span className="operator-action-icon">{operatorActionIcon(action.kind)}</span>
+                <span className="operator-action-body">
+                  <strong>{action.title}</strong>
+                  <em>{action.detail}</em>
+                </span>
+                <span className="operator-action-priority">{priorityLabel}</span>
+              </button>
+            );
+          })
+        ) : (
+          <p className="empty-state">{text(locale, "operatorNoActions")}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function operatorActionIcon(kind: OperatorActionKind): ReactNode {
+  if (kind === "materials") {
+    return <FolderArchive size={15} />;
+  }
+  if (kind === "review") {
+    return <ListChecks size={15} />;
+  }
+  return <Send size={15} />;
+}
+
+function operatorPriorityLabel(priority: OperatorAction["priority"], locale: Locale): string {
+  const labels: Record<Locale, Record<OperatorAction["priority"], string>> = {
+    pl: {
+      high: "pilne",
+      medium: "ważne",
+      low: "kolejne",
+    },
+    en: {
+      high: "urgent",
+      medium: "important",
+      low: "next",
+    },
+  };
+  return labels[locale][priority];
+}
+
+function buildOperatorActions({
+  activeQuestionId,
+  answerViews,
+  evidenceMap,
+  findings,
+  links,
+  locale,
+  materials,
+  questions,
+}: {
+  activeQuestionId: string | undefined;
+  answerViews: AnswerView[];
+  evidenceMap: EvidenceMap | null;
+  findings: ReviewFinding[];
+  links: MaterialQuestionLink[];
+  locale: Locale;
+  materials: MaterialRecord[];
+  questions: QuestionView[];
+}): OperatorAction[] {
+  const actions: OperatorAction[] = [];
+  const answeredQuestionIds = new Set(answerViews.map((answer) => answer.questionId));
+  const nextUnansweredQuestion = questions.find((question) => !answeredQuestionIds.has(question.id));
+  if (nextUnansweredQuestion) {
+    actions.push({
+      id: `ask-${nextUnansweredQuestion.id}`,
+      kind: "ask",
+      title: text(locale, "operatorAskNext"),
+      detail: `${nextUnansweredQuestion.id}: ${localize(nextUnansweredQuestion.text, locale)}`,
+      priority: "high",
+      targetQuestionId: nextUnansweredQuestion.id,
+    });
+  }
+
+  const activeQuestionLinks = activeQuestionId
+    ? links.filter((link) => link.question_id === activeQuestionId)
+    : [];
+  if (activeQuestionLinks.length) {
+    const linkedMaterialTitles = activeQuestionLinks
+      .slice(0, 2)
+      .map((link) => materials.find((material) => material.id === link.material_id)?.title ?? link.material_id)
+      .join(", ");
+    actions.push({
+      id: `materials-${activeQuestionId}`,
+      kind: "materials",
+      title: text(locale, "operatorCheckSources"),
+      detail: linkedMaterialTitles || text(locale, "groundedMaterials"),
+      priority: nextUnansweredQuestion ? "medium" : "high",
+      targetTab: "materials",
+    });
+  }
+
+  const urgentFinding = findings.find((finding) => finding.severity === "high") ?? findings[0];
+  if (urgentFinding) {
+    const targetQuestionId = urgentFinding.linked_ids.find((linkedId) =>
+      questions.some((question) => question.id === linkedId),
+    );
+    const targetTopicId = urgentFinding.linked_ids.find((linkedId) => linkedId.startsWith("topic-"));
+    const questionForTopic = targetTopicId
+      ? questions.find((question) => question.topicIds.includes(targetTopicId))
+      : undefined;
+    actions.push({
+      id: `finding-${urgentFinding.category}-${urgentFinding.title}`,
+      kind: "review",
+      title: text(locale, "operatorResolveFinding"),
+      detail: findingTitle(urgentFinding, locale),
+      priority: urgentFinding.severity === "high" ? "high" : "medium",
+      targetQuestionId: targetQuestionId ?? questionForTopic?.id,
+      targetTab: targetQuestionId || questionForTopic ? undefined : "review",
+    });
+  }
+
+  if (evidenceMap?.summary.material_only_topics) {
+    actions.push({
+      id: "material-only-topics",
+      kind: "materials",
+      title: text(locale, "operatorTurnMaterialIntoQuestion"),
+      detail: `${evidenceMap.summary.material_only_topics} ${text(locale, "statusMaterialOnly")}`,
+      priority: "medium",
+      targetTab: "materials",
+    });
+  }
+
+  const uniqueActions = new Map<string, OperatorAction>();
+  for (const action of actions) {
+    uniqueActions.set(action.id, action);
+  }
+
+  return Array.from(uniqueActions.values())
+    .sort((left, right) => priorityRank(left.priority) - priorityRank(right.priority))
+    .slice(0, 4);
+}
+
+function priorityRank(priority: OperatorAction["priority"]): number {
+  if (priority === "high") {
+    return 0;
+  }
+  if (priority === "medium") {
+    return 1;
+  }
+  return 2;
 }
 
 function CaseCatalogPanel({
