@@ -246,13 +246,25 @@ The project owner should evaluate:
 
 ## Current STOP
 
+Milestone 6: Export integrity model artifact provenance has reached its first review point.
+
+The project owner should evaluate:
+
+- whether model artifact references should remain optional or become mandatory for AI-assisted exports,
+- whether verification without `workspace_root_path` should fail, as it does now, or degrade to file-export-only verification,
+- whether export manifests should be digitally signed or timestamped before non-synthetic material is introduced,
+- whether export manifests should include full audit event snapshots, not only file and model artifact references,
+- whether UI export controls should expose provenance options before the first packaged desktop prototype.
+
+## Current STOP
+
 Milestone 6: Hash-chained model artifact manifests has reached its first review point.
 
 The project owner should evaluate:
 
 - whether invalid artifact manifest chains should remain a hard write blocker,
 - whether old prototype manifests without record hashes should be migrated manually or treated as invalid,
-- whether model artifact records should now be included in export integrity manifests,
+- whether optional model artifact references in export integrity manifests are sufficient before signed exports,
 - whether the UI should expose a dedicated artifact provenance view,
 - whether prompt/context/output artifact capture should become mandatory before any real local model call.
 

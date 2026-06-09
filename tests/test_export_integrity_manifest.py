@@ -5,10 +5,17 @@ from pathlib import Path
 
 from interrogaition.export.integrity_manifest import (
     ExportIntegrityError,
+    calculate_manifest_hash,
     create_export_manifest,
+    create_model_artifact_manifest_reference,
     read_export_manifest,
     verify_export_manifest,
     write_export_manifest,
+)
+from interrogaition.security.case_workspace import CaseWorkspaceManager
+from interrogaition.security.model_artifacts import (
+    ensure_model_artifact_isolation,
+    write_model_artifact,
 )
 
 
@@ -38,6 +45,100 @@ class ExportIntegrityManifestTest(unittest.TestCase):
         self.assertIsNotNone(loaded.manifest_hash)
         self.assertTrue(verification.verified)
         self.assertTrue(verification.manifest_hash_valid)
+
+    def test_reads_and_verifies_legacy_v1_manifest(self) -> None:
+        root = _export_root("legacy-v1")
+        report_path = root / "report.md"
+        report_path.write_text("legacy\n", encoding="utf-8")
+        current = create_export_manifest(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(report_path,),
+            root_path=root,
+        )
+        legacy = replace(current, schema_version=1, model_artifacts=None, manifest_hash=None)
+        legacy = replace(legacy, manifest_hash=calculate_manifest_hash(legacy))
+        manifest_path = root / "manifest-v1.json"
+        write_export_manifest(manifest_path, legacy)
+
+        loaded = read_export_manifest(manifest_path)
+        verification = verify_export_manifest(loaded, root_path=root)
+
+        self.assertEqual(loaded.schema_version, 1)
+        self.assertIsNone(loaded.model_artifacts)
+        self.assertTrue(verification.verified)
+
+    def test_includes_and_verifies_model_artifact_manifest_reference(self) -> None:
+        root = _export_root("model-artifacts")
+        report_path = root / "report.md"
+        report_path.write_text("# Report\n", encoding="utf-8")
+        workspace = _workspace_with_model_artifact("export-artifact-reference")
+
+        manifest = create_export_manifest(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(report_path,),
+            root_path=root,
+            model_artifacts=create_model_artifact_manifest_reference(workspace),
+        )
+        verification = verify_export_manifest(
+            manifest,
+            root_path=root,
+            workspace_root_path=workspace.root_path,
+        )
+
+        self.assertTrue(verification.verified)
+        self.assertIsNotNone(manifest.model_artifacts)
+        self.assertEqual(manifest.schema_version, 2)
+        self.assertEqual(manifest.model_artifacts.record_count, 1)
+        self.assertTrue(manifest.model_artifacts.chain_valid)
+        self.assertEqual(len(manifest.model_artifacts.records[0].record_hash or ""), 64)
+
+    def test_detects_changed_model_artifact_file(self) -> None:
+        root = _export_root("changed-model-artifact")
+        report_path = root / "report.md"
+        report_path.write_text("# Report\n", encoding="utf-8")
+        workspace = _workspace_with_model_artifact("changed-artifact")
+        manifest = create_export_manifest(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(report_path,),
+            root_path=root,
+            model_artifacts=create_model_artifact_manifest_reference(workspace),
+        )
+        artifact_path = workspace.root_path / manifest.model_artifacts.records[0].relative_path
+        artifact_path.write_text("tampered\n", encoding="utf-8")
+
+        verification = verify_export_manifest(
+            manifest,
+            root_path=root,
+            workspace_root_path=workspace.root_path,
+        )
+
+        self.assertFalse(verification.verified)
+        self.assertTrue(verification.model_artifact_manifest_hash_valid)
+        self.assertEqual(
+            verification.changed_model_artifact_files,
+            (manifest.model_artifacts.records[0].relative_path,),
+        )
+
+    def test_requires_workspace_root_for_model_artifact_verification(self) -> None:
+        root = _export_root("model-artifact-workspace-required")
+        report_path = root / "report.md"
+        report_path.write_text("# Report\n", encoding="utf-8")
+        workspace = _workspace_with_model_artifact("workspace-required")
+        manifest = create_export_manifest(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(report_path,),
+            root_path=root,
+            model_artifacts=create_model_artifact_manifest_reference(workspace),
+        )
+
+        verification = verify_export_manifest(manifest, root_path=root)
+
+        self.assertFalse(verification.verified)
+        self.assertIn("workspace_root_path is required", verification.unexpected_errors[0])
 
     def test_detects_changed_export_file(self) -> None:
         root = _export_root("changed")
@@ -91,6 +192,24 @@ def _export_root(name: str) -> Path:
     root = TEST_OUTPUT_ROOT / f"{name}-{uuid.uuid4()}"
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+def _workspace_with_model_artifact(name: str):
+    workspace = CaseWorkspaceManager(_export_root(f"workspace-root-{name}")).create_workspace(
+        case_id="case-001",
+        created_by="investigator-001",
+        workspace_id=f"workspace-{uuid.uuid4().hex[:10]}",
+    )
+    ensure_model_artifact_isolation(workspace, created_by="admin-001")
+    write_model_artifact(
+        workspace,
+        artifact_type="prompt",
+        content='{"instruction":"export me"}',
+        content_type="application/json",
+        source="unit-test",
+        created_by="model-audit-test",
+    )
+    return workspace
 
 
 if __name__ == "__main__":

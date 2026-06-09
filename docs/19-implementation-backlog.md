@@ -116,7 +116,7 @@ Success criteria:
 
 ## Milestone 6: Security Path
 
-Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, environment health reporting, workspace-local model artifact isolation with hash-chained deduplicating artifact write manifests, grounded suggestion prompt/context/output artifact capture, export integrity manifests, a workspace material register, bounded material previews, deterministic material-question grounding links with matched-term audit details, audited material-question link decisions, a first topic-level case evidence map, an advisory Evidence Alignment Indicator, an AI grounding context pack, live-visible grounded suggestions, and audited grounded-suggestion decisions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
+Status: started. SQLite session persistence, a hash-chained append-only audit log, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, environment health reporting, workspace-local model artifact isolation with hash-chained deduplicating artifact write manifests, grounded suggestion prompt/context/output artifact capture, export integrity manifests with optional model artifact provenance references, a workspace material register, bounded material previews, deterministic material-question grounding links with matched-term audit details, audited material-question link decisions, a first topic-level case evidence map, an advisory Evidence Alignment Indicator, an AI grounding context pack, live-visible grounded suggestions, and audited grounded-suggestion decisions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
 
 Tasks:
 
@@ -141,6 +141,7 @@ Tasks:
 - workspace-local model artifact isolation,
 - hash-chained model artifact write manifests,
 - prompt/context/output artifact capture with hash deduplication,
+- model artifact provenance references in export integrity manifests,
 - air-gapped mode policy.
 
 Success criteria:

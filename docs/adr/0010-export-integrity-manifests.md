@@ -37,6 +37,9 @@ It can verify the manifest with:
 python -m interrogaition.cli verify-export <manifest.json> --root <export_root>
 ```
 
+ADR 0025 extends this mechanism with optional model artifact provenance references
+for workspace-backed exports.
+
 ## Consequences
 
 - Export integrity is demonstrable without changing the report format.

@@ -55,13 +55,13 @@ Grounded suggestions now have a stronger provenance chain:
 Deterministic tests remain independent of Ollama. Real model output remains blocked by runtime
 configuration and product review gates.
 
-The current prototype does not yet hash-chain the artifact manifest, include model artifacts in
-export integrity manifests, or require model artifact isolation before every suggestion request.
-Those are future security/product decisions.
+Later ADRs hash-chain the artifact manifest and allow export integrity manifests to include
+model artifact provenance references. The current prototype still does not require model
+artifact isolation before every suggestion request.
 
 ## Follow-up
 
 - Decide whether artifact capture should become mandatory before any real model experiment.
 - Prompt artifacts were added later by ADR 0023.
-- Decide whether artifact manifests should be included in export integrity manifests.
+- Model artifact provenance references were added to export integrity manifests by ADR 0025.
 - Decide how artifact records should be displayed in a future audit/provenance view.

@@ -34,6 +34,13 @@ python -m interrogaition.cli review ..\data\synthetic\case-001\case.json --outpu
 python -m interrogaition.cli verify-export ..\test-output\manifest.json --root ..\test-output
 ```
 
+Report export with model artifact provenance, when a workspace is available:
+
+```powershell
+python -m interrogaition.cli review ..\data\synthetic\case-001\case.json --output ..\test-output\report.md --manifest ..\test-output\manifest.json --created-by investigator-001 --workspace-root ..\local-data\workspaces\case-workspace --include-model-artifacts
+python -m interrogaition.cli verify-export ..\test-output\manifest.json --root ..\test-output --workspace-root ..\local-data\workspaces\case-workspace
+```
+
 Pipeline:
 
 1. Wczytuje syntetyczna sprawe z JSON.
@@ -42,6 +49,7 @@ Pipeline:
 4. Wykrywa proste konflikty w ustrukturyzowanych twierdzeniach.
 5. Generuje raport Markdown.
 6. Opcjonalnie zapisuje manifest integralnosci eksportu.
+7. Opcjonalnie dolacza referencje do hash-chain manifestu artefaktow modelu.
 
 Testy:
 
@@ -84,7 +92,7 @@ backend/local-data/interrogaition.sqlite3
 
 Session start, answer creation, and review refresh events are also written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage. The storage boundary is designed so a later SQLCipher or encrypted-workspace adapter can replace the plain SQLite file.
 
-Markdown exports can be accompanied by an integrity manifest. The manifest stores SHA-256 hashes and sizes for exported files plus a hash of the manifest payload itself.
+Markdown exports can be accompanied by an integrity manifest. The manifest stores SHA-256 hashes and sizes for exported files plus a hash of the manifest payload itself. Schema v2 can also include a workspace model-artifact manifest reference: manifest file hash, artifact record hashes, artifact file hashes, chain validity, and latest artifact record hash.
 
 ## Case workspaces
 

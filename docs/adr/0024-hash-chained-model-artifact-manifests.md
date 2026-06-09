@@ -45,12 +45,11 @@ The project now has two independent local integrity chains:
 This improves forensic defensibility of model provenance without enabling real model
 output for institutional live use.
 
-The prototype still does not include model artifact records in export integrity manifests.
-That is now the next natural security step.
+Export integrity manifests can include model artifact provenance references as of ADR 0025.
 
 ## Follow-up
 
-- Decide whether model artifact records should be included in export integrity manifests.
+- Model artifact provenance references were added to export integrity manifests by ADR 0025.
 - Decide whether old prototype manifests should get an explicit migration command.
 - Decide whether invalid artifact chains should block grounded suggestion generation entirely, not only artifact writes.
 - Decide whether the frontend needs a dedicated provenance view for artifact chains.

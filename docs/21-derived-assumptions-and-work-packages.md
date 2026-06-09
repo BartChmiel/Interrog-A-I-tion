@@ -60,6 +60,7 @@ Implemented:
 - workspace-local model artifact isolation,
 - hash-chained deduplicating model artifact write manifests,
 - grounded suggestion prompt/context/output artifact capture,
+- model artifact provenance references in export integrity manifests,
 - live-visible grounded suggestions endpoint,
 - citation validation against `allowed_source_ids`,
 - audit metadata for prompt version, model id, prompt/context/output hashes, and captured artifact ids,
@@ -72,7 +73,7 @@ Next:
 - connect Ollama behind the same grounded service in controlled test mode after runtime approval,
 - block institutional live use of real model output until a STOP review,
 - decide whether artifact capture should become mandatory before every real model call,
-- decide whether model artifact records should be included in export integrity manifests,
+- decide whether export integrity manifests should become signed or timestamped,
 - add model selection persistence and runtime policy configuration.
 
 Strategic risk:
