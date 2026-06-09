@@ -1,0 +1,64 @@
+{
+  "materials": [
+    {
+      "id": "case-001-protocol-note",
+      "title": "Initial witness protocol note",
+      "title_i18n": {
+        "en": "Initial witness protocol note",
+        "pl": "Wstępna notatka z protokołu świadka"
+      },
+      "description": "Starter protocol excerpt used to ground the opening interview plan.",
+      "description_i18n": {
+        "en": "Starter protocol excerpt used to ground the opening interview plan.",
+        "pl": "Fragment protokołu startowego używany do powiązania początkowego planu pytań."
+      },
+      "source_type": "case_protocol",
+      "tags": ["protocol", "witness", "bicycle", "library"],
+      "content": "Synthetic protocol excerpt. Witness reports seeing a man near the bicycle stand in front of the library around 19:45. The person left with a dark bicycle. Witness observed from the sidewalk across the street and describes this as direct observation.",
+      "content_i18n": {
+        "en": "Synthetic protocol excerpt. Witness reports seeing a man near the bicycle stand in front of the library around 19:45. The person left with a dark bicycle. Witness observed from the sidewalk across the street and describes this as direct observation.",
+        "pl": "Syntetyczny fragment protokołu. Świadek podaje, że około 19:45 widział mężczyznę przy stojaku rowerowym przed biblioteką. Osoba odeszła z ciemnym rowerem. Świadek obserwował sytuację z chodnika po drugiej stronie ulicy i opisuje to jako obserwację bezpośrednią."
+      }
+    },
+    {
+      "id": "case-001-security-camera-note",
+      "title": "Campus camera check note",
+      "title_i18n": {
+        "en": "Campus camera check note",
+        "pl": "Notatka o sprawdzeniu kamer kampusu"
+      },
+      "description": "Synthetic note indicating a potential recording source.",
+      "description_i18n": {
+        "en": "Synthetic note indicating a potential recording source.",
+        "pl": "Syntetyczna notatka wskazująca potencjalne źródło nagrania."
+      },
+      "source_type": "external_document",
+      "tags": ["camera", "recording", "cctv", "library"],
+      "content": "Synthetic security note. Camera C-12 covers the library entrance and part of the bicycle stand. Retention window may include 19:40-20:20. Recording has not yet been reviewed or secured in this training scenario.",
+      "content_i18n": {
+        "en": "Synthetic security note. Camera C-12 covers the library entrance and part of the bicycle stand. Retention window may include 19:40-20:20. Recording has not yet been reviewed or secured in this training scenario.",
+        "pl": "Syntetyczna notatka ochrony. Kamera C-12 obejmuje wejście do biblioteki oraz część stojaka rowerowego. Okno retencji może obejmować godziny 19:40-20:20. Nagranie nie zostało jeszcze przejrzane ani zabezpieczone w tym scenariuszu treningowym."
+      }
+    },
+    {
+      "id": "case-001-patrol-log",
+      "title": "Patrol arrival log",
+      "title_i18n": {
+        "en": "Patrol arrival log",
+        "pl": "Log przyjazdu patrolu"
+      },
+      "description": "Synthetic follow-up note containing a later time reference.",
+      "description_i18n": {
+        "en": "Synthetic follow-up note containing a later time reference.",
+        "pl": "Syntetyczna notatka uzupełniająca z późniejszym odniesieniem czasowym."
+      },
+      "source_type": "text_note",
+      "tags": ["time", "patrol", "location"],
+      "content": "Synthetic patrol log. Patrol reached the library area at 20:22. Bicycle stand was checked. No dark bicycle matching the witness description was found nearby. The log does not establish the event time.",
+      "content_i18n": {
+        "en": "Synthetic patrol log. Patrol reached the library area at 20:22. Bicycle stand was checked. No dark bicycle matching the witness description was found nearby. The log does not establish the event time.",
+        "pl": "Syntetyczny log patrolu. Patrol dotarł w rejon biblioteki o 20:22. Sprawdzono stojak rowerowy. W pobliżu nie znaleziono ciemnego roweru odpowiadającego opisowi świadka. Log nie ustala czasu zdarzenia."
+      }
+    }
+  ]
+}

@@ -22,6 +22,7 @@ import type {
   MaterialSourceType,
   MaterialVerification,
   RuntimeConfig,
+  SeedMaterialsResponse,
   SessionReviewResponse,
   WorkspaceAccessDecision,
   WorkspaceResponse,
@@ -194,6 +195,20 @@ export async function ensureModelArtifactIsolation(
 
 export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`);
+}
+
+export async function seedWorkspaceMaterials(
+  config: RuntimeConfig,
+  locale: string,
+): Promise<SeedMaterialsResponse> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials/seed`, {
+    method: "POST",
+    body: JSON.stringify({
+      created_by: "local-ui",
+      locale,
+      role: "investigator",
+    }),
+  });
 }
 
 export async function loadWorkspaceMaterialPreview(

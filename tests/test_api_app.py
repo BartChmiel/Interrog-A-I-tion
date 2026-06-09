@@ -11,6 +11,7 @@ from interrogaition.api.app import (
     ModelArtifactIsolationRequest,
     ModelArtifactWriteRequest,
     RegisterMaterialRequest,
+    SeedWorkspaceMaterialsRequest,
     StartSessionRequest,
     create_app,
 )
@@ -112,6 +113,58 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(cases["case-002"]["question_count"], 6)
         self.assertEqual(cases["case-003"]["topic_count"], 7)
         self.assertGreaterEqual(cases["case-003"]["high_priority_topic_count"], 4)
+
+    def test_case_starter_materials_endpoint_localizes_materials(self) -> None:
+        app = create_app()
+        response = endpoint(app, "list_case_starter_materials")("case-003", locale="pl")
+
+        self.assertEqual(response["case_id"], "case-003")
+        self.assertEqual(len(response["materials"]), 3)
+        self.assertIn("dokumentacji lekowej", response["materials"][0]["title"])
+        self.assertIn("Syntetyczna dokumentacja lekowa", response["materials"][0]["content"])
+
+    def test_seed_workspace_materials_imports_and_skips_existing_materials(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"seed-workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        seed_materials = endpoint(app, "seed_workspace_materials")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-002",
+                created_by="investigator-001",
+                workspace_id="api-seed-workspace-001",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        first_seed = seed_materials(
+            "api-seed-workspace-001",
+            SeedWorkspaceMaterialsRequest(
+                created_by="investigator-001",
+                locale="en",
+                role=WorkspaceRole.INVESTIGATOR,
+            ),
+        )
+        second_seed = seed_materials(
+            "api-seed-workspace-001",
+            SeedWorkspaceMaterialsRequest(
+                created_by="investigator-001",
+                locale="en",
+                role=WorkspaceRole.INVESTIGATOR,
+            ),
+        )
+
+        self.assertEqual(first_seed["imported_count"], 3)
+        self.assertEqual(first_seed["skipped_count"], 0)
+        self.assertEqual(second_seed["imported_count"], 0)
+        self.assertEqual(second_seed["skipped_count"], 3)
+        self.assertEqual(len(second_seed["materials"]), 3)
 
     def test_workspace_endpoint_flow(self) -> None:
         app = create_app(

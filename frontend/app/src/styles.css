@@ -129,7 +129,10 @@ p {
 .grounded-suggestion-actions,
 .environment-health-header,
 .environment-health-summary,
-.environment-health-checks summary {
+.environment-health-checks summary,
+.material-add-panel summary,
+.material-overview-grid,
+.material-overview-grid span {
   display: flex;
   align-items: center;
 }
@@ -449,7 +452,7 @@ h2 {
 }
 
 .case-catalog-list {
-  max-height: 430px;
+  max-height: 310px;
   overflow: auto;
 }
 
@@ -464,7 +467,7 @@ h2 {
 
 .case-sidebar .question-list {
   min-height: 220px;
-  max-height: calc(100vh - 460px);
+  max-height: calc(100vh - 340px);
 }
 
 .case-catalog-item {
@@ -477,7 +480,7 @@ h2 {
   border-radius: var(--radius);
   background: var(--surface-strong);
   color: var(--text);
-  padding: 10px;
+  padding: 9px;
   cursor: pointer;
   transition:
     border-color 0.16s ease,
@@ -539,6 +542,10 @@ h2 {
 }
 
 .case-catalog-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
@@ -1338,13 +1345,75 @@ h2 {
   gap: 6px;
 }
 
+.material-overview,
+.material-add-panel {
+  margin: 11px 11px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+}
+
+.material-overview {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+}
+
+.material-overview > strong {
+  color: var(--heading);
+  font-size: 13px;
+}
+
+.material-overview-grid {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.material-overview-grid span {
+  min-height: 28px;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--muted-strong);
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.material-add-panel {
+  overflow: hidden;
+}
+
+.material-add-panel summary {
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 11px;
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.material-add-panel summary::marker {
+  color: var(--muted);
+}
+
+.material-add-panel summary em {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 400;
+}
+
 .material-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(120px, 0.55fr);
   gap: 10px;
   padding: 11px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-strong);
+  border-top: 1px solid var(--line);
+  background: #fff;
 }
 
 .material-form label {
@@ -1409,6 +1478,13 @@ h2 {
 
 .material-facts strong {
   font-size: 12px;
+}
+
+.material-description {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .material-tags span {

@@ -131,6 +131,10 @@ from interrogaition.storage.material_registry import (
 )
 from interrogaition.storage.session_store import SessionStore
 from interrogaition.storage.sqlite_session_store import SQLiteSessionStore
+from interrogaition.storage.synthetic_material_loader import (
+    SyntheticMaterial,
+    load_synthetic_materials,
+)
 
 
 SYNTHETIC_CASES_ROOT = PROJECT_ROOT / "data" / "synthetic"
@@ -178,6 +182,13 @@ class RegisterMaterialRequest:
     tags: list[str] = field(default_factory=list)
     mime_type: str = "text/plain"
     original_name: str | None = None
+    role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
+@dataclass(frozen=True)
+class SeedWorkspaceMaterialsRequest:
+    created_by: str = "local-ui"
+    locale: str = "en"
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
 
 
@@ -300,6 +311,17 @@ def create_app(
                 _case_catalog_item(case)
                 for case in _list_synthetic_cases(locale=locale)
             ]
+        }
+
+    @app.get("/cases/{case_id}/starter-materials")
+    def list_case_starter_materials(
+        case_id: str,
+        locale: str = Query(default="en"),
+    ) -> dict[str, Any]:
+        _load_synthetic_case(case_id, locale=locale)
+        return {
+            "case_id": case_id,
+            "materials": _to_jsonable(_load_synthetic_starter_materials(case_id, locale=locale)),
         }
 
     @app.get("/security/encryption")
@@ -490,6 +512,70 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         return {"materials": _to_jsonable(materials)}
+
+    @app.post("/workspaces/{workspace_id}/materials/seed")
+    def seed_workspace_materials(
+        workspace_id: str,
+        request: SeedWorkspaceMaterialsRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            registry = MaterialRegistry(workspace)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.IMPORT_MATERIAL,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        starter_materials = _load_synthetic_starter_materials(
+            workspace.manifest.case_id,
+            locale=request.locale,
+        )
+        try:
+            existing_ids = {material.id for material in registry.list_materials()}
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        imported_ids: list[str] = []
+        skipped_ids: list[str] = []
+
+        for material in starter_materials:
+            if material.id in existing_ids:
+                skipped_ids.append(material.id)
+                continue
+            try:
+                registry.register_text_material(
+                    material_id=material.id,
+                    title=material.title,
+                    content=material.content,
+                    created_by=request.created_by,
+                    source_type=material.source_type,
+                    data_sensitivity=DataSensitivity.SYNTHETIC,
+                    description=material.description,
+                    tags=material.tags,
+                )
+            except MaterialRegistryError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            imported_ids.append(material.id)
+            existing_ids.add(material.id)
+
+        try:
+            materials = registry.list_materials()
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return {
+            "materials": _to_jsonable(materials),
+            "imported_count": len(imported_ids),
+            "skipped_count": len(skipped_ids),
+            "imported_ids": imported_ids,
+            "skipped_ids": skipped_ids,
+        }
 
     @app.get("/workspaces/{workspace_id}/materials/{material_id}/preview")
     def get_workspace_material_preview(
@@ -1100,6 +1186,11 @@ def _load_synthetic_case(case_id: str, locale: str) -> Case:
         raise HTTPException(status_code=404, detail="Synthetic case not found.")
 
     return load_case_from_json(path, locale=locale)
+
+
+def _load_synthetic_starter_materials(case_id: str, locale: str) -> tuple[SyntheticMaterial, ...]:
+    path = SYNTHETIC_CASES_ROOT / case_id / "materials.json"
+    return load_synthetic_materials(path, locale=locale)
 
 
 def _list_synthetic_cases(locale: str) -> tuple[Case, ...]:

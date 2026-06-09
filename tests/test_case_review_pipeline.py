@@ -4,6 +4,7 @@ from pathlib import Path
 from interrogaition.analysis.interview_review import review_case
 from interrogaition.export.markdown_report import render_review_markdown
 from interrogaition.storage.json_case_loader import load_case_from_json
+from interrogaition.storage.synthetic_material_loader import load_synthetic_materials
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +49,17 @@ class CaseReviewPipelineTest(unittest.TestCase):
         self.assertIn("Prosz", polish_case.questions[0].text)
         self.assertIn("service door", english_case.answers[0].claims[1].source_text)
         self.assertIn("Drzwi", polish_case.answers[0].claims[1].source_text)
+
+    def test_loads_starter_materials_for_each_synthetic_case(self) -> None:
+        for case_id in ("case-001", "case-002", "case-003"):
+            materials = load_synthetic_materials(
+                SYNTHETIC_ROOT / case_id / "materials.json",
+                locale="pl",
+            )
+
+            self.assertEqual(len(materials), 3)
+            self.assertTrue(all(material.id.startswith(case_id) for material in materials))
+            self.assertTrue(all(material.content.strip() for material in materials))
 
     def test_review_detects_missing_topic_neutrality_and_inconsistency(self) -> None:
         case = load_case_from_json(CASE_PATH)

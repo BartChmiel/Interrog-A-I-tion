@@ -1,0 +1,64 @@
+{
+  "materials": [
+    {
+      "id": "case-002-alarm-panel-log",
+      "title": "Alarm panel log excerpt",
+      "title_i18n": {
+        "en": "Alarm panel log excerpt",
+        "pl": "Fragment logu panelu alarmowego"
+      },
+      "description": "Synthetic system log for alarm timing and source-of-knowledge checks.",
+      "description_i18n": {
+        "en": "Synthetic system log for alarm timing and source-of-knowledge checks.",
+        "pl": "Syntetyczny log systemowy do sprawdzenia czasu alarmu i źródła wiedzy."
+      },
+      "source_type": "external_document",
+      "tags": ["alarm", "log", "time", "source"],
+      "content": "Synthetic alarm panel log. Service corridor sensor changed state at 22:14. Alarm event registered at 22:28. Log source is the local alarm panel export prepared after the incident.",
+      "content_i18n": {
+        "en": "Synthetic alarm panel log. Service corridor sensor changed state at 22:14. Alarm event registered at 22:28. Log source is the local alarm panel export prepared after the incident.",
+        "pl": "Syntetyczny log panelu alarmowego. Czujnik korytarza serwisowego zmienił stan o 22:14. Zdarzenie alarmowe zarejestrowano o 22:28. Źródłem jest lokalny eksport z panelu alarmowego przygotowany po incydencie."
+      }
+    },
+    {
+      "id": "case-002-service-door-note",
+      "title": "Service door inspection note",
+      "title_i18n": {
+        "en": "Service door inspection note",
+        "pl": "Notatka z kontroli drzwi serwisowych"
+      },
+      "description": "Synthetic note that creates a cross-check for the door status account.",
+      "description_i18n": {
+        "en": "Synthetic note that creates a cross-check for the door status account.",
+        "pl": "Syntetyczna notatka tworząca punkt kontroli dla relacji o stanie drzwi."
+      },
+      "source_type": "text_note",
+      "tags": ["access", "door", "service", "locked", "open"],
+      "content": "Synthetic inspection note. The service door was checked by shift supervisor at 22:36 and found locked. The same note states that staff reported the door may have been open before the alarm.",
+      "content_i18n": {
+        "en": "Synthetic inspection note. The service door was checked by shift supervisor at 22:36 and found locked. The same note states that staff reported the door may have been open before the alarm.",
+        "pl": "Syntetyczna notatka z kontroli. Drzwi serwisowe sprawdził kierownik zmiany o 22:36 i stwierdził, że były zamknięte. Ta sama notatka wskazuje, że personel zgłaszał możliwość otwarcia drzwi przed alarmem."
+      }
+    },
+    {
+      "id": "case-002-camera-layout",
+      "title": "Pharmacy camera layout note",
+      "title_i18n": {
+        "en": "Pharmacy camera layout note",
+        "pl": "Notatka o rozmieszczeniu kamer w aptece"
+      },
+      "description": "Synthetic note identifying possible recording coverage.",
+      "description_i18n": {
+        "en": "Synthetic note identifying possible recording coverage.",
+        "pl": "Syntetyczna notatka identyfikująca możliwe pokrycie nagraniem."
+      },
+      "source_type": "external_document",
+      "tags": ["camera", "recording", "cctv", "corridor"],
+      "content": "Synthetic camera layout. Camera PH-02 covers the customer area but not the full service corridor. Camera PH-03 may partially cover the corridor entrance. Recording export status is unknown.",
+      "content_i18n": {
+        "en": "Synthetic camera layout. Camera PH-02 covers the customer area but not the full service corridor. Camera PH-03 may partially cover the corridor entrance. Recording export status is unknown.",
+        "pl": "Syntetyczny opis rozmieszczenia kamer. Kamera PH-02 obejmuje salę sprzedaży, ale nie cały korytarz serwisowy. Kamera PH-03 może częściowo obejmować wejście do korytarza. Status eksportu nagrania jest nieznany."
+      }
+    }
+  ]
+}

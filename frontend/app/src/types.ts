@@ -273,6 +273,14 @@ export type MaterialListResponse = {
   materials: MaterialRecord[];
 };
 
+export type SeedMaterialsResponse = {
+  materials: MaterialRecord[];
+  imported_count: number;
+  skipped_count: number;
+  imported_ids: string[];
+  skipped_ids: string[];
+};
+
 export type MaterialPreview = {
   material_id: string;
   title: string;

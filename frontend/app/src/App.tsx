@@ -47,6 +47,7 @@ import {
   recordMaterialQuestionLinkDecision,
   registerWorkspaceMaterial,
   runLocalModelSmoke,
+  seedWorkspaceMaterials,
   startSession,
   verifyWorkspaceMaterial,
   type ApiError,
@@ -253,6 +254,10 @@ export function App() {
         loadLocalModelConfig(config),
         ensureWorkspace(config),
       ]);
+      await seedWorkspaceMaterials(config, locale).catch((error) => {
+        console.warn("Could not seed starter materials.", error);
+        return null;
+      });
       const [
         access,
         artifactManifest,
@@ -1513,6 +1518,11 @@ function MaterialsPanel({
   verifications: Record<string, MaterialVerification>;
 }) {
   const disabled = apiMode !== "online" || isSubmitting;
+  const acceptedLinkCount = Object.values(decisions).filter((decision) => decision === "accepted").length;
+  const pendingLinkCount = Math.max(0, links.length - Object.keys(decisions).length);
+  const verifiedMaterialCount = materials.filter(
+    (material) => materialVerificationState(verifications[material.id]) === "ready",
+  ).length;
 
   return (
     <section>
@@ -1521,63 +1531,31 @@ function MaterialsPanel({
         meta={`${materials.length} ${text(locale, "registered")}`}
         compact
       />
-      <form
-        className="material-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onSubmit();
-        }}
-      >
-        <label>
-          <span>{text(locale, "materialTitle")}</span>
-          <input
-            disabled={disabled}
-            placeholder={text(locale, "materialTitlePlaceholder")}
-            value={draft.title}
-            onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
-          />
-        </label>
-        <label>
-          <span>{text(locale, "materialType")}</span>
-          <select
-            disabled={disabled}
-            value={draft.sourceType}
-            onChange={(event) =>
-              onDraftChange({ ...draft, sourceType: event.target.value as MaterialSourceType })
-            }
-          >
-            {materialSourceTypes.map((sourceType) => (
-              <option key={sourceType} value={sourceType}>
-                {materialSourceLabel(sourceType, locale)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="material-form-wide">
-          <span>{text(locale, "materialContent")}</span>
-          <textarea
-            disabled={disabled}
-            placeholder={text(locale, "materialContentPlaceholder")}
-            rows={4}
-            value={draft.content}
-            onChange={(event) => onDraftChange({ ...draft, content: event.target.value })}
-          />
-        </label>
-        <label className="material-form-wide">
-          <span>{text(locale, "materialTags")}</span>
-          <input
-            disabled={disabled}
-            placeholder={text(locale, "materialTagsPlaceholder")}
-            value={draft.tags}
-            onChange={(event) => onDraftChange({ ...draft, tags: event.target.value })}
-          />
-        </label>
-        <button disabled={disabled} type="submit">
-          <Plus size={15} />
-          {isSubmitting ? "..." : text(locale, "addMaterial")}
-        </button>
-        <span className="material-mode">{text(locale, "syntheticTextOnly")}</span>
-      </form>
+      <div className="material-overview">
+        <strong>{text(locale, "materialOverview")}</strong>
+        <div className="material-overview-grid">
+          <span>
+            <FileText size={14} />
+            {materials.length} {text(locale, "materialRecordCount")}
+          </span>
+          <span>
+            <Network size={14} />
+            {links.length} {text(locale, "materialLinksShort")}
+          </span>
+          <span>
+            <CheckCircle2 size={14} />
+            {acceptedLinkCount} {text(locale, "acceptedLinks")}
+          </span>
+          <span>
+            <ShieldQuestion size={14} />
+            {pendingLinkCount} {text(locale, "pendingLinks")}
+          </span>
+          <span>
+            <ShieldCheck size={14} />
+            {verifiedMaterialCount} {text(locale, "verifiedMaterials")}
+          </span>
+        </div>
+      </div>
 
       <div className="material-list">
         {materials.length ? (
@@ -1600,6 +1578,69 @@ function MaterialsPanel({
           <p className="empty-state">{text(locale, "noMaterials")}</p>
         )}
       </div>
+      <details className="material-add-panel">
+        <summary>
+          <Plus size={15} />
+          <span>{text(locale, "addOwnMaterial")}</span>
+          <em>{text(locale, "syntheticTextOnly")}</em>
+        </summary>
+        <form
+          className="material-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          <label>
+            <span>{text(locale, "materialTitle")}</span>
+            <input
+              disabled={disabled}
+              placeholder={text(locale, "materialTitlePlaceholder")}
+              value={draft.title}
+              onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>{text(locale, "materialType")}</span>
+            <select
+              disabled={disabled}
+              value={draft.sourceType}
+              onChange={(event) =>
+                onDraftChange({ ...draft, sourceType: event.target.value as MaterialSourceType })
+              }
+            >
+              {materialSourceTypes.map((sourceType) => (
+                <option key={sourceType} value={sourceType}>
+                  {materialSourceLabel(sourceType, locale)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="material-form-wide">
+            <span>{text(locale, "materialContent")}</span>
+            <textarea
+              disabled={disabled}
+              placeholder={text(locale, "materialContentPlaceholder")}
+              rows={4}
+              value={draft.content}
+              onChange={(event) => onDraftChange({ ...draft, content: event.target.value })}
+            />
+          </label>
+          <label className="material-form-wide">
+            <span>{text(locale, "materialTags")}</span>
+            <input
+              disabled={disabled}
+              placeholder={text(locale, "materialTagsPlaceholder")}
+              value={draft.tags}
+              onChange={(event) => onDraftChange({ ...draft, tags: event.target.value })}
+            />
+          </label>
+          <button disabled={disabled} type="submit">
+            <Plus size={15} />
+            {isSubmitting ? "..." : text(locale, "addMaterial")}
+          </button>
+        </form>
+      </details>
     </section>
   );
 }
@@ -1650,6 +1691,9 @@ function MaterialCard({
           {text(locale, "hash")}: <strong>{shortHash(material.sha256)}</strong>
         </span>
       </div>
+      {material.description ? (
+        <p className="material-description">{material.description}</p>
+      ) : null}
       {material.tags.length ? (
         <div className="material-tags">
           {material.tags.map((tag) => (
