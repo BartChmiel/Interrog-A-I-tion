@@ -1,6 +1,7 @@
 import type {
   CaseCatalogResponse,
   CaseReviewResponse,
+  CaseStarterMaterialsResponse,
   EncryptionStatus,
   EnvironmentHealth,
   GroundedSuggestionDecision,
@@ -101,6 +102,13 @@ export async function loadCaseCatalog(config: RuntimeConfig, locale: string): Pr
 
 export async function loadCaseReview(config: RuntimeConfig, locale: string): Promise<CaseReviewResponse> {
   return fetchJson(config, `/cases/${config.caseId}/review?locale=${locale}`);
+}
+
+export async function loadCaseStarterMaterials(
+  config: RuntimeConfig,
+  locale: string,
+): Promise<CaseStarterMaterialsResponse> {
+  return fetchJson(config, `/cases/${config.caseId}/starter-materials?locale=${locale}`);
 }
 
 export async function startSession(config: RuntimeConfig): Promise<InterviewSession> {

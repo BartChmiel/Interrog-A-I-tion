@@ -33,6 +33,7 @@ import {
   ensureWorkspace,
   loadCaseCatalog,
   loadCaseReview,
+  loadCaseStarterMaterials,
   loadEncryptionStatus,
   loadEnvironmentHealth,
   loadEvidenceMap,
@@ -67,6 +68,7 @@ import type {
   AuditEvent,
   CaseCatalogItem,
   CaseData,
+  CaseTopic,
   EncryptionStatus,
   EnvironmentHealth,
   EnvironmentHealthState,
@@ -79,6 +81,7 @@ import type {
   GroundedSuggestionWarning,
   Indicator,
   InterviewSession,
+  InterviewReview,
   Locale,
   LocalModelConfig,
   LocalModelSmokeResult,
@@ -97,6 +100,7 @@ import type {
   ReviewFinding,
   RuntimeConfig,
   SessionAuditResponse,
+  StarterMaterial,
   WorkspaceAccessDecision,
   WorkspaceAuditResponse,
   WorkspaceResponse,
@@ -154,7 +158,9 @@ export function App() {
   const [statusKey, setStatusKey] = useState<CopyKey>("localDemo");
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [caseCatalog, setCaseCatalog] = useState<CaseCatalogItem[]>(seedCaseCatalog[locale]);
+  const [caseStarterMaterials, setCaseStarterMaterials] = useState<StarterMaterial[]>([]);
   const [session, setSession] = useState<InterviewSession | null>(null);
+  const [review, setReview] = useState<InterviewReview | null>(null);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
@@ -276,15 +282,18 @@ export function App() {
     setStatusKey("connecting");
 
     try {
-      const [catalog, caseReview] = await Promise.all([
+      const [catalog, caseReview, starterMaterials] = await Promise.all([
         loadCaseCatalog(config, locale).catch(() => ({ cases: seedCaseCatalog[locale] })),
         loadCaseReview(config, locale),
+        loadCaseStarterMaterials(config, locale).catch(() => ({ case_id: config.caseId, materials: [] })),
       ]);
       const firstQuestionId = caseReview.case.questions[0]?.id ?? activeQuestionId;
       setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
+      setCaseStarterMaterials(starterMaterials.materials);
       setActiveQuestionId(firstQuestionId);
       setIndicators(caseReview.indicators);
+      setReview(caseReview.review);
       setFindings(caseReview.review.findings);
       await refreshSecurityState(firstQuestionId);
       await startOrResumeSession(config);
@@ -293,12 +302,15 @@ export function App() {
       setSession(sessionReview.session);
       setSessionAudit(nextSessionAudit);
       setIndicators(sessionReview.indicators);
+      setReview(sessionReview.snapshot.review);
       setFindings(sessionReview.snapshot.review.findings);
       setApiMode("online");
       setStatusKey("online");
     } catch (error) {
       console.warn("Local API unavailable, using static demo data.", error);
       setCaseCatalog(seedCaseCatalog[locale]);
+      setCaseStarterMaterials([]);
+      setReview(null);
       setApiMode("offline");
       setStatusKey("offline");
     }
@@ -509,6 +521,7 @@ export function App() {
       const [
         catalog,
         caseReview,
+        starterMaterials,
         sessionReview,
         materialLinks,
         nextEvidenceMap,
@@ -516,6 +529,7 @@ export function App() {
       ] = await Promise.all([
         loadCaseCatalog(config, nextLocale).catch(() => ({ cases: seedCaseCatalog[nextLocale] })),
         loadCaseReview(config, nextLocale),
+        loadCaseStarterMaterials(config, nextLocale).catch(() => ({ case_id: config.caseId, materials: [] })),
         loadSessionReview(config, nextLocale),
         loadMaterialQuestionLinksOrEmpty(nextLocale),
         loadEvidenceMapOrNull(nextLocale),
@@ -523,11 +537,13 @@ export function App() {
       ]);
       setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
+      setCaseStarterMaterials(starterMaterials.materials);
       if (!caseReview.case.questions.some((question) => question.id === activeQuestionId)) {
         setActiveQuestionId(caseReview.case.questions[0]?.id ?? activeQuestionId);
       }
       setSession(sessionReview.session);
       setIndicators(sessionReview.indicators);
+      setReview(sessionReview.snapshot.review);
       setFindings(sessionReview.snapshot.review.findings);
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
@@ -537,6 +553,8 @@ export function App() {
     } catch (error) {
       console.warn("Could not refresh localized API state.", error);
       setCaseCatalog(seedCaseCatalog[nextLocale]);
+      setCaseStarterMaterials([]);
+      setReview(null);
       setApiMode("offline");
       setStatusKey("offline");
     }
@@ -585,6 +603,7 @@ export function App() {
       ]);
       setSession(sessionReview.session);
       setIndicators(sessionReview.indicators);
+      setReview(sessionReview.snapshot.review);
       setFindings(sessionReview.snapshot.review.findings);
       setEvidenceMap(nextEvidenceMap);
       applyGroundedSuggestions(nextGroundedSuggestions);
@@ -1009,6 +1028,14 @@ export function App() {
             currentCaseId={config.caseId}
             locale={locale}
             onOpenCase={openCase}
+          />
+          <CaseDossierPanel
+            answerCount={answerViews.length}
+            caseData={caseData}
+            locale={locale}
+            review={review}
+            starterMaterials={caseStarterMaterials}
+            onOpenMaterials={() => setActiveOperationsTab("materials")}
           />
           <section className="question-panel">
             <PanelHeader
@@ -1656,6 +1683,22 @@ function operatorPriorityLabel(priority: OperatorAction["priority"], locale: Loc
   return labels[locale][priority];
 }
 
+function topicPriorityLabel(topic: CaseTopic, locale: Locale): string {
+  const labels: Record<Locale, Record<CaseTopic["priority"], string>> = {
+    pl: {
+      high: "wysoki",
+      medium: "średni",
+      low: "niski",
+    },
+    en: {
+      high: "high",
+      medium: "medium",
+      low: "low",
+    },
+  };
+  return labels[locale][topic.priority];
+}
+
 function buildOperatorActions({
   activeQuestionId,
   answerViews,
@@ -1827,6 +1870,108 @@ function CaseCatalogPanel({
             </button>
           );
         })}
+      </div>
+    </section>
+  );
+}
+
+function CaseDossierPanel({
+  answerCount,
+  caseData,
+  locale,
+  review,
+  starterMaterials,
+  onOpenMaterials,
+}: {
+  answerCount: number;
+  caseData: CaseData | null;
+  locale: Locale;
+  review: InterviewReview | null;
+  starterMaterials: StarterMaterial[];
+  onOpenMaterials: () => void;
+}) {
+  if (!caseData) {
+    return null;
+  }
+
+  const topics = caseData.topics ?? [];
+  const coveredTopicIds = new Set(review?.covered_topic_ids ?? []);
+  const missingTopicIds = new Set(review?.missing_topic_ids ?? []);
+  const highPriorityTopics = topics.filter((topic) => topic.priority === "high");
+  const missingHighPriorityTopics = highPriorityTopics.filter((topic) => missingTopicIds.has(topic.id));
+  const focusTopics = (missingHighPriorityTopics.length
+    ? missingHighPriorityTopics
+    : topics.filter((topic) => missingTopicIds.has(topic.id))
+  ).slice(0, 4);
+  const coverageLabel = topics.length
+    ? `${coveredTopicIds.size}/${topics.length}`
+    : text(locale, "alignmentNotAvailable");
+  const visibleMaterials = starterMaterials.slice(0, 3);
+
+  return (
+    <section className="case-dossier-panel">
+      <PanelHeader title={text(locale, "caseDossier")} meta={caseData.id} />
+      <div className="case-dossier-body">
+        <p>{caseData.description}</p>
+
+        <div className="case-dossier-metrics">
+          <span>
+            <ListChecks size={14} />
+            <strong>{coverageLabel}</strong>
+            {text(locale, "plannedScope")}
+          </span>
+          <span>
+            <AlertTriangle size={14} />
+            <strong>{missingHighPriorityTopics.length}</strong>
+            {text(locale, "priorityGaps")}
+          </span>
+          <span>
+            <FileText size={14} />
+            <strong>{starterMaterials.length}</strong>
+            {text(locale, "starterPack")}
+          </span>
+          <span>
+            <Check size={14} />
+            <strong>{answerCount}</strong>
+            {text(locale, "answeredShort")}
+          </span>
+        </div>
+
+        <div className="case-dossier-section">
+          <span>{text(locale, "priorityFocus")}</span>
+          {focusTopics.length ? (
+            <div className="topic-chip-list">
+              {focusTopics.map((topic) => (
+                <span data-priority={topic.priority} key={topic.id}>
+                  {topic.label}
+                  <em>{topicPriorityLabel(topic, locale)}</em>
+                </span>
+              ))}
+            </div>
+          ) : (
+            <strong>{text(locale, "noPriorityGaps")}</strong>
+          )}
+        </div>
+
+        <div className="case-dossier-section">
+          <span>{text(locale, "starterMaterials")}</span>
+          {visibleMaterials.length ? (
+            <div className="starter-material-mini-list">
+              {visibleMaterials.map((material) => (
+                <article key={material.id}>
+                  <strong>{material.title}</strong>
+                  <em>{materialSourceLabel(material.source_type, locale)}</em>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <strong>{text(locale, "noStarterMaterials")}</strong>
+          )}
+          <button type="button" onClick={onOpenMaterials}>
+            <FolderOpen size={14} />
+            {text(locale, "openMaterialsTab")}
+          </button>
+        </div>
       </div>
     </section>
   );

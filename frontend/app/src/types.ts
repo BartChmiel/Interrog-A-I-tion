@@ -29,10 +29,21 @@ export type Answer = {
   created_at?: string;
 };
 
+export type TopicPriority = "high" | "medium" | "low";
+
+export type CaseTopic = {
+  id: string;
+  label: string;
+  description: string;
+  priority: TopicPriority;
+};
+
 export type CaseData = {
   id: string;
   title: string;
   description: string;
+  created_at?: string;
+  topics: CaseTopic[];
   questions: Question[];
   answers: Answer[];
 };
@@ -274,6 +285,20 @@ export type MaterialSourceType =
   | "audio_transcript"
   | "external_document"
   | "user_note";
+
+export type StarterMaterial = {
+  id: string;
+  title: string;
+  description: string;
+  source_type: MaterialSourceType;
+  tags: string[];
+  content: string;
+};
+
+export type CaseStarterMaterialsResponse = {
+  case_id: string;
+  materials: StarterMaterial[];
+};
 
 export type MaterialRecord = {
   id: string;

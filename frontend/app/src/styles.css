@@ -137,6 +137,12 @@ p {
 .audit-event-header,
 .audit-event-details,
 .audit-event-footer,
+.case-dossier-metrics,
+.case-dossier-metrics span,
+.case-dossier-section > span,
+.topic-chip-list,
+.topic-chip-list span,
+.starter-material-mini-list article,
 .material-add-panel summary,
 .material-overview-grid,
 .material-overview-grid span {
@@ -274,6 +280,7 @@ h2 {
 }
 
 .case-catalog-panel,
+.case-dossier-panel,
 .question-panel,
 .interview-panel,
 .insight-panel > section,
@@ -573,6 +580,144 @@ h2 {
   color: var(--muted-strong);
   padding: 2px 7px;
   font-size: 11px;
+}
+
+.case-dossier-body {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.case-dossier-body > p {
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.case-dossier-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.case-dossier-metrics span {
+  min-width: 0;
+  min-height: 44px;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  color: var(--muted);
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.case-dossier-metrics svg {
+  flex: none;
+  color: var(--accent-strong);
+}
+
+.case-dossier-metrics strong {
+  color: var(--heading);
+  font-size: 13px;
+}
+
+.case-dossier-section {
+  display: grid;
+  gap: 8px;
+}
+
+.case-dossier-section > span {
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.case-dossier-section > strong {
+  color: var(--muted-strong);
+  font-size: 12px;
+}
+
+.topic-chip-list {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.topic-chip-list span {
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--heading);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.topic-chip-list span[data-priority="high"] {
+  border-color: #ead49b;
+  background: var(--warning-soft);
+}
+
+.topic-chip-list em {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.starter-material-mini-list {
+  display: grid;
+  gap: 7px;
+}
+
+.starter-material-mini-list article {
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-strong);
+  padding: 8px;
+}
+
+.starter-material-mini-list strong {
+  min-width: 0;
+  color: var(--heading);
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.starter-material-mini-list em {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.case-dossier-section button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.case-dossier-section button:hover {
+  border-color: rgba(52, 111, 183, 0.54);
+  background: var(--accent-soft);
 }
 
 .question-item {
