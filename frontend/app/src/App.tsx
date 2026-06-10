@@ -1045,6 +1045,20 @@ export function App() {
             starterMaterials={caseStarterMaterials}
             onOpenMaterials={() => setActiveOperationsTab("materials")}
           />
+          <DemoWalkthroughPanel
+            locale={locale}
+            onOpenAi={() => setActiveOperationsTab("ai")}
+            onOpenMaterials={() => setActiveOperationsTab("materials")}
+            onOpenMonitor={() => setActiveOperationsTab("monitor")}
+            onOpenNextQuestion={() => {
+              const answeredQuestionIds = new Set(answerViews.map((answer) => answer.questionId));
+              const nextQuestion = questions.find((question) => !answeredQuestionIds.has(question.id));
+              if (nextQuestion) {
+                selectActiveQuestion(nextQuestion.id);
+              }
+            }}
+            onOpenReview={() => setActiveOperationsTab("review")}
+          />
           <section className="question-panel">
             <PanelHeader
               title={text(locale, "questions")}
@@ -2092,6 +2106,75 @@ function CaseDossierPanel({
             {text(locale, "openMaterialsTab")}
           </button>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function DemoWalkthroughPanel({
+  locale,
+  onOpenAi,
+  onOpenMaterials,
+  onOpenMonitor,
+  onOpenNextQuestion,
+  onOpenReview,
+}: {
+  locale: Locale;
+  onOpenAi: () => void;
+  onOpenMaterials: () => void;
+  onOpenMonitor: () => void;
+  onOpenNextQuestion: () => void;
+  onOpenReview: () => void;
+}) {
+  const steps = [
+    {
+      id: "question",
+      icon: <Send size={14} />,
+      label: text(locale, "demoStepQuestion"),
+      detail: text(locale, "demoStepQuestionDetail"),
+      onClick: onOpenNextQuestion,
+    },
+    {
+      id: "local-ai",
+      icon: <Network size={14} />,
+      label: text(locale, "demoStepLocalAi"),
+      detail: text(locale, "demoStepLocalAiDetail"),
+      onClick: onOpenMonitor,
+    },
+    {
+      id: "materials",
+      icon: <FolderArchive size={14} />,
+      label: text(locale, "demoStepMaterials"),
+      detail: text(locale, "demoStepMaterialsDetail"),
+      onClick: onOpenMaterials,
+    },
+    {
+      id: "grounded-ai",
+      icon: <Sparkles size={14} />,
+      label: text(locale, "demoStepGroundedAi"),
+      detail: text(locale, "demoStepGroundedAiDetail"),
+      onClick: onOpenAi,
+    },
+    {
+      id: "review",
+      icon: <Fingerprint size={14} />,
+      label: text(locale, "demoStepReview"),
+      detail: text(locale, "demoStepReviewDetail"),
+      onClick: onOpenReview,
+    },
+  ];
+
+  return (
+    <section className="demo-walkthrough-panel">
+      <PanelHeader title={text(locale, "demoWalkthrough")} meta={text(locale, "demoReady")} />
+      <div className="demo-step-list">
+        {steps.map((step) => (
+          <button key={step.id} type="button" onClick={step.onClick}>
+            <span>{step.icon}</span>
+            <strong>{step.label}</strong>
+            <em>{step.detail}</em>
+          </button>
+        ))}
       </div>
     </section>
   );
