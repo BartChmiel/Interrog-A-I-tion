@@ -130,7 +130,15 @@ GET /ai/local-model/config
 POST /ai/local-model/smoke
 ```
 
-The default runtime is deterministic. Ollama can be configured through environment variables, but real model execution requires explicit enablement and live suggestions still use the injected `ModelClient`. This prevents real LLM output from entering live workflows by configuration drift alone.
+The default runtime is deterministic. Ollama can be configured through environment variables, but real model execution requires explicit enablement. Live grounded suggestions use Ollama only when all of the following are set:
+
+```powershell
+$env:INTERROGAITION_MODEL_PROVIDER='ollama'
+$env:INTERROGAITION_ENABLE_REAL_MODEL='1'
+$env:INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT='1'
+```
+
+See `config/local-ai-developer.ps1.example` for a developer shell setup. This prevents real LLM output from entering live workflows by configuration drift alone.
 
 ## Materials, Grounding, and Suggestions
 

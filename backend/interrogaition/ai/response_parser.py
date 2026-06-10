@@ -28,7 +28,7 @@ def parse_suggestion_response(text: str, *, model: str = "unknown") -> ParsedSug
         raise ModelResponseError(f"Model response contains forbidden claims: {', '.join(forbidden)}")
 
     try:
-        payload = json.loads(text)
+        payload = json.loads(_extract_json_text(text))
     except json.JSONDecodeError as exc:
         raise ModelResponseError(f"Model response is not valid JSON: {exc}") from exc
 
@@ -41,6 +41,36 @@ def parse_suggestion_response(text: str, *, model: str = "unknown") -> ParsedSug
     )
 
     return ParsedSuggestionBatch(suggestions=suggestions, model=model)
+
+
+def _extract_json_text(text: str) -> str:
+    """Return JSON object text from a raw model response."""
+
+    stripped = text.strip()
+    if not stripped:
+        raise json.JSONDecodeError("Empty model response", stripped, 0)
+
+    try:
+        json.loads(stripped)
+        return stripped
+    except json.JSONDecodeError:
+        pass
+
+    if "```" in stripped:
+        segments = stripped.split("```")
+        for segment in segments:
+            candidate = segment.strip()
+            if candidate.startswith("json"):
+                candidate = candidate[4:].strip()
+            if candidate.startswith("{"):
+                return candidate
+
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return stripped[start : end + 1]
+
+    return stripped
 
 
 def _parse_suggestion(raw: Any, *, index: int) -> AISuggestion:

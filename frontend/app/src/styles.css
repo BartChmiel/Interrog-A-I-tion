@@ -224,6 +224,19 @@ h2 {
   gap: 6px;
 }
 
+.model-smoke-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.local-ai-setup-hint {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .session-report-preview {
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 10px;

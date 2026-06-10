@@ -4,6 +4,7 @@ from pathlib import Path
 
 from interrogaition.ai.grounded_suggestion_service import generate_grounded_suggestions
 from interrogaition.ai.model_client import DeterministicGroundedModelClient, FakeModelClient
+from interrogaition.ai.response_parser import parse_suggestion_response
 from interrogaition.analysis.credibility_indicators import generate_indicators
 from interrogaition.analysis.evidence_map import build_evidence_map
 from interrogaition.analysis.grounding_context import build_grounding_context_pack

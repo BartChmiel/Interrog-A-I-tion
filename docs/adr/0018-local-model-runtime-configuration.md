@@ -22,8 +22,11 @@ Backend:
 - Default provider is `deterministic`.
 - Ollama can be selected with `INTERROGAITION_MODEL_PROVIDER=ollama`, but real
   model execution remains disabled unless `INTERROGAITION_ENABLE_REAL_MODEL=1`.
-- `live_output_enabled` remains `false`; live grounded suggestions still use the
-  explicitly injected `ModelClient`, which defaults to deterministic behavior.
+- `live_output_enabled` defaults to `false` and is enabled only with
+  `INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1`.
+- When provider, real-model, and live-output gates are all enabled, grounded
+  suggestions resolve to `OllamaClient`; otherwise they use
+  `DeterministicGroundedModelClient`.
 - `POST /ai/local-model/smoke` runs a deterministic smoke check by default.
 - Real Ollama smoke requires both `execute_real=true` and explicit runtime enablement.
 

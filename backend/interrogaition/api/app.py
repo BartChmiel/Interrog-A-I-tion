@@ -91,9 +91,10 @@ from interrogaition.ai.grounded_suggestion_service import GroundedSuggestionResu
 from interrogaition.ai.local_model_runtime import (
     LocalModelRuntimeConfig,
     load_local_model_runtime_config,
+    resolve_grounded_model_client,
     run_local_model_smoke,
 )
-from interrogaition.ai.model_client import DeterministicGroundedModelClient, ModelClient
+from interrogaition.ai.model_client import ModelClient
 from interrogaition.domain.models import Actor, Answer, AuditEvent, Claim, Case, Priority, SuggestionStatus
 from interrogaition.domain.session import (
     InterviewSession,
@@ -308,7 +309,7 @@ def create_app(
 
     store = store or SQLiteSessionStore.in_memory()
     workspace_manager = workspace_manager or CaseWorkspaceManager(DEFAULT_WORKSPACE_ROOT)
-    model_client = model_client or DeterministicGroundedModelClient()
+    grounded_model_client_override = model_client
     local_model_config = local_model_config or load_local_model_runtime_config()
 
     @app.get("/health")
@@ -873,12 +874,22 @@ def create_app(
             material_links=context["material_links"],
             focus_question_id=question_id,
         )
-        result = generate_grounded_suggestions(
-            grounding_pack=grounding_pack,
-            model_client=model_client,
-            locale=locale,
-            citation_policy="warn",
+        active_model_client = resolve_grounded_model_client(
+            local_model_config,
+            override=grounded_model_client_override,
         )
+        try:
+            result = generate_grounded_suggestions(
+                grounding_pack=grounding_pack,
+                model_client=active_model_client,
+                locale=locale,
+                citation_policy="warn",
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Grounded suggestion generation failed: {exc}",
+            ) from exc
         prompt_artifact, context_artifact, output_artifact, artifact_warning = _capture_grounded_suggestion_artifacts(
             workspace=workspace,
             grounding_pack=grounding_pack,

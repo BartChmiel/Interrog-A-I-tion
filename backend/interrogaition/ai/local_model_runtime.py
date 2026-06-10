@@ -11,7 +11,12 @@ import os
 from dataclasses import dataclass
 from typing import Mapping
 
-from interrogaition.ai.model_client import FakeModelClient, ModelClient, ModelRequest
+from interrogaition.ai.model_client import (
+    DeterministicGroundedModelClient,
+    FakeModelClient,
+    ModelClient,
+    ModelRequest,
+)
 from interrogaition.ai.ollama_client import OllamaClient
 
 
@@ -39,12 +44,23 @@ class LocalModelRuntimeConfig:
     @property
     def restrictions(self) -> tuple[str, ...]:
         restrictions = [
-            "Real model output is not used by live suggestions unless explicitly wired in code.",
             "Institutional live use remains blocked until a STOP review.",
             "Smoke prompts must not include case material, personal data, or interview notes.",
         ]
+        if self.live_output_enabled and self.effective_provider == "ollama":
+            restrictions.append(
+                "Live grounded suggestions use the configured Ollama model for developer experiments.",
+            )
+        else:
+            restrictions.append(
+                "Grounded suggestions use the deterministic local assistant unless live Ollama output is enabled.",
+            )
         if self.provider == "ollama" and not self.real_model_enabled:
             restrictions.append("Ollama is configured but real model execution is disabled.")
+        if self.provider == "ollama" and self.real_model_enabled and not self.live_output_enabled:
+            restrictions.append(
+                "Real model smoke is available, but live grounded suggestions remain deterministic.",
+            )
         return tuple(restrictions)
 
 
@@ -83,8 +99,36 @@ def load_local_model_runtime_config(
         timeout_seconds=_parse_int(values.get("INTERROGAITION_OLLAMA_TIMEOUT_SECONDS"), default=120),
         temperature=_parse_float(values.get("INTERROGAITION_MODEL_TEMPERATURE"), default=0.2),
         real_model_enabled=_parse_bool(values.get("INTERROGAITION_ENABLE_REAL_MODEL")),
-        live_output_enabled=False,
+        live_output_enabled=_parse_bool(values.get("INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT")),
     )
+
+
+def resolve_grounded_model_client(
+    config: LocalModelRuntimeConfig,
+    *,
+    override: ModelClient | None = None,
+) -> ModelClient:
+    """Select the model client for live grounded suggestions.
+
+    Tests may pass an explicit override. Otherwise Ollama is used only when the
+    provider, real-model gate, and live-output gate are all enabled.
+    """
+
+    if override is not None:
+        return override
+
+    if (
+        config.provider == "ollama"
+        and config.real_model_enabled
+        and config.live_output_enabled
+    ):
+        return OllamaClient(
+            model=config.configured_model,
+            base_url=config.ollama_base_url,
+            timeout_seconds=config.timeout_seconds,
+        )
+
+    return DeterministicGroundedModelClient()
 
 
 def run_local_model_smoke(

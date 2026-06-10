@@ -156,8 +156,12 @@ export async function loadLocalModelConfig(config: RuntimeConfig): Promise<Local
   return fetchJson(config, "/ai/local-model/config");
 }
 
-export async function runLocalModelSmoke(config: RuntimeConfig): Promise<LocalModelSmokeResult> {
-  return fetchJson(config, "/ai/local-model/smoke", {
+export async function runLocalModelSmoke(
+  config: RuntimeConfig,
+  executeReal = false,
+): Promise<LocalModelSmokeResult> {
+  const query = executeReal ? "?execute_real=true" : "";
+  return fetchJson(config, `/ai/local-model/smoke${query}`, {
     method: "POST",
   });
 }

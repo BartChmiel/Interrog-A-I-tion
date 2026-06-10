@@ -275,6 +275,9 @@ export const copy = {
     liveModelBlocked: "live zablokowany",
     liveModelEnabled: "live włączony",
     runModelSmoke: "Test modelu",
+    runModelSmokeReal: "Test Ollama",
+    localAiSetupHint:
+      "Aby włączyć lokalny model w Grounded AI: ustaw INTERROGAITION_MODEL_PROVIDER=ollama, INTERROGAITION_ENABLE_REAL_MODEL=1 i INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1, potem zrestartuj backend.",
     modelSmokeOk: "test modelu OK",
     modelSmokeFailed: "test modelu nieudany",
     realModelInvoked: "realny model",
@@ -661,6 +664,9 @@ export const copy = {
     liveModelBlocked: "live blocked",
     liveModelEnabled: "live enabled",
     runModelSmoke: "Run smoke",
+    runModelSmokeReal: "Test Ollama",
+    localAiSetupHint:
+      "To enable the local model in Grounded AI, set INTERROGAITION_MODEL_PROVIDER=ollama, INTERROGAITION_ENABLE_REAL_MODEL=1, and INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1, then restart the backend.",
     modelSmokeOk: "model smoke OK",
     modelSmokeFailed: "model smoke failed",
     realModelInvoked: "real model",

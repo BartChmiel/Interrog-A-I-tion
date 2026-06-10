@@ -842,7 +842,7 @@ export function App() {
     }
   }
 
-  async function smokeLocalModel() {
+  async function smokeLocalModel(executeReal = false) {
     if (apiMode !== "online") {
       setStatusKey("offline");
       return;
@@ -850,7 +850,7 @@ export function App() {
 
     setIsModelSmokeRunning(true);
     try {
-      const result = await runLocalModelSmoke(config);
+      const result = await runLocalModelSmoke(config, executeReal);
       setLocalModelSmoke(result);
       setStatusKey(result.ok ? "modelSmokeOk" : "modelSmokeFailed");
     } catch (error) {
@@ -1595,7 +1595,7 @@ export function App() {
                     modelArtifactIsolation={modelArtifactIsolation}
                     materials={workspaceMaterials}
                     onArtifactIsolation={() => void initializeModelArtifactIsolation()}
-                    onModelSmoke={() => void smokeLocalModel()}
+                    onModelSmoke={(executeReal) => void smokeLocalModel(executeReal)}
                     workspace={workspace}
                   />
                 </CollapsibleSection>
@@ -3830,7 +3830,7 @@ function SecurityPanel({
   modelArtifactIsolation: ModelArtifactIsolationStatus | null;
   materials: MaterialRecord[];
   onArtifactIsolation: () => void;
-  onModelSmoke: () => void;
+  onModelSmoke: (executeReal: boolean) => void;
   workspace: WorkspaceResponse | null;
 }) {
   const manifest = workspace?.manifest;
@@ -3944,10 +3944,28 @@ function SecurityPanel({
             {localModelSmoke.real_model_invoked ? text(locale, "realModelInvoked") : text(locale, "noRealModel")}
           </p>
         ) : null}
-        <button disabled={!localModelConfig || isModelSmokeRunning} type="button" onClick={onModelSmoke}>
-          <Activity size={14} />
-          {isModelSmokeRunning ? "..." : text(locale, "runModelSmoke")}
-        </button>
+        <div className="model-smoke-actions">
+          <button disabled={!localModelConfig || isModelSmokeRunning} type="button" onClick={() => onModelSmoke(false)}>
+            <Activity size={14} />
+            {isModelSmokeRunning ? "..." : text(locale, "runModelSmoke")}
+          </button>
+          <button
+            disabled={
+              !localModelConfig ||
+              isModelSmokeRunning ||
+              localModelConfig.provider !== "ollama" ||
+              !localModelConfig.real_model_enabled
+            }
+            type="button"
+            onClick={() => onModelSmoke(true)}
+          >
+            <Sparkles size={14} />
+            {isModelSmokeRunning ? "..." : text(locale, "runModelSmokeReal")}
+          </button>
+        </div>
+        {localModelConfig && !localModelConfig.live_output_enabled ? (
+          <p className="local-ai-setup-hint">{text(locale, "localAiSetupHint")}</p>
+        ) : null}
       </div>
       <ModelArtifactIsolationPanel
         isSubmitting={isArtifactIsolationSubmitting}
