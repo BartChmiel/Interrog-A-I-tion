@@ -179,3 +179,36 @@ Success criteria:
 - no guilt, truthfulness, or lie-detection claims are introduced.
 
 See `docs/24-first-supervisor-demo.md` for run instructions and boundaries.
+
+## Milestone 8: Session Report Export
+
+Status: implemented as a first research/demo Markdown export from the Review tab.
+
+Tasks:
+
+- expose backend `report_markdown` in the UI,
+- add session context and provenance summary wrapper,
+- add download and copy controls with a non-official disclaimer,
+- keep export behind the local API workflow.
+
+Next:
+
+- extend report content with answers, AI decisions, and integrity manifest references,
+- add JSON export and optional export manifest linkage after STOP review.
+
+## Milestone 9: Case Workflow Deepening
+
+Status: in progress.
+
+Implemented:
+
+- case progress navigator with stage navigation (dossier → interview → materials → AI → review → report),
+- scenario badges and supervisor-demo marker in the case catalog,
+- operational session context in the header and interview strip,
+- operations offline guidance when the local API is unavailable.
+
+Next:
+
+- richer per-case README summaries and starter materials,
+- stronger empty/loading states per operations tab,
+- extract large panels from `App.tsx` into maintainable components.

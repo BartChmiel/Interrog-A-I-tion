@@ -7,6 +7,7 @@ import {
   Database,
   Eye,
   FileCheck2,
+  FileDown,
   FileText,
   FolderArchive,
   FolderOpen,
@@ -60,6 +61,7 @@ import {
   verifyWorkspaceMaterial,
   type ApiError,
 } from "./api";
+import { CaseCatalogBadges, CaseWorkflowProgress, WorkspaceEmptyState, type CaseWorkflowStage } from "./case-workflow";
 import { seedAnswers, seedCaseCatalog, seedFindings, seedIndicators, seedQuestions } from "./demoData";
 import { domainLabel, localize, text, type CopyKey } from "./i18n";
 import type {
@@ -183,6 +185,8 @@ export function App() {
   const [caseStarterMaterials, setCaseStarterMaterials] = useState<StarterMaterial[]>([]);
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [review, setReview] = useState<InterviewReview | null>(null);
+  const [reportMarkdown, setReportMarkdown] = useState<string | null>(null);
+  const [sessionReportExported, setSessionReportExported] = useState(false);
   const [indicators, setIndicators] = useState<Indicator[]>([]);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
   const [encryptionStatus, setEncryptionStatus] = useState<EncryptionStatus | null>(null);
@@ -396,6 +400,11 @@ export function App() {
         label: text(locale, "demoStepReview"),
         done: demoReviewVisited,
       },
+      {
+        id: "report",
+        label: text(locale, "demoStepReport"),
+        done: sessionReportExported,
+      },
     ];
   }, [
     answerViews,
@@ -404,6 +413,7 @@ export function App() {
     groundedSuggestions.length,
     locale,
     localModelConfig,
+    sessionReportExported,
     workspaceMaterials.length,
   ]);
 
@@ -447,6 +457,7 @@ export function App() {
       setIndicators(sessionReview.indicators);
       setReview(sessionReview.snapshot.review);
       setFindings(sessionReview.snapshot.review.findings);
+      setReportMarkdown(sessionReview.report_markdown);
       setApiMode("online");
       setStatusKey("online");
     } catch (error) {
@@ -454,6 +465,7 @@ export function App() {
       setCaseCatalog(seedCaseCatalog[locale]);
       setCaseStarterMaterials([]);
       setReview(null);
+      setReportMarkdown(null);
       setApiMode("offline");
       setStatusKey("offline");
     }
@@ -688,6 +700,7 @@ export function App() {
       setIndicators(sessionReview.indicators);
       setReview(sessionReview.snapshot.review);
       setFindings(sessionReview.snapshot.review.findings);
+      setReportMarkdown(sessionReview.report_markdown);
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
       applyGroundedSuggestions(nextGroundedSuggestions);
@@ -698,6 +711,7 @@ export function App() {
       setCaseCatalog(seedCaseCatalog[nextLocale]);
       setCaseStarterMaterials([]);
       setReview(null);
+      setReportMarkdown(null);
       setApiMode("offline");
       setStatusKey("offline");
     }
@@ -748,6 +762,7 @@ export function App() {
       setIndicators(sessionReview.indicators);
       setReview(sessionReview.snapshot.review);
       setFindings(sessionReview.snapshot.review.findings);
+      setReportMarkdown(sessionReview.report_markdown);
       setEvidenceMap(nextEvidenceMap);
       applyGroundedSuggestions(nextGroundedSuggestions);
       setAnswerText("");
@@ -1010,6 +1025,28 @@ export function App() {
     void refreshLocalizedApiState(nextLocale);
   }
 
+  function navigateCaseWorkflow(stage: CaseWorkflowStage) {
+    if (stage === "dossier" || stage === "interview") {
+      setLeftRailCollapsed(false);
+    }
+    if (stage === "interview") {
+      setRightRailCollapsed(true);
+      return;
+    }
+
+    setRightRailCollapsed(false);
+    if (stage === "materials") {
+      setActiveOperationsTab("materials");
+      return;
+    }
+    if (stage === "ai") {
+      setActiveOperationsTab("ai");
+      return;
+    }
+    setActiveOperationsTab("review");
+    setDemoReviewVisited(true);
+  }
+
   function openCase(caseId: string) {
     if (caseId === config.caseId) {
       return;
@@ -1063,6 +1100,36 @@ export function App() {
     } catch {
       setStatusKey("demoSummaryCopyFailed");
     }
+  }
+
+  async function copySessionReport() {
+    if (!sessionReportText) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(sessionReportText);
+      setSessionReportExported(true);
+      setStatusKey("sessionReportCopied");
+    } catch {
+      setStatusKey("demoSummaryCopyFailed");
+    }
+  }
+
+  function downloadSessionReport() {
+    if (!sessionReportText) {
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `interrogaition-${config.caseId}-${config.sessionId}-${stamp}.md`;
+    const blob = new Blob([sessionReportText], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setSessionReportExported(true);
+    setStatusKey("sessionReportCopied");
   }
 
   async function recordOperatorActionDecisionType(
@@ -1133,6 +1200,44 @@ export function App() {
   const answeredQuestionCount = answeredQuestionIds.size;
   const urgentOperatorActionCount = visibleOperatorActions.filter((action) => action.priority === "high").length;
   const questionCoverageLabel = `${answeredQuestionCount}/${questions.length}`;
+  const topicCoverageLabel = useMemo(() => {
+    const topicCount = caseData?.topics?.length ?? 0;
+    if (!review || !topicCount) {
+      return null;
+    }
+    return `${review.covered_topic_ids.length}/${topicCount}`;
+  }, [caseData?.topics, review]);
+  const sessionReportText = useMemo(() => {
+    if (!reportMarkdown) {
+      return null;
+    }
+    return buildSessionReportExport(reportMarkdown, {
+      locale,
+      config,
+      caseData,
+      materialCount: workspaceMaterials.length,
+      groundedCount: groundedSuggestions.length,
+      operatorDecisionCount: operatorActionDecisions.length,
+      workspaceAuditValid: workspaceAudit?.chain_valid ?? null,
+      workspaceAuditCount: workspaceAudit?.events.length ?? 0,
+      sessionAuditCount: sessionAudit?.events.length ?? 0,
+      modelProvider: localModelConfig?.effective_provider ?? null,
+      environmentState: environmentHealth?.state ?? null,
+    });
+  }, [
+    caseData,
+    config,
+    environmentHealth?.state,
+    groundedSuggestions.length,
+    locale,
+    localModelConfig?.effective_provider,
+    operatorActionDecisions.length,
+    reportMarkdown,
+    sessionAudit?.events.length,
+    workspaceAudit?.chain_valid,
+    workspaceAudit?.events.length,
+    workspaceMaterials.length,
+  ]);
   const topicsById = useMemo(
     () => new Map((caseData?.topics ?? []).map((topic) => [topic.id, topic])),
     [caseData],
@@ -1193,6 +1298,9 @@ export function App() {
           <div>
             <h1>InterrogA(I)tion</h1>
             <p>{caseData?.title ?? text(locale, "caseFallback")}</p>
+            <p className="topbar-session-meta">
+              {config.caseId} · {config.sessionId} · {config.participantId}
+            </p>
           </div>
         </div>
 
@@ -1245,6 +1353,16 @@ export function App() {
               currentCaseId={config.caseId}
               locale={locale}
               onOpenCase={openCase}
+            />
+            <CaseWorkflowProgress
+              answerCount={answerViews.length}
+              apiMode={apiMode}
+              groundedCount={groundedSuggestions.length}
+              locale={locale}
+              materialCount={workspaceMaterials.length}
+              reportExported={sessionReportExported}
+              reviewVisited={demoReviewVisited}
+              onNavigate={navigateCaseWorkflow}
             />
             <CaseDossierPanel
               answerCount={answerViews.length}
@@ -1312,7 +1430,10 @@ export function App() {
               caseId={config.caseId}
               coverageLabel={questionCoverageLabel}
               locale={locale}
+              participantId={config.participantId}
               roleLabel={participantRoleLine}
+              sessionId={config.sessionId}
+              topicCoverageLabel={topicCoverageLabel}
               urgentActionCount={urgentOperatorActionCount}
             />
 
@@ -1444,6 +1565,13 @@ export function App() {
           </div>
 
           <div className="operations-content" data-tab={activeOperationsTab}>
+            {apiMode !== "online" ? (
+              <WorkspaceEmptyState
+                detail={text(locale, "operationsOfflineDetail")}
+                locale={locale}
+                title={text(locale, "operationsOfflineTitle")}
+              />
+            ) : null}
             {activeOperationsTab === "monitor" ? (
               <>
                 <CollapsibleSection
@@ -1561,6 +1689,23 @@ export function App() {
 
             {activeOperationsTab === "review" ? (
               <>
+                <CollapsibleSection
+                  accordionGroup="ops-review"
+                  className="operations-section"
+                  defaultOpen
+                  hint={text(locale, "expandWhenNeeded")}
+                  meta={text(locale, "sessionReportMeta")}
+                  title={text(locale, "sessionReport")}
+                  tutorialId="session-report"
+                >
+                  <SessionReportPanel
+                    apiMode={apiMode}
+                    locale={locale}
+                    preview={sessionReportText}
+                    onCopy={() => void copySessionReport()}
+                    onDownload={downloadSessionReport}
+                  />
+                </CollapsibleSection>
                 <CollapsibleSection
                   accordionGroup="ops-review"
                   className="operations-section"
@@ -2511,6 +2656,7 @@ function CaseCatalogPanel({
                   {caseItem.id}
                   <em>{isActive ? text(locale, "currentCase") : text(locale, "openCase")}</em>
                 </span>
+                <CaseCatalogBadges caseId={caseItem.id} locale={locale} />
                 <strong>{caseItem.title}</strong>
                 <span className="case-catalog-description">{caseItem.description}</span>
                 <span className="case-catalog-stats">
@@ -2805,6 +2951,98 @@ function buildDemoSummaryText(input: DemoSummaryInput): string {
   ];
 
   return lines.filter((line) => line.length > 0).join("\n");
+}
+
+type SessionReportExportInput = {
+  locale: Locale;
+  config: RuntimeConfig;
+  caseData: CaseData | null;
+  materialCount: number;
+  groundedCount: number;
+  operatorDecisionCount: number;
+  workspaceAuditValid: boolean | null;
+  workspaceAuditCount: number;
+  sessionAuditCount: number;
+  modelProvider: string | null;
+  environmentState: EnvironmentHealthState | null;
+};
+
+function buildSessionReportExport(baseMarkdown: string, input: SessionReportExportInput): string {
+  const contextLines = [
+    "## Session context",
+    "",
+    `- Case: ${input.config.caseId}`,
+    input.caseData ? `- Title: ${localize(input.caseData.title, input.locale)}` : "",
+    `- Session: ${input.config.sessionId}`,
+    `- Participant: ${input.config.participantId}`,
+    `- Workspace: ${input.config.workspaceId}`,
+    `- Generated at: ${new Date().toISOString()}`,
+    "",
+    "## Provenance summary",
+    "",
+    `- ${text(input.locale, "sourceMaterials")}: ${input.materialCount}`,
+    `- ${text(input.locale, "operationsAi")}: ${input.groundedCount} grounded suggestions`,
+    `- ${text(input.locale, "operatorDecisionTrail")}: ${input.operatorDecisionCount}`,
+    `- ${text(input.locale, "workspaceAudit")}: ${input.workspaceAuditCount} events${
+      input.workspaceAuditValid === null
+        ? ""
+        : ` (${input.workspaceAuditValid ? text(input.locale, "chainValid") : text(input.locale, "chainInvalid")})`
+    }`,
+    `- ${text(input.locale, "sessionAudit")}: ${input.sessionAuditCount} events`,
+    input.environmentState
+      ? `- ${text(input.locale, "environmentHealth")}: ${environmentStateShortLabel(input.environmentState, input.locale)}`
+      : "",
+    input.modelProvider ? `- ${text(input.locale, "localModelRuntime")}: ${input.modelProvider}` : "",
+    "",
+    text(input.locale, "sessionReportDisclaimer"),
+    "",
+    "---",
+    "",
+  ];
+
+  return [...contextLines.filter((line) => line.length > 0), baseMarkdown.trim(), ""].join("\n");
+}
+
+function SessionReportPanel({
+  apiMode,
+  locale,
+  preview,
+  onCopy,
+  onDownload,
+}: {
+  apiMode: ApiMode;
+  locale: Locale;
+  preview: string | null;
+  onCopy: () => void;
+  onDownload: () => void;
+}) {
+  const available = apiMode === "online" && Boolean(preview);
+
+  return (
+    <div className="session-report-panel">
+      <p className="session-report-disclaimer">{text(locale, "sessionReportDisclaimer")}</p>
+      {available ? (
+        <>
+          <div className="session-report-actions">
+            <button type="button" onClick={onDownload}>
+              <FileDown size={14} />
+              {text(locale, "sessionReportDownload")}
+            </button>
+            <button type="button" onClick={onCopy}>
+              <ClipboardCopy size={14} />
+              {text(locale, "sessionReportCopy")}
+            </button>
+          </div>
+          <details className="session-report-preview">
+            <summary>{text(locale, "sessionReportPreview")}</summary>
+            <pre>{preview}</pre>
+          </details>
+        </>
+      ) : (
+        <p className="session-report-unavailable">{text(locale, "sessionReportUnavailable")}</p>
+      )}
+    </div>
+  );
 }
 
 function LinkedMaterialStrip({

@@ -39,7 +39,8 @@ The first demo includes:
 - SQLite session storage and append-only audit-chain events,
 - workspace-local model artifact manifests and export integrity manifest support,
 - three-zone workspace layout with progressive disclosure (collapsed-by-default panels),
-- in-app tutorial mode with spotlight walkthrough (15 steps, PL/EN).
+- in-app tutorial mode with spotlight walkthrough (15 steps, PL/EN),
+- session report export (Markdown download/copy from Review, research disclaimer).
 
 ## Workspace Layout
 

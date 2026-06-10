@@ -145,6 +145,23 @@ export function scorePercent(score: number | null): string {
   return `${Math.round((score ?? 0) * 100)}%`;
 }
 
+export function caseCatalogMeta(
+  caseId: string,
+  locale: Locale,
+): { recommendedDemo: boolean; scenarioLabel: string } {
+  const scenarios: Record<string, { labelKey: CopyKey; recommendedDemo?: boolean }> = {
+    "case-001": { labelKey: "caseScenarioTheft" },
+    "case-002": { labelKey: "caseScenarioPharmacy" },
+    "case-003": { labelKey: "caseScenarioCare", recommendedDemo: true },
+  };
+  const scenario = scenarios[caseId] ?? scenarios["case-001"];
+
+  return {
+    scenarioLabel: text(locale, scenario.labelKey),
+    recommendedDemo: scenario.recommendedDemo ?? false,
+  };
+}
+
 export function sessionRoleLine(caseId: string, locale: Locale): string {
   const roleKeys: Record<string, CopyKey> = {
     "case-001": "roleWitnessMale",

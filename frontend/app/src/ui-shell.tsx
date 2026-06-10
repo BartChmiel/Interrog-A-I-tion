@@ -93,24 +93,41 @@ export function InterviewContextStrip({
   caseId,
   coverageLabel,
   locale,
+  participantId,
   roleLabel,
+  sessionId,
+  topicCoverageLabel,
   urgentActionCount,
 }: {
   activeQuestionLabel: string;
   caseId: string;
   coverageLabel: string;
   locale: Locale;
+  participantId: string;
   roleLabel: string;
+  sessionId: string;
+  topicCoverageLabel: string | null;
   urgentActionCount: number;
 }) {
   return (
     <div className="interview-context-strip" data-tutorial="interview-context" role="status">
       <div className="interview-context-pills">
         <span className="context-pill">{caseId}</span>
+        <span className="context-pill">
+          {text(locale, "contextSession")}: {sessionId}
+        </span>
+        <span className="context-pill">
+          {text(locale, "contextParticipant")}: {participantId}
+        </span>
         <span className="context-pill">{roleLabel}</span>
         <span className="context-pill">
           {coverageLabel} {text(locale, "contextCoverage")}
         </span>
+        {topicCoverageLabel ? (
+          <span className="context-pill">
+            {topicCoverageLabel} {text(locale, "contextTopicCoverage")}
+          </span>
+        ) : null}
         {urgentActionCount > 0 ? (
           <span className="context-pill context-pill--signal">
             {urgentActionCount} {text(locale, "operatorUrgentShort")}

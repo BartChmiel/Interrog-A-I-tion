@@ -19,6 +19,7 @@
 - `frontend/app/src` - main React/Vite application.
 - `frontend/app/src/ui-shell.tsx` - workspace zones, collapsible sections, modal shell.
 - `frontend/app/src/tutorial-tour.tsx` and `tutorial-steps.ts` - in-app supervisor demo tutorial.
+- `frontend/app/src/case-workflow.tsx` - case progress navigator and catalog badges.
 - `frontend/prototype` - older static prototype kept for reference.
 
 ## Backend Structure
