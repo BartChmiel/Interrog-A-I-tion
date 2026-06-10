@@ -28,6 +28,9 @@ build/
 .idea/
 .vscode/
 
+# Local agent handoff notes (never commit)
+docs/24-cursor-agent-handoff.md
+
 # Sensitive project data
 data/private/
 data/cases/
