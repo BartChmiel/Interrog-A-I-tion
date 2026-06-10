@@ -142,7 +142,7 @@ def _inconsistency_suggestion_for_topic(topic: dict[str, object], *, locale: str
     label = str(topic["label"])
     evidence = _topic_evidence(topic)
     if locale == "pl":
-        text = f"Potencjalna niespojnosc w watku '{label}' wymaga spokojnego doprecyzowania."
+        text = f"Potencjalna niespójność w wątku „{label}” wymaga spokojnego doprecyzowania."
         reason = _pl_reason(label, "contested")
     else:
         text = f"Potential inconsistency in '{label}' requires calm clarification."
@@ -168,7 +168,7 @@ def _summary_suggestion(pack: dict[str, object], *, locale: str) -> dict[str, ob
         for source_id in _topic_evidence(topic)
     ][:6]
     if locale == "pl":
-        text = "Mapa sprawy wskazuje watki wymagajace dalszego prowadzenia bez automatycznego werdyktu."
+        text = "Mapa sprawy wskazuje wątki wymagające dalszego prowadzenia bez automatycznego werdyktu."
         reason = "Podsumowanie obejmuje tematy z aktualnego pakietu kontekstowego."
     else:
         text = "The case map shows threads that need further handling without an automated verdict."
@@ -199,22 +199,28 @@ def _topic_evidence(topic: dict[str, object]) -> list[str]:
 
 def _pl_question(label: str, status: str) -> str:
     if status == "contested":
-        return f"Prosze doprecyzowac watek: {label}. Co dokladnie Pan/Pani pamieta i w jakiej kolejnosci?"
+        return (
+            f"Proszę doprecyzować wątek: {label}. "
+            "Co dokładnie pamięta Pan/Pani i w jakiej kolejności?"
+        )
     if status == "material_only":
-        return f"Czy moze Pan/Pani odniesc sie do watku: {label}, jesli jest on Panu/Pani znany?"
+        return f"Czy może Pan/Pani odnieść się do wątku: {label}, jeśli jest on Panu/Pani znany?"
     if status == "missing":
-        return f"Co moze Pan/Pani powiedziec o watku: {label}?"
-    return f"Czy chce Pan/Pani cos doprecyzowac w watku: {label}?"
+        return f"Co może Pan/Pani powiedzieć o wątku: {label}?"
+    return f"Czy chce Pan/Pani coś doprecyzować w wątku: {label}?"
 
 
 def _pl_reason(label: str, status: str) -> str:
     if status == "contested":
-        return f"Mapa sprawy oznacza temat '{label}' jako wymagajacy wyjasnienia."
+        return f"Mapa sprawy oznacza temat „{label}” jako wymagający wyjaśnienia."
     if status == "material_only":
-        return f"Zarejestrowany material wskazuje temat '{label}', ale nie ma jeszcze odpowiedzi w tym watku."
+        return (
+            f"Zarejestrowany materiał wskazuje temat „{label}”, "
+            "ale nie ma jeszcze odpowiedzi w tym wątku."
+        )
     if status == "missing":
-        return f"Temat '{label}' nie ma jeszcze pokrycia w pytaniach lub odpowiedziach."
-    return f"Temat '{label}' jest w zakresie aktualnego kontekstu."
+        return f"Temat „{label}” nie ma jeszcze pokrycia w pytaniach lub odpowiedziach."
+    return f"Temat „{label}” jest w zakresie aktualnego kontekstu."
 
 
 def _en_question(label: str, status: str) -> str:

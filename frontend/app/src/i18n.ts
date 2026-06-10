@@ -71,6 +71,27 @@ export const copy = {
     reviewUpdated: "review odświeżony",
     saveFailed: "błąd zapisu",
     roleLine: "Rola: Świadek",
+    rolePrefix: "Rola",
+    roleWitness: "Świadek",
+    roleWitnessMale: "Świadek",
+    roleNightStaffWitness: "Pracownik apteki (świadek)",
+    roleCareWitness: "Pracownik opieki (świadek)",
+    questionAnswered: "odpowiedziano",
+    questionPending: "do zadania",
+    questionTopics: "tematy",
+    answerToQuestion: "Do pytania",
+    hintCareTimeTitle: "Doprecyzuj czas odkrycia braku dawki",
+    hintCareTimeDetail:
+      "W odpowiedziach pojawiają się różne godziny (18:40 i 19:05). Warto spokojnie ustalić kolejność zdarzeń względem dokumentacji lekowej.",
+    hintCareRecordingTitle: "Sprawdź monitoring i logi dostępu",
+    hintCareRecordingDetail:
+      "Materiał wspomina o monitoringu korytarza i logach dostępu — temat nie został jeszcze w pełni pokryty w rozmowie.",
+    hintPharmacyDoorTitle: "Ustal stan drzwi serwisowych",
+    hintPharmacyDoorDetail:
+      "Relacja wskazuje na otwarte drzwi, a późniejsze pytania mogą sugerować inną wersję. Warto doprecyzować bez nacisku werdyktycznego.",
+    hintBikeTimeTitle: "Doprecyzuj czas zdarzenia",
+    hintBikeTimeDetail:
+      "W materiale pojawiają się różne godziny (19:45 i 20:10). Warto spokojnie ustalić chronologię bez sugerowania odpowiedzi.",
     caseCatalog: "Katalog spraw",
     caseDossier: "Dossier sprawy",
     plannedScope: "zakres",
@@ -93,6 +114,77 @@ export const copy = {
     demoStepGroundedAiDetail: "pokaż sugestie z uzasadnieniem i źródłami",
     demoStepReview: "Review",
     demoStepReviewDetail: "pokaż STOP, wskaźniki i ślad audytu",
+    demoFreshStart: "Świeże demo",
+    demoFreshStartDetail: "nowa sesja i workspace dla bieżącej sprawy",
+    demoCopySummary: "Kopiuj podsumowanie",
+    demoSummaryCopied: "podsumowanie skopiowane",
+    demoSummaryCopyFailed: "kopiowanie nieudane",
+    demoChecklist: "Checklista demo",
+    demoSummaryTitle: "InterrogA(I)tion — podsumowanie demo",
+    demoSummaryBoundary:
+      "Uwaga: prototyp badawczy, dane syntetyczne. Brak werdyktu prawdy, winy ani wiarygodności.",
+    zoneCasePrep: "Przygotowanie sprawy",
+    zoneInterview: "Przesłuchanie na żywo",
+    zoneOperations: "Operacje i przegląd",
+    collapseZone: "Zwiń",
+    expandZone: "Rozwiń panel",
+    closeModal: "Zamknij",
+    answerHistory: "Historia odpowiedzi",
+    disclosureHint: "Sekcje zwinięte — rozwiń tylko to, czego potrzebujesz.",
+    expandWhenNeeded: "rozwiń w razie potrzeby",
+    contextCoverage: "pokrycie pytań",
+    operatorUrgentShort: "pilne",
+    tutorialLaunch: "Tryb tutorialowy",
+    tutorialMode: "Przewodnik po demo",
+    tutorialSkip: "Zamknij",
+    tutorialBack: "Wstecz",
+    tutorialNext: "Dalej",
+    tutorialFinish: "Zakończ",
+    tutorialWelcomeTitle: "Witaj w InterrogA(I)tion",
+    tutorialWelcomeBody:
+      "To lokalny prototyp badawczy do wspierania przesłuchań — z audytem, materiałami i AI doradczym. Ten przewodnik przeprowadzi Cię przez demo krok po kroku. Użyj strzałek lub przycisków Dalej/Wstecz.",
+    tutorialTopbarTitle: "Pasek sesji",
+    tutorialTopbarBody:
+      "Tutaj widzisz nazwę sprawy, status połączenia z lokalnym API oraz przełącznik języka PL/EN. Domyślnie pracujemy na danych syntetycznych.",
+    tutorialZoneLeftTitle: "Przygotowanie sprawy",
+    tutorialZoneLeftBody:
+      "Lewy panel to kontekst sprawy: katalog, dossier, ścieżka demo i lista pytań. Sekcje są zwinięte — rozwiń tylko to, czego potrzebujesz.",
+    tutorialDossierTitle: "Dossier sprawy",
+    tutorialDossierBody:
+      "Dossier pokazuje zakres, luki priorytetowe, materiały startowe i postęp. To szybki briefing przed przesłuchaniem.",
+    tutorialDemoTitle: "Pakiet demo",
+    tutorialDemoBody:
+      "Świeże demo, kopiowanie podsumowania i checklista kroków — przydatne przed pokazem prowadzącemu. Możesz też uruchomić ten tutorial klawiszem ?.",
+    tutorialContextTitle: "Kontekst rozmowy",
+    tutorialContextBody:
+      "Ten pasek mówi, na której sprawie pracujesz, jakie jest pokrycie pytań i czy są pilne kroki — bez otwierania wszystkich paneli.",
+    tutorialQuestionTitle: "Aktywne pytanie",
+    tutorialQuestionBody:
+      "To główny tor pracy: bieżące pytanie i powiązane materiały. System nie wydaje werdyktów — wspiera operatora człowieka.",
+    tutorialComposerTitle: "Zapis odpowiedzi",
+    tutorialComposerBody:
+      "Tu rejestrujesz odpowiedź świadka. Ctrl+Enter zapisuje szybciej. Odpowiedzi trafiają do historii i audytu sesji.",
+    tutorialZoneOpsTitle: "Operacje i przegląd",
+    tutorialZoneOpsBody:
+      "Prawy panel to narzędzia analityczne: runtime, AI, materiały i review. Domyślnie jest zwinięty, żeby nie rozpraszać podczas rozmowy.",
+    tutorialTabsTitle: "Zakładki operacji",
+    tutorialTabsBody:
+      "Cztery obszary: Monitor (środowisko), AI (sugestie), Materiały (rejestr źródeł), Review (STOP, board, audyt). Przejdziemy przez każdy z nich.",
+    tutorialMonitorTitle: "Monitor i bezpieczeństwo",
+    tutorialMonitorBody:
+      "Lokalne bramki, tryb danych, audyt workspace i bezpieczny smoke test modelu. Demo używa deterministycznego runtime — bez zewnętrznego modelu.",
+    tutorialAiTitle: "Grounded AI",
+    tutorialAiBody:
+      "Sugestie follow-up z uzasadnieniem i źródłami. Operator może użyć, edytować lub odrzucić — decyzja zawsze po stronie człowieka.",
+    tutorialMaterialsTitle: "Rejestr materiałów",
+    tutorialMaterialsBody:
+      "Materiały mają hashe, weryfikację i powiązania z pytaniami. Podgląd otwiera się w oknie modalnym, żeby nie zaśmiecać listy.",
+    tutorialReviewTitle: "Review i board",
+    tutorialReviewBody:
+      "STOP readiness, investigative board, wskaźniki i ślad audytu. Board grupuje sygnały czasu, cele doprecyzowania i tropy materiałowe — bez oceny winy czy prawdy.",
+    tutorialFinishTitle: "Gotowe do przeglądu",
+    tutorialFinishBody:
+      "To komplet pierwszego demo: sprawa syntetyczna, przesłuchanie na żywo, materiały, AI doradcze i audyt. Powodzenia na prezentacji.",
     caseSingular: "sprawa",
     casePluralFew: "sprawy",
     casePluralMany: "spraw",
@@ -331,6 +423,27 @@ export const copy = {
     reviewUpdated: "review refreshed",
     saveFailed: "save failed",
     roleLine: "Role: Witness",
+    rolePrefix: "Role",
+    roleWitness: "Witness",
+    roleWitnessMale: "Witness",
+    roleNightStaffWitness: "Pharmacy staff (witness)",
+    roleCareWitness: "Care worker (witness)",
+    questionAnswered: "answered",
+    questionPending: "pending",
+    questionTopics: "topics",
+    answerToQuestion: "For question",
+    hintCareTimeTitle: "Clarify discovery time for the missing dose",
+    hintCareTimeDetail:
+      "Answers mention different times (18:40 and 19:05). Calmly establish the sequence against the medication log.",
+    hintCareRecordingTitle: "Check monitoring and access logs",
+    hintCareRecordingDetail:
+      "Materials mention corridor monitoring and access logs — the topic is not fully covered in the interview yet.",
+    hintPharmacyDoorTitle: "Clarify service door status",
+    hintPharmacyDoorDetail:
+      "The account mentions an open door while later questions may imply another version. Clarify without a verdict tone.",
+    hintBikeTimeTitle: "Clarify event timing",
+    hintBikeTimeDetail:
+      "Materials mention different times (19:45 and 20:10). Establish chronology calmly without suggesting an answer.",
     caseCatalog: "Case catalog",
     caseDossier: "Case dossier",
     plannedScope: "scope",
@@ -353,6 +466,77 @@ export const copy = {
     demoStepGroundedAiDetail: "show suggestions with reasons and sources",
     demoStepReview: "Review",
     demoStepReviewDetail: "show STOP readiness, indicators, and audit trace",
+    demoFreshStart: "Fresh demo",
+    demoFreshStartDetail: "new session and workspace for the current case",
+    demoCopySummary: "Copy summary",
+    demoSummaryCopied: "summary copied",
+    demoSummaryCopyFailed: "copy failed",
+    demoChecklist: "Demo checklist",
+    demoSummaryTitle: "InterrogA(I)tion — demo summary",
+    demoSummaryBoundary:
+      "Note: research prototype, synthetic data only. No truth, guilt, or credibility verdict.",
+    zoneCasePrep: "Case preparation",
+    zoneInterview: "Live interview",
+    zoneOperations: "Operations & review",
+    collapseZone: "Collapse",
+    expandZone: "Expand panel",
+    closeModal: "Close",
+    answerHistory: "Answer history",
+    disclosureHint: "Sections stay collapsed — expand only what you need.",
+    expandWhenNeeded: "expand when needed",
+    contextCoverage: "question coverage",
+    operatorUrgentShort: "urgent",
+    tutorialLaunch: "Tutorial mode",
+    tutorialMode: "Demo guide",
+    tutorialSkip: "Close",
+    tutorialBack: "Back",
+    tutorialNext: "Next",
+    tutorialFinish: "Finish",
+    tutorialWelcomeTitle: "Welcome to InterrogA(I)tion",
+    tutorialWelcomeBody:
+      "This is a local research prototype for interview support — with audit, materials, and advisory AI. This guide walks through the demo step by step. Use arrows or Next/Back buttons.",
+    tutorialTopbarTitle: "Session bar",
+    tutorialTopbarBody:
+      "Case title, local API status, and PL/EN language toggle. The demo uses synthetic data only.",
+    tutorialZoneLeftTitle: "Case preparation",
+    tutorialZoneLeftBody:
+      "The left panel holds case context: catalog, dossier, demo path, and questions. Sections stay collapsed — expand only what you need.",
+    tutorialDossierTitle: "Case dossier",
+    tutorialDossierBody:
+      "The dossier shows scope, priority gaps, starter materials, and progress. A quick briefing before the interview.",
+    tutorialDemoTitle: "Demo pack",
+    tutorialDemoBody:
+      "Fresh demo, copyable summary, and a walkthrough checklist — useful before a supervisor review. Press ? anytime to reopen this guide.",
+    tutorialContextTitle: "Conversation context",
+    tutorialContextBody:
+      "This strip shows the active case, question coverage, and urgent steps without opening every panel.",
+    tutorialQuestionTitle: "Active question",
+    tutorialQuestionBody:
+      "The primary work lane: current question and linked materials. The system does not issue verdicts — it supports a human operator.",
+    tutorialComposerTitle: "Record an answer",
+    tutorialComposerBody:
+      "Record the witness answer here. Ctrl+Enter saves faster. Answers feed history and the session audit trail.",
+    tutorialZoneOpsTitle: "Operations and review",
+    tutorialZoneOpsBody:
+      "The right panel holds analytical tools: runtime, AI, materials, and review. It starts collapsed to protect focus during the interview.",
+    tutorialTabsTitle: "Operations tabs",
+    tutorialTabsBody:
+      "Four areas: Monitor (environment), AI (suggestions), Materials (source register), Review (STOP, board, audit). We will visit each one.",
+    tutorialMonitorTitle: "Monitor and security",
+    tutorialMonitorBody:
+      "Local gates, data mode, workspace audit, and the safe model smoke check. The demo uses a deterministic runtime — no external model required.",
+    tutorialAiTitle: "Grounded AI",
+    tutorialAiBody:
+      "Follow-up suggestions with reasons and sources. The operator can use, edit, or reject — the human always decides.",
+    tutorialMaterialsTitle: "Material register",
+    tutorialMaterialsBody:
+      "Materials include hashes, verification, and question links. Preview opens in a modal so the list stays clean.",
+    tutorialReviewTitle: "Review and board",
+    tutorialReviewBody:
+      "STOP readiness, investigative board, indicators, and audit trace. The board groups time signals, clarification targets, and material leads — no guilt or truth verdict.",
+    tutorialFinishTitle: "Ready for review",
+    tutorialFinishBody:
+      "That is the first demo loop: synthetic case, live interview, materials, advisory AI, and audit. Good luck with the presentation.",
     caseSingular: "case",
     casePluralFew: "cases",
     casePluralMany: "cases",

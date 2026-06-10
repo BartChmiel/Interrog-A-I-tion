@@ -1,4 +1,5 @@
 import type { Answer, AnswerView, Locale, Question, QuestionView, RuntimeConfig } from "./types";
+import { text, type CopyKey } from "./i18n";
 import { seedAnswers, seedQuestions } from "./demoData";
 
 export function runtimeConfig(): RuntimeConfig {
@@ -48,13 +49,33 @@ export function questionTypeLabel(questionType: string): { pl: string; en: strin
   const labels: Record<string, { pl: string; en: string }> = {
     open: { pl: "otwarte", en: "open" },
     clarifying: { pl: "doprecyzowujące", en: "clarifying" },
-    chronological: { pl: "chronologiczne", en: "chronological" },
-    source_of_knowledge: { pl: "źródło wiedzy", en: "source of knowledge" },
+    chronological: { pl: "chronologia", en: "timeline" },
+    source_of_knowledge: { pl: "źródło wiedzy", en: "source" },
     control: { pl: "kontrolne", en: "control" },
     summary: { pl: "podsumowanie", en: "summary" },
-    challenge: { pl: "konfrontujące", en: "challenge" },
+    challenge: { pl: "weryfikacyjne", en: "verification" },
   };
   return labels[questionType] ?? { pl: questionType, en: questionType };
+}
+
+export function questionSourceLabel(source: string | undefined): { pl: string; en: string } | undefined {
+  if (source === "ai") {
+    return { pl: "AI / operator", en: "AI / operator" };
+  }
+  if (source === "human") {
+    return { pl: "plan sprawy", en: "case plan" };
+  }
+  return undefined;
+}
+
+export function questionRiskLabel(question: Question): { pl: string; en: string } | undefined {
+  if (question.question_type === "challenge") {
+    return { pl: "pytanie sugerujące", en: "leading question" };
+  }
+  if (question.neutrality_flags?.length) {
+    return { pl: "wymaga neutralizacji", en: "needs neutralization" };
+  }
+  return undefined;
 }
 
 export function toQuestionView(question: Question): QuestionView {
@@ -64,11 +85,8 @@ export function toQuestionView(question: Question): QuestionView {
     type: seed?.type ?? questionTypeLabel(question.question_type),
     text: seed?.text ?? { pl: question.text, en: question.text },
     topicIds: question.topic_ids,
-    risk:
-      seed?.risk ??
-      (question.neutrality_flags?.length
-        ? { pl: "flaga neutralności", en: "neutrality flag" }
-        : undefined),
+    source: question.source,
+    risk: seed?.risk ?? questionRiskLabel(question),
   };
 }
 
@@ -125,4 +143,38 @@ export function formatCount(
 
 export function scorePercent(score: number | null): string {
   return `${Math.round((score ?? 0) * 100)}%`;
+}
+
+export function sessionRoleLine(caseId: string, locale: Locale): string {
+  const roleKeys: Record<string, CopyKey> = {
+    "case-001": "roleWitnessMale",
+    "case-002": "roleNightStaffWitness",
+    "case-003": "roleCareWitness",
+  };
+  return `${text(locale, "rolePrefix")}: ${text(locale, roleKeys[caseId] ?? "roleWitness")}`;
+}
+
+export function caseAssistantHints(
+  caseId: string,
+  locale: Locale,
+): Array<{ detail: string; title: string }> {
+  const hintSets: Record<string, Array<{ detailKey: CopyKey; titleKey: CopyKey }>> = {
+    "case-001": [
+      { titleKey: "hintBikeTimeTitle", detailKey: "hintBikeTimeDetail" },
+      { titleKey: "checkRecording", detailKey: "checkRecordingDetail" },
+    ],
+    "case-002": [
+      { titleKey: "hintPharmacyDoorTitle", detailKey: "hintPharmacyDoorDetail" },
+      { titleKey: "checkRecording", detailKey: "checkRecordingDetail" },
+    ],
+    "case-003": [
+      { titleKey: "hintCareTimeTitle", detailKey: "hintCareTimeDetail" },
+      { titleKey: "hintCareRecordingTitle", detailKey: "hintCareRecordingDetail" },
+    ],
+  };
+
+  return (hintSets[caseId] ?? hintSets["case-001"]).map((hint) => ({
+    title: text(locale, hint.titleKey),
+    detail: text(locale, hint.detailKey),
+  }));
 }

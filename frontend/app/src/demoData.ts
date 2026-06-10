@@ -28,9 +28,9 @@ export const seedCaseCatalog: Record<Locale, CaseCatalogItem[]> = {
     },
     {
       id: "case-003",
-      title: "Syntetyczna rozbieżność lekowa w placówce opiekuńczej",
+      title: "Rozbieżność lekowa w placówce opiekuńczej",
       description:
-        "Scenariusz z granicą roli procesowej, dokumentacją lekową, czasem odkrycia i dostępem do kluczy.",
+        "Wieczorny obchód, brak dawki leku, sprzeczne godziny odkrycia (18:40 vs 19:05) i dostęp do szafki.",
       created_at: "2026-05-07T10:15:00Z",
       topic_count: 7,
       high_priority_topic_count: 4,
@@ -66,9 +66,9 @@ export const seedCaseCatalog: Record<Locale, CaseCatalogItem[]> = {
     },
     {
       id: "case-003",
-      title: "Synthetic care facility medication discrepancy",
+      title: "Care facility medication discrepancy",
       description:
-        "Role-boundary, medication documentation, discovery-time conflict, and cabinet-key access scenario.",
+        "Evening round, missing dose, conflicting discovery times (18:40 vs 19:05), and cabinet access.",
       created_at: "2026-05-07T10:15:00Z",
       topic_count: 7,
       high_priority_topic_count: 4,

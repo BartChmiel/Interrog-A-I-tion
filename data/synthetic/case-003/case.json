@@ -182,10 +182,10 @@
     },
     {
       "id": "q-306",
-      "text": "You were the only person who could have moved the medication, correct?",
+      "text": "You were the only person with access to the medication cabinet, correct?",
       "text_i18n": {
-        "en": "You were the only person who could have moved the medication, correct?",
-        "pl": "To Pani była jedyną osobą, która mogła przenieść lek, prawda?"
+        "en": "You were the only person with access to the medication cabinet, correct?",
+        "pl": "Pani była jedyną osobą z dostępem do szafki z lekami, prawda?"
       },
       "source": "human",
       "question_type": "challenge",

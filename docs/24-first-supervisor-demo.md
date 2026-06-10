@@ -37,7 +37,20 @@ The first demo includes:
 - operator work queue with audited open/skip/dismiss decisions,
 - Review tab with STOP readiness, an investigative board, indicators, findings, and provenance timeline,
 - SQLite session storage and append-only audit-chain events,
-- workspace-local model artifact manifests and export integrity manifest support.
+- workspace-local model artifact manifests and export integrity manifest support,
+- three-zone workspace layout with progressive disclosure (collapsed-by-default panels),
+- in-app tutorial mode with spotlight walkthrough (15 steps, PL/EN).
+
+## Workspace Layout
+
+The interview workspace is split into three zones:
+
+- **Case prep** (left) — demo path, dossier, and case context.
+- **Live interview** (center) — active question, answer composer, and answer history.
+- **Operations** (right) — materials, grounded AI, operator queue, and review.
+
+Side rails can collapse to keep focus on the live interview. Secondary panels stay
+collapsed until opened, so the default view stays readable during a walkthrough.
 
 ## How To Run The Demo
 
@@ -62,7 +75,21 @@ Open:
 http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-003&session=demo-session&participant=person-001&workspace=demo-workspace
 ```
 
+For a self-guided supervisor walkthrough, add `&tutorial=1` to auto-start the
+in-app tutorial, or press `?` / use **Tutorial mode** in the top bar anytime.
+
 The demo uses synthetic material only.
+
+## Demo Pack Controls
+
+The left sidebar **Demo path** panel includes supervisor-demo helpers:
+
+- **Fresh demo** — reloads the page with a new session and workspace for the
+  current case, so each walkthrough starts from a clean local state.
+- **Copy summary** — copies a compact text snapshot (case, coverage, materials,
+  audit counts, advisory boundary) for notes or email follow-up.
+- **Demo checklist** — tracks which walkthrough steps have been touched in the
+  current session.
 
 ## Suggested Walkthrough
 
@@ -70,7 +97,8 @@ For the first review, the recommended path is:
 
 1. Open `case-003`, which contains a medication-discrepancy scenario with timing,
    documentation, access, and monitoring questions.
-2. Use the left-side demo path to move through the main workflow.
+2. Use **Fresh demo** if you need a clean workspace, then use the left-side demo
+   path to move through the main workflow.
 3. Review the case dossier: planned scope, priority gaps, answer count, and starter materials.
 4. Open the local AI/runtime area from the demo path. The default runtime is deterministic and
    safe for demonstration; it shows the local model gate without relying on a real model.

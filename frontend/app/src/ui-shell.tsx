@@ -1,0 +1,281 @@
+import { useEffect, useId, type ReactNode } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { text, type CopyKey } from "./i18n";
+import type { Locale } from "./types";
+
+export function CollapsibleSection({
+  accordionGroup,
+  children,
+  className = "",
+  defaultOpen = false,
+  hint,
+  meta,
+  title,
+  tutorialId,
+}: {
+  accordionGroup?: string;
+  children: ReactNode;
+  className?: string;
+  defaultOpen?: boolean;
+  hint?: string;
+  meta: string;
+  title: string;
+  tutorialId?: string;
+}) {
+  return (
+    <details
+      className={`collapsible-section ${className}`.trim()}
+      data-tutorial={tutorialId}
+      name={accordionGroup}
+      open={defaultOpen || undefined}
+    >
+      <summary className="collapsible-section-summary">
+        <span className="collapsible-section-titles">
+          <strong>{title}</strong>
+          <em>{meta}</em>
+          {hint ? <span className="collapsible-section-hint">{hint}</span> : null}
+        </span>
+        <ChevronDown aria-hidden className="collapsible-section-chevron" size={16} />
+      </summary>
+      <div className="collapsible-section-body">{children}</div>
+    </details>
+  );
+}
+
+export function CollapsibleWorkspaceCard({
+  children,
+  className = "",
+  defaultOpen = false,
+  highlight = false,
+  meta,
+  scrollable = false,
+  sticky = false,
+  title,
+  tutorialId,
+}: {
+  children: ReactNode;
+  className?: string;
+  defaultOpen?: boolean;
+  highlight?: boolean;
+  meta?: string;
+  scrollable?: boolean;
+  sticky?: boolean;
+  title: string;
+  tutorialId?: string;
+}) {
+  const classes = [
+    "workspace-card",
+    "collapsible-workspace-card",
+    highlight ? "workspace-card--highlight" : "",
+    scrollable ? "workspace-card--scroll" : "",
+    sticky ? "workspace-card--sticky" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <details className={classes} data-tutorial={tutorialId} open={defaultOpen || undefined}>
+      <summary className="workspace-card-header">
+        <span className="workspace-card-header-titles">
+          <strong>{title}</strong>
+          {meta ? <span>{meta}</span> : null}
+        </span>
+        <ChevronDown aria-hidden className="workspace-card-chevron" size={15} />
+      </summary>
+      <div className="workspace-card-body">{children}</div>
+    </details>
+  );
+}
+
+export function InterviewContextStrip({
+  activeQuestionLabel,
+  caseId,
+  coverageLabel,
+  locale,
+  roleLabel,
+  urgentActionCount,
+}: {
+  activeQuestionLabel: string;
+  caseId: string;
+  coverageLabel: string;
+  locale: Locale;
+  roleLabel: string;
+  urgentActionCount: number;
+}) {
+  return (
+    <div className="interview-context-strip" data-tutorial="interview-context" role="status">
+      <div className="interview-context-pills">
+        <span className="context-pill">{caseId}</span>
+        <span className="context-pill">{roleLabel}</span>
+        <span className="context-pill">
+          {coverageLabel} {text(locale, "contextCoverage")}
+        </span>
+        {urgentActionCount > 0 ? (
+          <span className="context-pill context-pill--signal">
+            {urgentActionCount} {text(locale, "operatorUrgentShort")}
+          </span>
+        ) : null}
+      </div>
+      <p className="interview-context-focus">{activeQuestionLabel}</p>
+      <span className="interview-context-hint">{text(locale, "disclosureHint")}</span>
+    </div>
+  );
+}
+
+export function WorkspaceZone({
+  children,
+  collapsed,
+  disclosureHint,
+  label,
+  locale,
+  onToggleCollapse,
+  side,
+  tutorialId,
+}: {
+  children: ReactNode;
+  collapsed: boolean;
+  disclosureHint?: string;
+  label: string;
+  locale: Locale;
+  onToggleCollapse: () => void;
+  side: "left" | "center" | "right";
+  tutorialId?: string;
+}) {
+  const collapseKey: CopyKey = "collapseZone";
+  const expandKey: CopyKey = "expandZone";
+
+  if (collapsed) {
+    return (
+      <div className={`workspace-zone workspace-zone--${side} is-collapsed`} data-tutorial={tutorialId}>
+        <button
+          className="workspace-zone-restore"
+          type="button"
+          title={text(locale, expandKey)}
+          onClick={onToggleCollapse}
+        >
+          {side === "left" ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          <span>{label}</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`workspace-zone workspace-zone--${side}`} data-tutorial={tutorialId}>
+      <div className="workspace-zone-header">
+        <div className="workspace-zone-heading">
+          <span className="workspace-zone-label">{label}</span>
+          {disclosureHint ? <span className="workspace-zone-hint">{disclosureHint}</span> : null}
+        </div>
+        {side === "center" ? null : (
+          <button
+            className="workspace-zone-collapse"
+            type="button"
+            title={text(locale, collapseKey)}
+            onClick={onToggleCollapse}
+          >
+            {side === "left" ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+            <span>{text(locale, collapseKey)}</span>
+          </button>
+        )}
+      </div>
+      <div className="workspace-zone-body">{children}</div>
+    </div>
+  );
+}
+
+export function WorkspaceCard({
+  children,
+  className = "",
+  highlight = false,
+  meta,
+  scrollable = false,
+  sticky = false,
+  title,
+  tutorialId,
+}: {
+  children: ReactNode;
+  className?: string;
+  highlight?: boolean;
+  meta?: string;
+  scrollable?: boolean;
+  sticky?: boolean;
+  title: string;
+  tutorialId?: string;
+}) {
+  const classes = [
+    "workspace-card",
+    highlight ? "workspace-card--highlight" : "",
+    scrollable ? "workspace-card--scroll" : "",
+    sticky ? "workspace-card--sticky" : "",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <article className={classes} data-tutorial={tutorialId}>
+      <header className="workspace-card-header">
+        <strong>{title}</strong>
+        {meta ? <span>{meta}</span> : null}
+      </header>
+      <div className="workspace-card-body">{children}</div>
+    </article>
+  );
+}
+
+export function Modal({
+  children,
+  locale,
+  onClose,
+  subtitle,
+  title,
+}: {
+  children: ReactNode;
+  locale: Locale;
+  onClose: () => void;
+  subtitle?: string;
+  title: string;
+}) {
+  const titleId = useId();
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="modal-root" role="presentation" onClick={onClose}>
+      <div
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="modal-dialog"
+        role="dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="modal-header">
+          <div>
+            <h2 id={titleId}>{title}</h2>
+            {subtitle ? <p>{subtitle}</p> : null}
+          </div>
+          <button className="modal-close" type="button" onClick={onClose}>
+            <X size={16} />
+            <span>{text(locale, "closeModal")}</span>
+          </button>
+        </header>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}

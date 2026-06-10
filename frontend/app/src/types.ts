@@ -577,6 +577,7 @@ export type QuestionView = {
   text: LocalizedText;
   type: LocalizedText;
   topicIds: string[];
+  source?: string;
   risk?: LocalizedText;
 };
 
