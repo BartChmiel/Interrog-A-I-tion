@@ -135,6 +135,14 @@ type OperatorAction = {
   sourceObjectIds?: string[];
 };
 
+type StopReadinessGate = {
+  id: string;
+  label: string;
+  detail: string;
+  state: EnvironmentHealthState;
+  icon: ReactNode;
+};
+
 const emptyMaterialDraft: MaterialDraft = {
   title: "",
   content: "",
@@ -1233,6 +1241,15 @@ export function App() {
 
             {activeOperationsTab === "review" ? (
               <>
+                <StopReadinessPanel
+                  encryptionStatus={encryptionStatus}
+                  locale={locale}
+                  localModelConfig={localModelConfig}
+                  modelArtifactManifest={modelArtifactManifest}
+                  sessionAudit={sessionAudit}
+                  workspace={workspace}
+                  workspaceAudit={workspaceAudit}
+                />
                 <ProvenanceTimelinePanel
                   locale={locale}
                   sessionAudit={sessionAudit}
@@ -1365,6 +1382,109 @@ function OperatorWorkflowPanel({
           ))}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+function StopReadinessPanel({
+  encryptionStatus,
+  locale,
+  localModelConfig,
+  modelArtifactManifest,
+  sessionAudit,
+  workspace,
+  workspaceAudit,
+}: {
+  encryptionStatus: EncryptionStatus | null;
+  locale: Locale;
+  localModelConfig: LocalModelConfig | null;
+  modelArtifactManifest: ModelArtifactManifest | null;
+  sessionAudit: SessionAuditResponse | null;
+  workspace: WorkspaceResponse | null;
+  workspaceAudit: WorkspaceAuditResponse | null;
+}) {
+  const manifest = workspace?.manifest;
+  const isSynthetic = manifest?.data_sensitivity === "synthetic";
+  const encryptionReady = encryptionStatus?.available === true || manifest?.storage_mode === "encrypted_required";
+  const liveModelEnabled = localModelConfig?.live_output_enabled === true;
+  const auditReady = workspaceAudit?.chain_valid === true && sessionAudit?.chain_valid === true;
+  const artifactReady = modelArtifactManifest?.chain_valid === true;
+  const readyCount = [
+    isSynthetic,
+    encryptionReady,
+    !liveModelEnabled,
+    auditReady,
+    artifactReady,
+    true,
+  ].filter(Boolean).length;
+
+  const gates: StopReadinessGate[] = [
+    {
+      id: "data-posture",
+      label: text(locale, "stopGateData"),
+      detail: text(locale, isSynthetic ? "stopGateDataReady" : "stopGateDataWarning"),
+      state: isSynthetic ? "ready" : "warning",
+      icon: <Database size={15} />,
+    },
+    {
+      id: "encrypted-storage",
+      label: text(locale, "stopGateEncryption"),
+      detail: text(locale, encryptionReady ? "stopGateEncryptionReady" : "stopGateEncryptionWarning"),
+      state: encryptionReady ? "ready" : "warning",
+      icon: <KeyRound size={15} />,
+    },
+    {
+      id: "model-output",
+      label: text(locale, "stopGateModel"),
+      detail: text(locale, liveModelEnabled ? "stopGateModelWarning" : "stopGateModelReady"),
+      state: liveModelEnabled ? "warning" : "ready",
+      icon: <Network size={15} />,
+    },
+    {
+      id: "audit-chain",
+      label: text(locale, "stopGateAudit"),
+      detail: text(locale, auditReady ? "stopGateAuditReady" : "stopGateAuditWarning"),
+      state: auditReady ? "ready" : "unknown",
+      icon: <Fingerprint size={15} />,
+    },
+    {
+      id: "model-artifacts",
+      label: text(locale, "stopGateArtifacts"),
+      detail: text(locale, artifactReady ? "stopGateArtifactsReady" : "stopGateArtifactsWarning"),
+      state: artifactReady ? "ready" : "warning",
+      icon: <FileCheck2 size={15} />,
+    },
+    {
+      id: "human-authority",
+      label: text(locale, "stopGateHuman"),
+      detail: text(locale, "stopGateHumanReady"),
+      state: "ready",
+      icon: <ShieldCheck size={15} />,
+    },
+  ];
+
+  return (
+    <section className="stop-readiness-panel">
+      <PanelHeader
+        title={text(locale, "stopReadiness")}
+        meta={`${readyCount}/${gates.length} ${text(locale, "ready")}`}
+        compact
+      />
+      <div className="stop-readiness-body">
+        <p>{text(locale, "stopReadinessAdvisory")}</p>
+        <div className="stop-gate-grid">
+          {gates.map((gate) => (
+            <article className="stop-gate-card" data-state={gate.state} key={gate.id}>
+              <span className="stop-gate-icon">{gate.icon}</span>
+              <span>
+                <strong>{gate.label}</strong>
+                <em>{environmentStateShortLabel(gate.state, locale)}</em>
+              </span>
+              <p>{gate.detail}</p>
+            </article>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

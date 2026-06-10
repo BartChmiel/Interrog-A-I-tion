@@ -356,6 +356,24 @@ The project owner should evaluate:
 - whether the indicator should also appear in the markdown export and live-session review, not only the case-map panel,
 - whether reviewed-link alignment can be used in thesis evaluation before real case data is available.
 
+## Current STOP
+
+Milestone 4/7: Operator dossier, case navigation, work queue, and provenance review have reached
+their first integrated workflow checkpoint.
+
+The project owner should evaluate:
+
+- whether the left-side case dossier gives enough orientation before an operator starts or resumes
+  an interview,
+- whether starter materials should be visible in the dossier, only in the Materials tab, or both,
+- whether the operator work queue is helpful without becoming too directive,
+- whether skipped and dismissed operator actions should remain hidden after dismissal or stay visible
+  with a decision state,
+- whether the Review tab should remain the home for provenance and STOP readiness or whether a
+  separate Governance/Admin view is needed,
+- whether chain-validity and prompt hashes are understandable enough for thesis demonstration,
+- whether any current UI wording looks too official for a synthetic prototype.
+
 ## Next Expected STOP
 
 The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, before treating audited suggestion decisions as official procedural records, or before introducing export formats intended to look official.

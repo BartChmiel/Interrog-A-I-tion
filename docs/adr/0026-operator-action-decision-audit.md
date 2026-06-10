@@ -1,4 +1,4 @@
-# ADR 0024: Operator Action Decision Audit
+# ADR 0026: Operator Action Decision Audit
 
 ## Status
 

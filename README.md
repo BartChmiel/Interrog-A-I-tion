@@ -78,6 +78,7 @@ UI labels, report copy, and future installer/startup language selection should u
 - [Derived Assumptions and Work Packages](docs/21-derived-assumptions-and-work-packages.md)
 - [Architecture Diagram](docs/22-architecture-diagram.md)
 - [Brand](docs/23-brand.md)
+- [First Supervisor Demo](docs/24-first-supervisor-demo.md)
 
 ## Development Stages
 

@@ -137,6 +137,8 @@ p {
 .audit-event-header,
 .audit-event-details,
 .audit-event-footer,
+.stop-gate-card,
+.stop-gate-card > span,
 .case-dossier-metrics,
 .case-dossier-metrics span,
 .case-dossier-section > span,
@@ -1004,6 +1006,100 @@ h2 {
   font-size: 11px;
 }
 
+.stop-readiness-panel {
+  display: grid;
+  gap: 0;
+}
+
+.stop-readiness-body {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+}
+
+.stop-readiness-body > p {
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.stop-gate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stop-gate-card {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.stop-gate-card[data-state="ready"] {
+  border-color: #b7dec9;
+  background: linear-gradient(180deg, #fff 0, #f7fcfa 100%);
+}
+
+.stop-gate-card[data-state="warning"] {
+  border-color: #ead49b;
+  background: linear-gradient(180deg, #fff 0, #fffaf0 100%);
+}
+
+.stop-gate-card[data-state="blocked"] {
+  border-color: #e6b3ad;
+  background: linear-gradient(180deg, #fff 0, #fff7f6 100%);
+}
+
+.stop-gate-card > span:first-child {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: var(--radius);
+  background: var(--surface-muted);
+  color: var(--accent-strong);
+}
+
+.stop-gate-card[data-state="ready"] > span:first-child {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.stop-gate-card[data-state="warning"] > span:first-child {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.stop-gate-card > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.stop-gate-card strong {
+  color: var(--heading);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.stop-gate-card em,
+.stop-gate-card p {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.stop-gate-card p {
+  grid-column: 1 / -1;
+  margin: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .provenance-panel {
   display: grid;
   gap: 10px;
@@ -1247,6 +1343,7 @@ h2 {
 .suggestion-card,
 .finding-card,
 .security-item,
+.stop-gate-card,
 .material-card,
 .grounded-suggestion-card,
 .environment-health,
@@ -2235,6 +2332,7 @@ h2 {
   .material-card-footer,
   .evidence-map-summary,
   .operator-action-list,
+  .stop-gate-grid,
   .security-list {
     grid-template-columns: 1fr;
   }
