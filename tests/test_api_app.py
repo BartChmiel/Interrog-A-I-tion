@@ -5,6 +5,9 @@ from pathlib import Path
 from interrogaition.api.app import (
     AddAnswerRequest,
     CreateWorkspaceRequest,
+    ExportBundleRequest,
+    ExportFileContent,
+    ExportIntegrityPreviewRequest,
     GroundedSuggestionDecisionRequest,
     HTTPException,
     MaterialQuestionLinkDecisionRequest,
@@ -194,6 +197,7 @@ class ApiAppTest(unittest.TestCase):
         record_operator_decision = endpoint(app, "record_workspace_operator_action_decision")
         list_operator_decisions = endpoint(app, "list_workspace_operator_action_decisions")
         get_workspace_audit = endpoint(app, "get_workspace_audit")
+        preview_export_integrity = endpoint(app, "preview_workspace_export_integrity")
         verify_material = endpoint(app, "verify_workspace_material")
 
         created = create_workspace(
@@ -470,6 +474,38 @@ class ApiAppTest(unittest.TestCase):
             ],
         )
         self.assertTrue(material_verification["verified"])
+        integrity_preview = preview_export_integrity(
+            "api-workspace-001",
+            ExportIntegrityPreviewRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                files=[
+                    ExportFileContent(
+                        path="session-report.md",
+                        content="# Session report\n\nSynthetic export preview.\n",
+                    )
+                ],
+            ),
+        )
+        self.assertEqual(integrity_preview["manifest"]["case_id"], "case-001")
+        self.assertEqual(integrity_preview["manifest"]["files"][0]["path"], "session-report.md")
+        self.assertEqual(len(integrity_preview["manifest"]["manifest_hash"]), 64)
+        self.assertIsNotNone(integrity_preview["manifest"]["model_artifacts"])
+        self.assertEqual(integrity_preview["manifest"]["model_artifacts"]["record_count"], 4)
+        self.assertTrue(integrity_preview["verification"]["verified"])
+        create_export_bundle = endpoint(app, "create_workspace_export_bundle")
+        bundle = create_export_bundle(
+            "api-workspace-001",
+            ExportBundleRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                markdown="# Session report\n\nSynthetic export preview.\n",
+                json_export='{"schema_version":1}',
+            ),
+        )
+        self.assertTrue(bundle["filename"].endswith("-export.zip"))
+        self.assertTrue(bundle["content_base64"])
+        self.assertTrue(bundle["verification"]["verified"])
 
         with self.assertRaises(HTTPException) as caught:
             create_workspace(

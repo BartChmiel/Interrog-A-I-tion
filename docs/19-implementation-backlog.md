@@ -56,7 +56,7 @@ Success criteria:
 
 ## Milestone 3: Local Model Abstraction
 
-Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, and a deterministic grounding context pack for future model calls. A real local model has not been connected to live suggestions yet.
+Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, a deterministic grounding context pack, and developer-gated live grounded suggestions via Ollama when `INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1`. The default demo path remains deterministic.
 
 Tasks:
 
@@ -182,19 +182,41 @@ See `docs/24-first-supervisor-demo.md` for run instructions and boundaries.
 
 ## Milestone 8: Session Report Export
 
-Status: implemented as a first research/demo Markdown export from the Review tab.
+Status: implemented as a research/demo Markdown and JSON export from the Review tab with session context, provenance summary, recorded answers, grounded AI trace, audited AI decisions, and export integrity manifest references.
 
 Tasks:
 
 - expose backend `report_markdown` in the UI,
 - add session context and provenance summary wrapper,
 - add download and copy controls with a non-official disclaimer,
-- keep export behind the local API workflow.
+- keep export behind the local API workflow,
+- add recorded answers and grounded AI trace sections to the export wrapper.
 
 Next:
 
-- extend report content with answers, AI decisions, and integrity manifest references,
-- add JSON export and optional export manifest linkage after STOP review.
+- verify downloaded zip bundles offline with the CLI integrity tool,
+- attach export bundle hash to workspace audit after STOP review.
+
+## Milestone 10: Grounded AI Panel UX
+
+Status: implemented for the first developer-facing AI workflow polish.
+
+Implemented:
+
+- regenerate grounded suggestions control with loading state,
+- provider badge for deterministic vs developer-gated live Ollama output,
+- surfaced 502/503 and generic generation errors in the AI tab,
+- extracted `grounded-ai-panel.tsx` and `session-report.ts` from `App.tsx`,
+- grounding pack preview panel in the AI tab (`GET /grounding-pack`),
+- per-question grounded suggestion cache so decisions survive question switches,
+- AI runtime status card in Security,
+- audited grounded-suggestion decisions in session report export.
+
+Implemented additionally:
+
+- ZIP export bundle with session-report.md, manifest.json, and optional session-report.json,
+- inline manifest verification badge in Review,
+- grounding pack topic-row diff highlighting.
 
 ## Milestone 9: Case Workflow Deepening
 

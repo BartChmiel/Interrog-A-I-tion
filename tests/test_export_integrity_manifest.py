@@ -1,3 +1,4 @@
+import io
 import unittest
 import uuid
 from dataclasses import replace
@@ -6,12 +7,16 @@ from pathlib import Path
 from interrogaition.export.integrity_manifest import (
     ExportIntegrityError,
     calculate_manifest_hash,
+    create_export_bundle_zip,
     create_export_manifest,
+    create_export_manifest_from_contents,
     create_model_artifact_manifest_reference,
     read_export_manifest,
     verify_export_manifest,
+    verify_export_manifest_contents,
     write_export_manifest,
 )
+import zipfile
 from interrogaition.security.case_workspace import CaseWorkspaceManager
 from interrogaition.security.model_artifacts import (
     ensure_model_artifact_isolation,
@@ -23,6 +28,59 @@ TEST_OUTPUT_ROOT = Path(__file__).resolve().parents[1] / "backend" / "test-outpu
 
 
 class ExportIntegrityManifestTest(unittest.TestCase):
+    def test_creates_manifest_from_in_memory_contents(self) -> None:
+        manifest = create_export_manifest_from_contents(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(("session-report.md", "# Report\n"),),
+            export_id="export-preview-001",
+        )
+
+        self.assertEqual(manifest.export_id, "export-preview-001")
+        self.assertEqual(manifest.files[0].path, "session-report.md")
+        self.assertEqual(manifest.files[0].size_bytes, len("# Report\n".encode("utf-8")))
+        self.assertIsNotNone(manifest.manifest_hash)
+
+    def test_verifies_in_memory_export_contents(self) -> None:
+        manifest = create_export_manifest_from_contents(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(("session-report.md", "# Report\n"),),
+        )
+        verification = verify_export_manifest_contents(
+            manifest,
+            files=(("session-report.md", "# Report\n"),),
+        )
+
+        self.assertTrue(verification.verified)
+        self.assertTrue(verification.manifest_hash_valid)
+
+    def test_creates_zip_bundle_with_manifest(self) -> None:
+        manifest = create_export_manifest_from_contents(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(("session-report.md", "# Report\n"),),
+        )
+        bundle = create_export_bundle_zip(
+            markdown_path="session-report.md",
+            markdown_content="# Report\n",
+            manifest=manifest,
+            json_content='{"schema_version":1}',
+        )
+
+        with zipfile.ZipFile(io.BytesIO(bundle)) as archive:
+            names = set(archive.namelist())
+
+        self.assertEqual(names, {"session-report.md", "manifest.json", "session-report.json"})
+
+    def test_rejects_unsafe_virtual_export_paths(self) -> None:
+        with self.assertRaises(ExportIntegrityError):
+            create_export_manifest_from_contents(
+                case_id="case-001",
+                created_by="investigator-001",
+                files=(("../escape.md", "nope"),),
+            )
+
     def test_creates_writes_reads_and_verifies_export_manifest(self) -> None:
         root = _export_root("valid")
         report_path = root / "report.md"

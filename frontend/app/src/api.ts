@@ -7,6 +7,9 @@ import type {
   GroundedSuggestionDecision,
   GroundedSuggestionDecisionResponse,
   EvidenceMapResponse,
+  ExportBundleResponse,
+  ExportIntegrityPreviewResponse,
+  GroundingPackResponse,
   GroundedSuggestionsResponse,
   InterviewSession,
   LocalModelConfig,
@@ -311,6 +314,58 @@ export async function loadEvidenceMap(
     locale,
   });
   return fetchJson(config, `/workspaces/${workspaceId}/evidence-map?${query.toString()}`);
+}
+
+export async function loadExportIntegrityPreview(
+  config: RuntimeConfig,
+  reportMarkdown: string,
+  reportPath = "session-report.md",
+): Promise<ExportIntegrityPreviewResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  return fetchJson(config, `/workspaces/${workspaceId}/exports/integrity-preview`, {
+    method: "POST",
+    body: JSON.stringify({
+      case_id: config.caseId,
+      created_by: "local-ui",
+      include_model_artifacts: true,
+      files: [{ path: reportPath, content: reportMarkdown }],
+    }),
+  });
+}
+
+export async function loadExportBundle(
+  config: RuntimeConfig,
+  markdown: string,
+  jsonExport: string | null,
+  markdownPath = "session-report.md",
+): Promise<ExportBundleResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  return fetchJson(config, `/workspaces/${workspaceId}/exports/bundle`, {
+    method: "POST",
+    body: JSON.stringify({
+      case_id: config.caseId,
+      created_by: "local-ui",
+      include_model_artifacts: true,
+      markdown,
+      markdown_path: markdownPath,
+      json_export: jsonExport,
+    }),
+  });
+}
+
+export async function loadGroundingPack(
+  config: RuntimeConfig,
+  locale: string,
+  questionId: string,
+): Promise<GroundingPackResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({
+    case_id: config.caseId,
+    session_id: config.sessionId,
+    question_id: questionId,
+    locale,
+  });
+  return fetchJson(config, `/workspaces/${workspaceId}/grounding-pack?${query.toString()}`);
 }
 
 export async function loadGroundedSuggestions(

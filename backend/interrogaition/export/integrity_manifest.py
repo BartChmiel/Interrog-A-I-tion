@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import io
 import json
 import uuid
+import zipfile
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -75,6 +78,117 @@ class ExportVerification:
     missing_model_artifact_files: tuple[str, ...] = ()
     changed_model_artifact_files: tuple[str, ...] = ()
     unexpected_errors: tuple[str, ...] = ()
+
+
+def create_export_manifest_from_contents(
+    *,
+    case_id: str,
+    created_by: str,
+    files: Iterable[tuple[str, str | bytes]],
+    model_artifacts: ExportModelArtifactManifestReference | None = None,
+    export_id: str | None = None,
+    created_at: datetime | None = None,
+) -> ExportManifest:
+    """Create a manifest from in-memory export file contents."""
+
+    records = tuple(
+        _record_content(path=path, content=content)
+        for path, content in sorted(files, key=lambda item: item[0])
+    )
+    manifest = ExportManifest(
+        export_id=export_id or f"export-{uuid.uuid4()}",
+        case_id=case_id,
+        created_by=created_by,
+        created_at=created_at or datetime.now(UTC),
+        files=records,
+        model_artifacts=model_artifacts,
+    )
+    return replace(manifest, manifest_hash=calculate_manifest_hash(manifest))
+
+
+def export_manifest_to_dict(manifest: ExportManifest) -> dict[str, Any]:
+    """Serialize an export manifest for API or file output."""
+
+    return _manifest_to_dict(manifest)
+
+
+def verify_export_manifest_contents(
+    manifest: ExportManifest,
+    *,
+    files: Iterable[tuple[str, str | bytes]],
+) -> ExportVerification:
+    """Verify in-memory export files against a manifest."""
+
+    content_by_path = {
+        path: content if isinstance(content, bytes) else content.encode("utf-8")
+        for path, content in files
+    }
+    missing_files: list[str] = []
+    changed_files: list[str] = []
+
+    for record in manifest.files:
+        payload = content_by_path.get(record.path)
+        if payload is None:
+            missing_files.append(record.path)
+            continue
+        if len(payload) != record.size_bytes or hashlib.sha256(payload).hexdigest() != record.sha256:
+            changed_files.append(record.path)
+
+    manifest_hash_valid = manifest.manifest_hash == calculate_manifest_hash(manifest)
+    model_artifact_chain_valid = (
+        manifest.model_artifacts.chain_valid if manifest.model_artifacts is not None else True
+    )
+
+    return ExportVerification(
+        verified=(
+            manifest_hash_valid
+            and model_artifact_chain_valid
+            and not missing_files
+            and not changed_files
+        ),
+        manifest_hash_valid=manifest_hash_valid,
+        missing_files=tuple(missing_files),
+        changed_files=tuple(changed_files),
+        model_artifact_chain_valid=model_artifact_chain_valid,
+    )
+
+
+def create_export_bundle_zip(
+    *,
+    markdown_path: str,
+    markdown_content: str,
+    manifest: ExportManifest,
+    json_content: str | None = None,
+) -> bytes:
+    """Create a zip archive with report files and manifest.json."""
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(markdown_path, markdown_content)
+        archive.writestr(
+            "manifest.json",
+            json.dumps(export_manifest_to_dict(manifest), ensure_ascii=False, indent=2, sort_keys=True),
+        )
+        if json_content is not None:
+            archive.writestr("session-report.json", json_content)
+    return buffer.getvalue()
+
+
+def create_export_bundle_base64(
+    *,
+    markdown_path: str,
+    markdown_content: str,
+    manifest: ExportManifest,
+    json_content: str | None = None,
+) -> str:
+    return base64.b64encode(
+        create_export_bundle_zip(
+            markdown_path=markdown_path,
+            markdown_content=markdown_content,
+            manifest=manifest,
+            json_content=json_content,
+        )
+    ).decode("ascii")
 
 
 def create_export_manifest(
@@ -253,6 +367,19 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _record_content(*, path: str, content: str | bytes) -> ExportFileRecord:
+    normalized_path = path.strip().replace("\\", "/")
+    if not normalized_path or normalized_path.startswith("/") or ".." in normalized_path.split("/"):
+        raise ExportIntegrityError("Export file path must be a safe relative path.")
+
+    payload = content.encode("utf-8") if isinstance(content, str) else content
+    return ExportFileRecord(
+        path=normalized_path,
+        sha256=hashlib.sha256(payload).hexdigest(),
+        size_bytes=len(payload),
+    )
 
 
 def _record_file(*, path: Path, root_path: Path) -> ExportFileRecord:

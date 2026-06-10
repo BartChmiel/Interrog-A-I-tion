@@ -467,6 +467,109 @@ export type EvidenceMapResponse = {
   evidence_alignment: EvidenceAlignment;
 };
 
+export type GroundingPackRule = {
+  id: string;
+  severity: "required" | "recommended";
+  instruction: string;
+};
+
+export type GroundingTopicContext = {
+  topic_id: string;
+  label: string;
+  status: EvidenceTopicStatus;
+  in_focus: boolean;
+  priority: "low" | "medium" | "high";
+  question_ids: string[];
+  answer_ids: string[];
+  claim_ids: string[];
+  material_ids: string[];
+  finding_ids: string[];
+};
+
+export type GroundingMaterialReference = {
+  material_id: string;
+  title: string;
+  source_type: string;
+  topic_ids: string[];
+  linked_question_ids: string[];
+  max_confidence: number;
+  tags: string[];
+};
+
+export type GroundingContextPack = {
+  case_id: string;
+  focus_question_id: string | null;
+  task: string;
+  allowed_source_ids: string[];
+  topic_contexts: GroundingTopicContext[];
+  material_references: GroundingMaterialReference[];
+  rules: GroundingPackRule[];
+  operator_review_required: boolean;
+};
+
+export type GroundingPackResponse = {
+  grounding_pack: GroundingContextPack;
+};
+
+export type ExportIntegrityFileRecord = {
+  path: string;
+  sha256: string;
+  size_bytes: number;
+};
+
+export type ExportModelArtifactManifestReference = {
+  workspace_id: string;
+  manifest_path: string;
+  manifest_sha256: string | null;
+  record_count: number;
+  chain_valid: boolean;
+  latest_record_hash: string | null;
+  records: Array<{
+    artifact_id: string;
+    artifact_type: string;
+    relative_path: string;
+    sha256: string;
+    size_bytes: number;
+    record_hash: string | null;
+  }>;
+};
+
+export type ExportIntegrityManifest = {
+  schema_version: number;
+  export_id: string;
+  case_id: string;
+  created_by: string;
+  created_at: string;
+  files: ExportIntegrityFileRecord[];
+  manifest_hash: string | null;
+  model_artifacts: ExportModelArtifactManifestReference | null;
+};
+
+export type ExportIntegrityVerification = {
+  verified: boolean;
+  manifest_hash_valid: boolean;
+  missing_files: string[];
+  changed_files: string[];
+  model_artifact_manifest_hash_valid: boolean;
+  model_artifact_chain_valid: boolean;
+  missing_model_artifact_files: string[];
+  changed_model_artifact_files: string[];
+  unexpected_errors: string[];
+};
+
+export type ExportIntegrityPreviewResponse = {
+  manifest: ExportIntegrityManifest;
+  verification: ExportIntegrityVerification;
+};
+
+export type ExportBundleResponse = {
+  filename: string;
+  content_type: string;
+  content_base64: string;
+  manifest: ExportIntegrityManifest;
+  verification: ExportIntegrityVerification;
+};
+
 export type GroundedSuggestion = {
   id: string;
   suggestion_type: string;

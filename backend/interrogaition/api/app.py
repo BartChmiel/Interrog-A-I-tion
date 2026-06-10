@@ -103,6 +103,14 @@ from interrogaition.domain.session import (
     merge_session_answers,
     start_interview_session,
 )
+from interrogaition.export.integrity_manifest import (
+    ExportIntegrityError,
+    create_export_bundle_base64,
+    create_export_manifest_from_contents,
+    create_model_artifact_manifest_reference,
+    export_manifest_to_dict,
+    verify_export_manifest_contents,
+)
 from interrogaition.export.markdown_report import render_review_markdown
 from interrogaition.security.access_policy import (
     WorkspaceAction,
@@ -257,6 +265,30 @@ class OperatorActionDecisionRequest:
     context_hash: str = ""
     output_hash: str = ""
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
+@dataclass(frozen=True)
+class ExportFileContent:
+    path: str
+    content: str
+
+
+@dataclass(frozen=True)
+class ExportIntegrityPreviewRequest:
+    case_id: str
+    created_by: str = "local-ui"
+    files: list[ExportFileContent] = field(default_factory=list)
+    include_model_artifacts: bool = True
+
+
+@dataclass(frozen=True)
+class ExportBundleRequest:
+    case_id: str
+    created_by: str = "local-ui"
+    markdown: str = ""
+    markdown_path: str = "session-report.md"
+    json_export: str | None = None
+    include_model_artifacts: bool = True
 
 
 @dataclass(frozen=True)
@@ -1087,6 +1119,99 @@ def create_app(
             "session_id": session_id,
             "decisions": [_operator_action_decision_from_event(event) for event in reversed(events)],
             "chain_valid": store.verify_audit_chain(),
+        }
+
+    @app.post("/workspaces/{workspace_id}/exports/integrity-preview")
+    def preview_workspace_export_integrity(
+        workspace_id: str,
+        request: ExportIntegrityPreviewRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        if request.case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+
+        if not request.files:
+            raise HTTPException(status_code=400, detail="At least one export file is required.")
+
+        model_artifacts = None
+        if request.include_model_artifacts:
+            try:
+                model_artifacts = create_model_artifact_manifest_reference(workspace)
+            except Exception:
+                model_artifacts = None
+
+        try:
+            manifest = create_export_manifest_from_contents(
+                case_id=request.case_id,
+                created_by=request.created_by,
+                files=[(item.path, item.content) for item in request.files],
+                model_artifacts=model_artifacts,
+            )
+            verification = verify_export_manifest_contents(
+                manifest,
+                files=[(item.path, item.content) for item in request.files],
+            )
+        except ExportIntegrityError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return {
+            "manifest": export_manifest_to_dict(manifest),
+            "verification": _to_jsonable(verification),
+        }
+
+    @app.post("/workspaces/{workspace_id}/exports/bundle")
+    def create_workspace_export_bundle(
+        workspace_id: str,
+        request: ExportBundleRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        if request.case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+
+        if not request.markdown.strip():
+            raise HTTPException(status_code=400, detail="Export markdown is required.")
+
+        model_artifacts = None
+        if request.include_model_artifacts:
+            try:
+                model_artifacts = create_model_artifact_manifest_reference(workspace)
+            except Exception:
+                model_artifacts = None
+
+        try:
+            manifest = create_export_manifest_from_contents(
+                case_id=request.case_id,
+                created_by=request.created_by,
+                files=[(request.markdown_path, request.markdown)],
+                model_artifacts=model_artifacts,
+            )
+            verification = verify_export_manifest_contents(
+                manifest,
+                files=[(request.markdown_path, request.markdown)],
+            )
+            bundle_base64 = create_export_bundle_base64(
+                markdown_path=request.markdown_path,
+                markdown_content=request.markdown,
+                manifest=manifest,
+                json_content=request.json_export,
+            )
+        except ExportIntegrityError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return {
+            "filename": f"interrogaition-{request.case_id}-export.zip",
+            "content_type": "application/zip",
+            "content_base64": bundle_base64,
+            "manifest": export_manifest_to_dict(manifest),
+            "verification": _to_jsonable(verification),
         }
 
     @app.get("/workspaces/{workspace_id}/audit")

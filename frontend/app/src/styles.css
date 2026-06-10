@@ -2828,6 +2828,240 @@ h2 {
   padding: 11px;
 }
 
+.grounded-ai-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.grounded-ai-provider-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef4fb;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.grounded-ai-provider-badge[data-provider="ollama"] {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.grounded-ai-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.grounded-ai-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #8a2f28;
+}
+
+.grounded-ai-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spin {
+  animation: grounded-ai-spin 0.9s linear infinite;
+}
+
+@keyframes grounded-ai-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.grounding-pack-panel,
+.ai-runtime-status-card {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+}
+
+.grounding-pack-toolbar,
+.ai-runtime-smoke-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.grounding-pack-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.grounding-pack-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.grounding-pack-topics ul,
+.grounding-pack-materials ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grounding-pack-topics li,
+.grounding-pack-materials li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.grounding-pack-topics li[data-in-focus="true"] {
+  background: var(--accent-soft);
+}
+
+.grounding-pack-topics li[data-diff="added"] {
+  border-left: 3px solid #2f9e44;
+}
+
+.grounding-pack-topics li[data-diff="removed"] {
+  border-left: 3px solid #d94848;
+  opacity: 0.88;
+}
+
+.integrity-verification-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+}
+
+.integrity-verification-badge[data-verified="true"] {
+  background: #e8f6ed;
+  color: #1f6b39;
+}
+
+.integrity-verification-badge[data-verified="false"] {
+  background: #fdecea;
+  color: #8a2f28;
+}
+
+.grounding-pack-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #8a2f28;
+}
+
+.grounding-pack-json pre {
+  max-height: 280px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+}
+
+.grounding-pack-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.grounding-pack-compare select {
+  min-width: 120px;
+}
+
+.grounding-pack-diff {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #dbe5f0;
+}
+
+.grounding-pack-diff-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.grounding-pack-diff-group ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.session-report-integrity {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.session-report-integrity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.session-report-actions {
+  flex-wrap: wrap;
+}
+
+.ai-runtime-status-card {
+  border-radius: 10px;
+  background: #f8fbff;
+  border: 1px solid #d7e4f2;
+}
+
+.ai-runtime-status-card[data-live="true"] {
+  border-color: #b9d5f2;
+  background: #f3f9ff;
+}
+
+.ai-runtime-smoke-line {
+  justify-content: flex-start;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
 .grounded-ai-meta {
   flex-wrap: wrap;
   gap: 6px;

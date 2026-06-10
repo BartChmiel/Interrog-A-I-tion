@@ -160,6 +160,8 @@ POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
 POST /workspaces/{workspace_id}/operator-actions/decisions
 GET /workspaces/{workspace_id}/operator-actions/decisions?case_id=case-001&session_id=demo-session
 GET /workspaces/{workspace_id}/audit
+POST /workspaces/{workspace_id}/exports/integrity-preview
+POST /workspaces/{workspace_id}/exports/bundle
 ```
 
 Grounded suggestions use the current grounding context pack, validate citations against `allowed_source_ids`, return citation warnings, and audit model id, prompt version, prompt hash, context hash, and output hash.

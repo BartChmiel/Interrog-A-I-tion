@@ -61,7 +61,16 @@ import {
   verifyWorkspaceMaterial,
   type ApiError,
 } from "./api";
+import { AiRuntimeStatusCard } from "./ai-status-card";
 import { CaseCatalogBadges, CaseWorkflowProgress, WorkspaceEmptyState, type CaseWorkflowStage } from "./case-workflow";
+import { evidenceStatusLabel } from "./evidence-labels";
+import { GroundingPackPanel } from "./grounding-pack-panel";
+import {
+  formatGroundedAiError,
+  GroundedSuggestionsPanel,
+} from "./grounded-ai-panel";
+import { SessionReportPanel } from "./session-report-panel";
+import type { SessionReportExportInput } from "./session-report";
 import { seedAnswers, seedCaseCatalog, seedFindings, seedIndicators, seedQuestions } from "./demoData";
 import { domainLabel, localize, text, type CopyKey } from "./i18n";
 import type {
@@ -222,6 +231,31 @@ export function App() {
   } | null>(null);
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, GroundedSuggestionDecision>>({});
+  const [isGroundedSuggestionsLoading, setIsGroundedSuggestionsLoading] = useState(false);
+  const [groundedSuggestionsError, setGroundedSuggestionsError] = useState<string | null>(null);
+  const [groundedCacheTick, setGroundedCacheTick] = useState(0);
+  const groundedCacheRef = useRef<
+    Record<
+      string,
+      {
+        suggestions: GroundedSuggestion[];
+        warnings: GroundedSuggestionWarning[];
+        meta: {
+          model: string;
+          promptVersion: string;
+          promptHash: string;
+          contextHash: string;
+          outputHash: string;
+          promptArtifact: ModelArtifactSummary | null;
+          contextArtifact: ModelArtifactSummary | null;
+          outputArtifact: ModelArtifactSummary | null;
+          artifactWarning: string | null;
+        } | null;
+        decisions: Record<string, GroundedSuggestionDecision>;
+        drafts: Record<string, string>;
+      }
+    >
+  >({});
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
@@ -260,6 +294,40 @@ export function App() {
     const localAnswerViews = localAnswers.map((answer) => toAnswerView(answer, locale));
     return [...base, ...localAnswerViews, ...sessionAnswers];
   }, [caseData, locale, localAnswers, session]);
+
+  useEffect(() => {
+    if (!activeQuestionId) {
+      return;
+    }
+
+    groundedCacheRef.current[activeQuestionId] = {
+      suggestions: groundedSuggestions,
+      warnings: groundedSuggestionWarnings,
+      meta: groundedSuggestionMeta,
+      decisions: suggestionDecisions,
+      drafts: suggestionDrafts,
+    };
+  }, [
+    activeQuestionId,
+    groundedSuggestionMeta,
+    groundedSuggestionWarnings,
+    groundedSuggestions,
+    suggestionDecisions,
+    suggestionDrafts,
+  ]);
+
+  const cachedGroundedQuestionCount = useMemo(
+    () => Object.keys(groundedCacheRef.current).length,
+    [activeQuestionId, groundedCacheTick],
+  );
+  const auditedGroundedDecisionCount = useMemo(() => {
+    const events = [...(workspaceAudit?.events ?? []), ...(sessionAudit?.events ?? [])];
+    return events.filter((event) =>
+      ["grounded_suggestion_accepted", "grounded_suggestion_edited", "grounded_suggestion_rejected"].includes(
+        event.action,
+      ),
+    ).length;
+  }, [sessionAudit?.events, workspaceAudit?.events]);
 
   const visibleIndicators = indicators.length ? indicators : seedIndicators;
   const visibleFindings = findings.length ? findings : seedFindings;
@@ -616,6 +684,34 @@ export function App() {
     }
   }
 
+  async function refreshGroundedSuggestions(
+    nextLocale: Locale = locale,
+    questionId: string = activeQuestionId,
+    options: { clearOnError?: boolean } = {},
+  ) {
+    if (apiMode !== "online") {
+      return;
+    }
+
+    delete groundedCacheRef.current[questionId];
+    setGroundedCacheTick((value) => value + 1);
+    setIsGroundedSuggestionsLoading(true);
+    setGroundedSuggestionsError(null);
+
+    try {
+      const response = await loadGroundedSuggestions(config, nextLocale, questionId);
+      applyGroundedSuggestions(response);
+    } catch (error) {
+      console.warn("Could not refresh grounded suggestions.", error);
+      setGroundedSuggestionsError(formatGroundedAiError(error, nextLocale));
+      if (options.clearOnError) {
+        applyGroundedSuggestions(null);
+      }
+    } finally {
+      setIsGroundedSuggestionsLoading(false);
+    }
+  }
+
   function refreshModelArtifactManifestAfterCapture(response: GroundedSuggestionsResponse | null) {
     if (!response?.prompt_artifact && !response?.context_artifact && !response?.output_artifact) {
       return;
@@ -671,6 +767,8 @@ export function App() {
 
     setApiMode("connecting");
     setStatusKey("connecting");
+    groundedCacheRef.current = {};
+    setGroundedCacheTick((value) => value + 1);
 
     try {
       const [
@@ -940,12 +1038,25 @@ export function App() {
 
   function selectActiveQuestion(questionId: string) {
     setActiveQuestionId(questionId);
-    if (apiMode === "online") {
-      void loadGroundedSuggestionsOrEmpty(locale, questionId).then((response) => {
-        applyGroundedSuggestions(response);
-        void refreshAuditTrails();
-      });
+    if (apiMode !== "online") {
+      return;
     }
+
+    const cached = groundedCacheRef.current[questionId];
+    if (cached) {
+      setGroundedSuggestions(cached.suggestions);
+      setGroundedSuggestionWarnings(cached.warnings);
+      setGroundedSuggestionMeta(cached.meta);
+      setSuggestionDecisions(cached.decisions);
+      setSuggestionDrafts(cached.drafts);
+      setGroundedSuggestionsError(null);
+      setIsGroundedSuggestionsLoading(false);
+      return;
+    }
+
+    void refreshGroundedSuggestions(locale, questionId, { clearOnError: true }).then(() => {
+      void refreshAuditTrails();
+    });
   }
 
   function startEditingSuggestion(suggestion: GroundedSuggestion) {
@@ -1102,36 +1213,6 @@ export function App() {
     }
   }
 
-  async function copySessionReport() {
-    if (!sessionReportText) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(sessionReportText);
-      setSessionReportExported(true);
-      setStatusKey("sessionReportCopied");
-    } catch {
-      setStatusKey("demoSummaryCopyFailed");
-    }
-  }
-
-  function downloadSessionReport() {
-    if (!sessionReportText) {
-      return;
-    }
-    const stamp = new Date().toISOString().slice(0, 10);
-    const filename = `interrogaition-${config.caseId}-${config.sessionId}-${stamp}.md`;
-    const blob = new Blob([sessionReportText], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    setSessionReportExported(true);
-    setStatusKey("sessionReportCopied");
-  }
-
   async function recordOperatorActionDecisionType(
     action: OperatorAction,
     decisionType: OperatorActionDecisionType,
@@ -1207,11 +1288,11 @@ export function App() {
     }
     return `${review.covered_topic_ids.length}/${topicCount}`;
   }, [caseData?.topics, review]);
-  const sessionReportText = useMemo(() => {
+  const sessionReportExportInput = useMemo<SessionReportExportInput | null>(() => {
     if (!reportMarkdown) {
       return null;
     }
-    return buildSessionReportExport(reportMarkdown, {
+    return {
       locale,
       config,
       caseData,
@@ -1223,19 +1304,34 @@ export function App() {
       sessionAuditCount: sessionAudit?.events.length ?? 0,
       modelProvider: localModelConfig?.effective_provider ?? null,
       environmentState: environmentHealth?.state ?? null,
-    });
+      answerViews,
+      questions,
+      activeQuestionId,
+      groundedSuggestions,
+      suggestionDecisions,
+      groundedModel: groundedSuggestionMeta?.model ?? null,
+      groundedPromptVersion: groundedSuggestionMeta?.promptVersion ?? null,
+      auditEvents: [...(workspaceAudit?.events ?? []), ...(sessionAudit?.events ?? [])],
+      integrityManifest: null,
+    };
   }, [
+    activeQuestionId,
+    answerViews,
     caseData,
     config,
     environmentHealth?.state,
-    groundedSuggestions.length,
+    groundedSuggestionMeta?.model,
+    groundedSuggestionMeta?.promptVersion,
+    groundedSuggestions,
     locale,
     localModelConfig?.effective_provider,
     operatorActionDecisions.length,
+    questions,
     reportMarkdown,
-    sessionAudit?.events.length,
+    sessionAudit?.events,
+    suggestionDecisions,
     workspaceAudit?.chain_valid,
-    workspaceAudit?.events.length,
+    workspaceAudit?.events,
     workspaceMaterials.length,
   ]);
   const topicsById = useMemo(
@@ -1583,9 +1679,12 @@ export function App() {
                 >
                   <SecurityPanel
                     accessDecision={workspaceAccess}
+                    auditedGroundedDecisionCount={auditedGroundedDecisionCount}
                     bare
+                    cachedGroundedQuestionCount={cachedGroundedQuestionCount}
                     encryptionStatus={encryptionStatus}
                     environmentHealth={environmentHealth}
+                    groundedSuggestionCount={groundedSuggestions.length}
                     isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
                     isModelSmokeRunning={isModelSmokeRunning}
                     locale={locale}
@@ -1626,10 +1725,14 @@ export function App() {
                   title={text(locale, "groundedAi")}
                 >
                   <GroundedSuggestionsPanel
+                    apiMode={apiMode}
                     bare
                     decisions={suggestionDecisions}
                     drafts={suggestionDrafts}
+                    error={groundedSuggestionsError}
+                    isLoading={isGroundedSuggestionsLoading}
                     locale={locale}
+                    localModelConfig={localModelConfig}
                     meta={groundedSuggestionMeta}
                     suggestions={groundedSuggestions}
                     warnings={groundedSuggestionWarnings}
@@ -1637,9 +1740,26 @@ export function App() {
                       setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
                     }
                     onEdit={startEditingSuggestion}
+                    onRegenerate={() => void refreshGroundedSuggestions()}
                     onReject={rejectSuggestion}
                     onSaveEdit={saveEditedSuggestion}
                     onUse={useSuggestion}
+                  />
+                </CollapsibleSection>
+                <CollapsibleSection
+                  accordionGroup="ops-ai"
+                  className="operations-section"
+                  defaultOpen={false}
+                  hint={text(locale, "expandWhenNeeded")}
+                  meta={text(locale, "developerPreview")}
+                  title={text(locale, "groundingPack")}
+                >
+                  <GroundingPackPanel
+                    activeQuestionId={activeQuestionId}
+                    apiMode={apiMode}
+                    config={config}
+                    locale={locale}
+                    questions={questions}
                   />
                 </CollapsibleSection>
                 <CollapsibleSection
@@ -1700,10 +1820,14 @@ export function App() {
                 >
                   <SessionReportPanel
                     apiMode={apiMode}
+                    config={config}
+                    exportInput={sessionReportExportInput}
                     locale={locale}
-                    preview={sessionReportText}
-                    onCopy={() => void copySessionReport()}
-                    onDownload={downloadSessionReport}
+                    preview={reportMarkdown}
+                    onExported={() => {
+                      setSessionReportExported(true);
+                      setStatusKey("sessionReportCopied");
+                    }}
                   />
                 </CollapsibleSection>
                 <CollapsibleSection
@@ -2953,98 +3077,6 @@ function buildDemoSummaryText(input: DemoSummaryInput): string {
   return lines.filter((line) => line.length > 0).join("\n");
 }
 
-type SessionReportExportInput = {
-  locale: Locale;
-  config: RuntimeConfig;
-  caseData: CaseData | null;
-  materialCount: number;
-  groundedCount: number;
-  operatorDecisionCount: number;
-  workspaceAuditValid: boolean | null;
-  workspaceAuditCount: number;
-  sessionAuditCount: number;
-  modelProvider: string | null;
-  environmentState: EnvironmentHealthState | null;
-};
-
-function buildSessionReportExport(baseMarkdown: string, input: SessionReportExportInput): string {
-  const contextLines = [
-    "## Session context",
-    "",
-    `- Case: ${input.config.caseId}`,
-    input.caseData ? `- Title: ${localize(input.caseData.title, input.locale)}` : "",
-    `- Session: ${input.config.sessionId}`,
-    `- Participant: ${input.config.participantId}`,
-    `- Workspace: ${input.config.workspaceId}`,
-    `- Generated at: ${new Date().toISOString()}`,
-    "",
-    "## Provenance summary",
-    "",
-    `- ${text(input.locale, "sourceMaterials")}: ${input.materialCount}`,
-    `- ${text(input.locale, "operationsAi")}: ${input.groundedCount} grounded suggestions`,
-    `- ${text(input.locale, "operatorDecisionTrail")}: ${input.operatorDecisionCount}`,
-    `- ${text(input.locale, "workspaceAudit")}: ${input.workspaceAuditCount} events${
-      input.workspaceAuditValid === null
-        ? ""
-        : ` (${input.workspaceAuditValid ? text(input.locale, "chainValid") : text(input.locale, "chainInvalid")})`
-    }`,
-    `- ${text(input.locale, "sessionAudit")}: ${input.sessionAuditCount} events`,
-    input.environmentState
-      ? `- ${text(input.locale, "environmentHealth")}: ${environmentStateShortLabel(input.environmentState, input.locale)}`
-      : "",
-    input.modelProvider ? `- ${text(input.locale, "localModelRuntime")}: ${input.modelProvider}` : "",
-    "",
-    text(input.locale, "sessionReportDisclaimer"),
-    "",
-    "---",
-    "",
-  ];
-
-  return [...contextLines.filter((line) => line.length > 0), baseMarkdown.trim(), ""].join("\n");
-}
-
-function SessionReportPanel({
-  apiMode,
-  locale,
-  preview,
-  onCopy,
-  onDownload,
-}: {
-  apiMode: ApiMode;
-  locale: Locale;
-  preview: string | null;
-  onCopy: () => void;
-  onDownload: () => void;
-}) {
-  const available = apiMode === "online" && Boolean(preview);
-
-  return (
-    <div className="session-report-panel">
-      <p className="session-report-disclaimer">{text(locale, "sessionReportDisclaimer")}</p>
-      {available ? (
-        <>
-          <div className="session-report-actions">
-            <button type="button" onClick={onDownload}>
-              <FileDown size={14} />
-              {text(locale, "sessionReportDownload")}
-            </button>
-            <button type="button" onClick={onCopy}>
-              <ClipboardCopy size={14} />
-              {text(locale, "sessionReportCopy")}
-            </button>
-          </div>
-          <details className="session-report-preview">
-            <summary>{text(locale, "sessionReportPreview")}</summary>
-            <pre>{preview}</pre>
-          </details>
-        </>
-      ) : (
-        <p className="session-report-unavailable">{text(locale, "sessionReportUnavailable")}</p>
-      )}
-    </div>
-  );
-}
-
 function LinkedMaterialStrip({
   links,
   locale,
@@ -3234,208 +3266,6 @@ function alignmentBandLabel(band: EvidenceAlignment["band"], locale: Locale): st
   };
 
   return text(locale, keys[band]);
-}
-
-function evidenceStatusLabel(status: EvidenceTopicStatus, locale: Locale): string {
-  const keys: Record<EvidenceTopicStatus, CopyKey> = {
-    covered: "statusCovered",
-    grounded: "statusGrounded",
-    material_only: "statusMaterialOnly",
-    contested: "statusContested",
-    missing: "statusMissing",
-  };
-
-  return text(locale, keys[status]);
-}
-
-function GroundedSuggestionsPanel({
-  bare = false,
-  decisions,
-  drafts,
-  locale,
-  meta,
-  suggestions,
-  warnings,
-  onDraftChange,
-  onEdit,
-  onReject,
-  onSaveEdit,
-  onUse,
-}: {
-  bare?: boolean;
-  decisions: Record<string, GroundedSuggestionDecision>;
-  drafts: Record<string, string>;
-  locale: Locale;
-  meta: {
-    model: string;
-    promptVersion: string;
-    promptArtifact: ModelArtifactSummary | null;
-    contextArtifact: ModelArtifactSummary | null;
-    outputArtifact: ModelArtifactSummary | null;
-    artifactWarning: string | null;
-  } | null;
-  suggestions: GroundedSuggestion[];
-  warnings: GroundedSuggestionWarning[];
-  onDraftChange: (suggestionId: string, value: string) => void;
-  onEdit: (suggestion: GroundedSuggestion) => void;
-  onReject: (suggestion: GroundedSuggestion) => void;
-  onSaveEdit: (suggestion: GroundedSuggestion) => void;
-  onUse: (suggestion: GroundedSuggestion) => void;
-}) {
-  const warningsBySuggestion = useMemo(() => {
-    const grouped = new Map<string, GroundedSuggestionWarning[]>();
-    for (const warning of warnings) {
-      grouped.set(warning.suggestion_id, [...(grouped.get(warning.suggestion_id) ?? []), warning]);
-    }
-    return grouped;
-  }, [warnings]);
-
-  const body = (
-    <div className="grounded-suggestion-list">
-      {meta ? (
-        <div className="grounded-ai-meta">
-          <span>{text(locale, "modelLabel")}: {meta.model}</span>
-          <span>{text(locale, "promptVersion")}: {meta.promptVersion}</span>
-          {meta.promptArtifact ? (
-            <span>{text(locale, "promptArtifact")}: {shortArtifact(meta.promptArtifact)}</span>
-          ) : null}
-          {meta.contextArtifact ? (
-            <span>{text(locale, "contextArtifact")}: {shortArtifact(meta.contextArtifact)}</span>
-          ) : null}
-          {meta.outputArtifact ? (
-            <span>{text(locale, "outputArtifact")}: {shortArtifact(meta.outputArtifact)}</span>
-          ) : null}
-          {meta.artifactWarning ? (
-            <span>{text(locale, "artifactWarning")}: {meta.artifactWarning}</span>
-          ) : null}
-        </div>
-      ) : null}
-      {suggestions.length ? (
-        suggestions.map((suggestion) => (
-          <GroundedSuggestionCard
-            decision={decisions[suggestion.id]}
-            draft={drafts[suggestion.id]}
-            key={suggestion.id}
-            locale={locale}
-            suggestion={suggestion}
-            warnings={warningsBySuggestion.get(suggestion.id) ?? []}
-            onDraftChange={onDraftChange}
-            onEdit={onEdit}
-            onReject={onReject}
-            onSaveEdit={onSaveEdit}
-            onUse={onUse}
-          />
-        ))
-      ) : (
-        <p className="empty-state">{text(locale, "noGroundedSuggestions")}</p>
-      )}
-    </div>
-  );
-
-  if (bare) {
-    return <div className="grounded-suggestions-panel is-bare">{body}</div>;
-  }
-
-  return (
-    <section>
-      <PanelHeader
-        title={text(locale, "groundedAi")}
-        meta={meta?.model ?? text(locale, "localOnly")}
-        compact
-      />
-      {body}
-    </section>
-  );
-}
-
-function GroundedSuggestionCard({
-  decision,
-  draft,
-  locale,
-  suggestion,
-  warnings,
-  onDraftChange,
-  onEdit,
-  onReject,
-  onSaveEdit,
-  onUse,
-}: {
-  decision?: GroundedSuggestionDecision;
-  draft?: string;
-  locale: Locale;
-  suggestion: GroundedSuggestion;
-  warnings: GroundedSuggestionWarning[];
-  onDraftChange: (suggestionId: string, value: string) => void;
-  onEdit: (suggestion: GroundedSuggestion) => void;
-  onReject: (suggestion: GroundedSuggestion) => void;
-  onSaveEdit: (suggestion: GroundedSuggestion) => void;
-  onUse: (suggestion: GroundedSuggestion) => void;
-}) {
-  const visibleText = draft ?? suggestion.text;
-
-  return (
-    <article className="grounded-suggestion-card" data-state={decision ?? "proposed"}>
-      <div className="grounded-suggestion-header">
-        <span className="grounded-suggestion-type">
-          <Sparkles size={13} />
-          {suggestion.suggestion_type}
-        </span>
-        {decision ? <span className="meta">{suggestionDecisionLabel(decision, locale)}</span> : null}
-      </div>
-      {draft !== undefined ? (
-        <textarea
-          rows={3}
-          value={visibleText}
-          onChange={(event) => onDraftChange(suggestion.id, event.target.value)}
-        />
-      ) : (
-        <strong>{visibleText}</strong>
-      )}
-      <p>{suggestion.reason}</p>
-      <div className="grounded-source-list">
-        <span>{text(locale, "sourceIds")}</span>
-        {suggestion.linked_evidence.map((sourceId, index) => (
-          <em key={`${sourceId}-${index}`}>{sourceId}</em>
-        ))}
-      </div>
-      {warnings.length ? (
-        <div className="grounded-warning">
-          <AlertTriangle size={14} />
-          <span>{text(locale, "citationsWarning")}</span>
-        </div>
-      ) : null}
-      <div className="grounded-suggestion-actions">
-        <button type="button" onClick={() => onUse(suggestion)}>
-          <Check size={14} />
-          {text(locale, "useSuggestion")}
-        </button>
-        {draft !== undefined ? (
-          <button type="button" onClick={() => onSaveEdit(suggestion)}>
-            <Check size={14} />
-            {text(locale, "saveEditSuggestion")}
-          </button>
-        ) : (
-          <button type="button" onClick={() => onEdit(suggestion)}>
-            <Pencil size={14} />
-            {text(locale, "editSuggestion")}
-          </button>
-        )}
-        <button type="button" onClick={() => onReject(suggestion)}>
-          <X size={14} />
-          {text(locale, "rejectSuggestion")}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-function suggestionDecisionLabel(decision: GroundedSuggestionDecision, locale: Locale): string {
-  const keys: Record<GroundedSuggestionDecision, CopyKey> = {
-    accepted: "usedSuggestion",
-    edited: "editedSuggestion",
-    rejected: "rejectedSuggestion",
-  };
-  return text(locale, keys[decision]);
 }
 
 function MaterialsPanel({
@@ -3802,9 +3632,12 @@ function materialQuestionLinkDecisionLabel(
 
 function SecurityPanel({
   accessDecision,
+  auditedGroundedDecisionCount,
   bare = false,
+  cachedGroundedQuestionCount,
   encryptionStatus,
   environmentHealth,
+  groundedSuggestionCount,
   isArtifactIsolationSubmitting,
   isModelSmokeRunning,
   locale,
@@ -3818,9 +3651,12 @@ function SecurityPanel({
   workspace,
 }: {
   accessDecision: WorkspaceAccessDecision | null;
+  auditedGroundedDecisionCount: number;
   bare?: boolean;
+  cachedGroundedQuestionCount: number;
   encryptionStatus: EncryptionStatus | null;
   environmentHealth: EnvironmentHealth | null;
+  groundedSuggestionCount: number;
   isArtifactIsolationSubmitting: boolean;
   isModelSmokeRunning: boolean;
   locale: Locale;
@@ -3915,6 +3751,14 @@ function SecurityPanel({
           value={manifest ? text(locale, "ready") : text(locale, "unknown")}
         />
       </div>
+      <AiRuntimeStatusCard
+        auditedDecisionCount={auditedGroundedDecisionCount}
+        cachedQuestionCount={cachedGroundedQuestionCount}
+        locale={locale}
+        localModelConfig={localModelConfig}
+        localModelSmoke={localModelSmoke}
+        visibleSuggestionCount={groundedSuggestionCount}
+      />
       <div className="model-runtime-panel" data-state={modelState}>
         <div className="model-runtime-header">
           <span className="security-icon">
@@ -4239,10 +4083,6 @@ function sortMaterials(materials: MaterialRecord[]): MaterialRecord[] {
 
 function shortHash(value: string): string {
   return value.length > 12 ? `${value.slice(0, 12)}...` : value;
-}
-
-function shortArtifact(artifact: ModelArtifactSummary): string {
-  return `${artifact.artifact_id} / ${shortHash(artifact.sha256)}`;
 }
 
 function formatDecisionTime(value: string): string {
