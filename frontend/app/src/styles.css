@@ -139,6 +139,8 @@ p {
 .audit-event-footer,
 .stop-gate-card,
 .stop-gate-card > span,
+.investigative-board-column > span,
+.material-lead-item div,
 .case-dossier-metrics,
 .case-dossier-metrics span,
 .case-dossier-section > span,
@@ -1155,6 +1157,101 @@ h2 {
   margin: 0;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.investigative-board-panel {
+  display: grid;
+}
+
+.investigative-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  padding: 11px;
+}
+
+.investigative-board-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.investigative-board-column > span {
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.timeline-item,
+.clarification-item,
+.material-lead-item {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 9px;
+}
+
+.timeline-item {
+  border-color: #c5d9ef;
+  background: linear-gradient(180deg, #fff 0, #f7fbff 100%);
+}
+
+.clarification-item[data-severity="high"],
+.material-lead-item[data-state="missing"] {
+  border-color: #e6b3ad;
+  background: linear-gradient(180deg, #fff 0, #fff7f6 100%);
+}
+
+.clarification-item[data-severity="medium"],
+.material-lead-item[data-state="material_only"],
+.material-lead-item[data-state="contested"] {
+  border-color: #ead49b;
+  background: linear-gradient(180deg, #fff 0, #fffaf0 100%);
+}
+
+.timeline-item strong,
+.clarification-item strong,
+.material-lead-item strong {
+  color: var(--heading);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.timeline-item p,
+.clarification-item p,
+.material-lead-item p {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.timeline-item em,
+.clarification-item em,
+.material-lead-item em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.material-lead-item div {
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.material-lead-item div em {
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--line);
+  padding: 2px 6px;
 }
 
 .provenance-panel {
@@ -2388,6 +2485,7 @@ h2 {
   .material-form,
   .material-card-footer,
   .evidence-map-summary,
+  .investigative-board-grid,
   .operator-action-list,
   .stop-gate-grid,
   .security-list {

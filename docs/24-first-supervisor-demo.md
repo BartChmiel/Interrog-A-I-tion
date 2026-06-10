@@ -35,7 +35,7 @@ The first demo includes:
 - case evidence map and advisory evidence-alignment indicator,
 - grounded AI suggestion panel with human use/edit/reject controls,
 - operator work queue with audited open/skip/dismiss decisions,
-- Review tab with STOP readiness, indicators, findings, and provenance timeline,
+- Review tab with STOP readiness, an investigative board, indicators, findings, and provenance timeline,
 - SQLite session storage and append-only audit-chain events,
 - workspace-local model artifact manifests and export integrity manifest support.
 
@@ -77,8 +77,12 @@ For the first review, the recommended path is:
 5. Open Materials and inspect starter materials, hashes, verification, and material-question links.
 6. Open Grounded AI and inspect suggested follow-up questions with reasons, source ids, and
    human use/edit/reject controls.
-7. Open Review and inspect STOP readiness, advisory indicators, findings, and the provenance
-   timeline.
+7. Open Review and inspect STOP readiness, the investigative board, advisory indicators,
+   findings, and the provenance timeline.
+
+The investigative board is the most compact way to show the current analytical value of the
+prototype. It groups structured narrative time signals, clarification targets, and material
+leads without making any truthfulness or guilt decision.
 
 ## Local AI Notes
 

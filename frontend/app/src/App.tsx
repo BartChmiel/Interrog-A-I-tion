@@ -1264,6 +1264,13 @@ export function App() {
                   workspace={workspace}
                   workspaceAudit={workspaceAudit}
                 />
+                <InvestigativeBoardPanel
+                  caseData={caseData}
+                  evidenceMap={evidenceMap}
+                  findings={visibleFindings}
+                  locale={locale}
+                  materialsById={materialsById}
+                />
                 <ProvenanceTimelinePanel
                   locale={locale}
                   sessionAudit={sessionAudit}
@@ -1501,6 +1508,127 @@ function StopReadinessPanel({
       </div>
     </section>
   );
+}
+
+function InvestigativeBoardPanel({
+  caseData,
+  evidenceMap,
+  findings,
+  locale,
+  materialsById,
+}: {
+  caseData: CaseData | null;
+  evidenceMap: EvidenceMap | null;
+  findings: ReviewFinding[];
+  locale: Locale;
+  materialsById: Map<string, MaterialRecord>;
+}) {
+  const timelineItems = buildTimelineItems(caseData);
+  const clarificationItems = findings
+    .filter((finding) => finding.category === "potential_inconsistency" || finding.category === "missing_topic")
+    .slice(0, 4);
+  const materialLeads = (evidenceMap?.topic_nodes ?? [])
+    .filter((node) => node.status === "material_only" || node.status === "contested" || node.status === "missing")
+    .slice(0, 4);
+  const boardCount = timelineItems.length + clarificationItems.length + materialLeads.length;
+
+  return (
+    <section className="investigative-board-panel">
+      <PanelHeader
+        title={text(locale, "investigativeBoard")}
+        meta={`${boardCount} ${text(locale, "reviewSignals")}`}
+        compact
+      />
+      <div className="investigative-board-grid">
+        <div className="investigative-board-column">
+          <span>{text(locale, "narrativeTimeline")}</span>
+          {timelineItems.length ? (
+            timelineItems.map((item) => (
+              <article className="timeline-item" key={`${item.answerId}-${item.claimId}`}>
+                <strong>{item.value}</strong>
+                <p>{item.sourceText}</p>
+                <em>
+                  {item.answerId} / {item.attribute}
+                </em>
+              </article>
+            ))
+          ) : (
+            <p className="empty-state">{text(locale, "noTimelineSignals")}</p>
+          )}
+        </div>
+
+        <div className="investigative-board-column">
+          <span>{text(locale, "clarificationTargets")}</span>
+          {clarificationItems.length ? (
+            clarificationItems.map((finding) => (
+              <article className="clarification-item" data-severity={finding.severity} key={`${finding.category}-${finding.title}`}>
+                <strong>{findingTitle(finding, locale)}</strong>
+                <p>{findingDetail(finding, locale)}</p>
+                <em>{uniqueIds(finding.linked_ids).join(", ")}</em>
+              </article>
+            ))
+          ) : (
+            <p className="empty-state">{text(locale, "noClarificationTargets")}</p>
+          )}
+        </div>
+
+        <div className="investigative-board-column">
+          <span>{text(locale, "materialLeads")}</span>
+          {materialLeads.length ? (
+            materialLeads.map((node) => (
+              <article className="material-lead-item" data-state={node.status} key={node.topic_id}>
+                <strong>{node.label}</strong>
+                <p>{evidenceStatusLabel(node.status, locale)}</p>
+                <div>
+                  {node.material_ids.slice(0, 3).map((materialId) => (
+                    <em key={materialId}>{materialsById.get(materialId)?.title ?? materialId}</em>
+                  ))}
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="empty-state">{text(locale, "noMaterialLeads")}</p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type TimelineItem = {
+  answerId: string;
+  attribute: string;
+  claimId: string;
+  sourceText: string;
+  value: string;
+};
+
+function buildTimelineItems(caseData: CaseData | null): TimelineItem[] {
+  if (!caseData) {
+    return [];
+  }
+
+  return caseData.answers
+    .flatMap((answer) =>
+      (answer.claims ?? [])
+        .filter((claim) => isTimelineClaim(claim.attribute, claim.value))
+        .map((claim) => ({
+          answerId: answer.id,
+          attribute: claim.attribute.replaceAll("_", " "),
+          claimId: claim.id,
+          sourceText: claim.source_text || answer.text,
+          value: claim.value,
+        })),
+    )
+    .slice(0, 5);
+}
+
+function isTimelineClaim(attribute: string, value: string): boolean {
+  return attribute.toLowerCase().includes("time") || /\b\d{1,2}:\d{2}\b/.test(value);
+}
+
+function uniqueIds(ids: string[]): string[] {
+  return Array.from(new Set(ids));
 }
 
 function ProvenanceTimelinePanel({

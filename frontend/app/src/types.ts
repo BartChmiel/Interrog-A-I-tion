@@ -27,6 +27,15 @@ export type Answer = {
   text: string;
   topic_ids: string[];
   created_at?: string;
+  claims?: Claim[];
+};
+
+export type Claim = {
+  id: string;
+  subject: string;
+  attribute: string;
+  value: string;
+  source_text?: string;
 };
 
 export type TopicPriority = "high" | "medium" | "low";
