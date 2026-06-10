@@ -14,6 +14,13 @@
 - `assets/` - visual identity and product assets.
 - `config/` - local configuration examples.
 
+## Frontend Structure
+
+- `frontend/app/src` - main React/Vite application.
+- `frontend/app/src/ui-shell.tsx` - workspace zones, collapsible sections, modal shell.
+- `frontend/app/src/tutorial-tour.tsx` and `tutorial-steps.ts` - in-app supervisor demo tutorial.
+- `frontend/prototype` - older static prototype kept for reference.
+
 ## Backend Structure
 
 - `interrogaition/domain` - domain models.

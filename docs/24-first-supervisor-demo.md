@@ -76,7 +76,8 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-003&session=demo-sess
 ```
 
 For a self-guided supervisor walkthrough, add `&tutorial=1` to auto-start the
-in-app tutorial, or press `?` / use **Tutorial mode** in the top bar anytime.
+in-app tutorial, or press `?` / use **Tutorial mode** (EN) or **Tryb tutorialowy** (PL) in the
+top bar anytime.
 
 The demo uses synthetic material only.
 
@@ -95,8 +96,9 @@ The left sidebar **Demo path** panel includes supervisor-demo helpers:
 
 For the first review, the recommended path is:
 
-1. Open `case-003`, which contains a medication-discrepancy scenario with timing,
-   documentation, access, and monitoring questions.
+1. Open `case-003` with `&tutorial=1` for a guided walkthrough, or start the tutorial from the
+   top bar after load. The scenario covers medication discrepancy with timing, documentation,
+   access, and monitoring questions.
 2. Use **Fresh demo** if you need a clean workspace, then use the left-side demo
    path to move through the main workflow.
 3. Review the case dossier: planned scope, priority gaps, answer count, and starter materials.

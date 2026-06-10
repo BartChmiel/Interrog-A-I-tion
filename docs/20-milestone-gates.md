@@ -374,6 +374,21 @@ The project owner should evaluate:
 - whether chain-validity and prompt hashes are understandable enough for thesis demonstration,
 - whether any current UI wording looks too official for a synthetic prototype.
 
+## Current STOP
+
+Milestone 7: First supervisor demo UX has reached its first review point.
+
+The project owner should evaluate:
+
+- whether the three-zone workspace is readable enough for a non-technical supervisor walkthrough,
+- whether collapsed-by-default panels help or hide too much of the workflow,
+- whether the in-app tutorial (`&tutorial=1`, `?`, or top-bar launch) is sufficient as a
+  self-guided demo path,
+- whether demo-pack controls (`Fresh demo`, `Copy summary`, checklist) are enough for a prepared
+  review without adding export/report scope yet,
+- whether current UI wording still looks clearly non-official for a synthetic prototype,
+- whether the default deterministic runtime should remain mandatory for the first supervisor send.
+
 ## Next Expected STOP
 
 The next expected STOP is before adding encrypted storage, before connecting real local model output to live mode, before importing real or anonymized case data, before treating audited suggestion decisions as official procedural records, or before introducing export formats intended to look official.

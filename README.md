@@ -33,6 +33,12 @@ Core capabilities:
 
 Interpretation remains with the authorized human user.
 
+## First Supervisor Demo
+
+The current shareable demo uses synthetic data only. Run instructions, workspace layout notes,
+tutorial launch (`&tutorial=1`), and ethical boundaries are documented in
+[First Supervisor Demo](docs/24-first-supervisor-demo.md).
+
 ## Language Policy
 
 Engineering artifacts are English-first:

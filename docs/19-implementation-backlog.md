@@ -2,9 +2,11 @@
 
 ## Immediate Next Step
 
-Build the live-session domain model and deterministic live review loop.
+Prepare the thesis evaluation path and the next security gate: encrypted workspace creation and a
+controlled real-model experiment behind STOP review.
 
-This should happen before the real LLM adapter, because the live workflow must be testable without a model.
+The live-session core, supervisor-demo UX, and deterministic AI path are already in place. Do not
+rush Ollama into the default demo workflow.
 
 ## Milestone 1: Live Session Core
 
@@ -96,7 +98,10 @@ Success criteria:
 
 ## Milestone 5: First UI
 
-Status: first static prototype implemented in `frontend/prototype`, with React + TypeScript + Vite foundation added in `frontend/app`. The React app preserves the live-session review loop, local API reconnect path, PL/EN UI switching, and decision-support indicator layout.
+Status: implemented. `frontend/app` is the main UI target. The React app preserves the live-session
+review loop, local API reconnect path, PL/EN UI switching, a three-zone workspace layout
+(case prep / live interview / operations), progressive disclosure, case dossier, guided demo path,
+demo-pack controls, and an in-app tutorial walkthrough. `frontend/prototype` remains archival.
 
 Tasks:
 
@@ -151,3 +156,26 @@ Success criteria:
 - export integrity is demonstrable,
 - grounded suggestions remain source-traceable and human-controlled,
 - architecture leaves a clear path toward institutional deployment.
+
+## Milestone 7: First Supervisor Demo UX
+
+Status: implemented for the first shareable course-supervisor demo.
+
+Tasks:
+
+- first supervisor demo document,
+- guided demo path and case dossier orientation,
+- demo-pack controls: fresh demo, copy summary, demo checklist,
+- investigative review board in the Review tab,
+- three-zone workspace with collapsed-by-default panels,
+- in-app tutorial mode with spotlight walkthrough (PL/EN),
+- clearer question and answer presentation in the live interview zone.
+
+Success criteria:
+
+- a supervisor can run the demo from synthetic data only,
+- the default path uses deterministic local AI, not a required real model,
+- the UI stays readable during a live walkthrough,
+- no guilt, truthfulness, or lie-detection claims are introduced.
+
+See `docs/24-first-supervisor-demo.md` for run instructions and boundaries.
