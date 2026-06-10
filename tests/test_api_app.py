@@ -161,11 +161,11 @@ class ApiAppTest(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(first_seed["imported_count"], 3)
+        self.assertEqual(first_seed["imported_count"], 4)
         self.assertEqual(first_seed["skipped_count"], 0)
         self.assertEqual(second_seed["imported_count"], 0)
-        self.assertEqual(second_seed["skipped_count"], 3)
-        self.assertEqual(len(second_seed["materials"]), 3)
+        self.assertEqual(second_seed["skipped_count"], 4)
+        self.assertEqual(len(second_seed["materials"]), 4)
 
     def test_workspace_endpoint_flow(self) -> None:
         app = create_app(

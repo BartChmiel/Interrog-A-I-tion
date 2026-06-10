@@ -59,6 +59,26 @@
         "en": "Synthetic camera layout. Camera PH-02 covers the customer area but not the full service corridor. Camera PH-03 may partially cover the corridor entrance. Recording export status is unknown.",
         "pl": "Syntetyczny opis rozmieszczenia kamer. Kamera PH-02 obejmuje salę sprzedaży, ale nie cały korytarz serwisowy. Kamera PH-03 może częściowo obejmować wejście do korytarza. Status eksportu nagrania jest nieznany."
       }
+    },
+    {
+      "id": "case-002-access-card-log",
+      "title": "Service corridor access-card log",
+      "title_i18n": {
+        "en": "Service corridor access-card log",
+        "pl": "Log kart dostępu do korytarza serwisowego"
+      },
+      "description": "Synthetic access log for recording-topic and access cross-checks.",
+      "description_i18n": {
+        "en": "Synthetic access log for recording-topic and access cross-checks.",
+        "pl": "Syntetyczny log dostępu do weryfikacji tematu nagrań i dostępu."
+      },
+      "source_type": "external_document",
+      "tags": ["access", "card", "recording", "corridor", "log"],
+      "content": "Synthetic access-card export. Card STAFF-14 used at service corridor reader at 22:13. No customer-card event recorded for the corridor door in the same window. Export has not yet been matched to camera PH-03.",
+      "content_i18n": {
+        "en": "Synthetic access-card export. Card STAFF-14 used at service corridor reader at 22:13. No customer-card event recorded for the corridor door in the same window. Export has not yet been matched to camera PH-03.",
+        "pl": "Syntetyczny eksport kart dostępu. Karta STAFF-14 użyta przy czytniku korytarza serwisowego o 22:13. Brak zdarzenia karty klienta przy drzwiach korytarza w tym samym oknie. Eksport nie został jeszcze zestawiony z kamerą PH-03."
+      }
     }
   ]
 }

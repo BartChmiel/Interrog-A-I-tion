@@ -18,6 +18,12 @@ LEADING_PATTERNS: tuple[str, ...] = (
     "skoro ",
     "musial pan",
     "musiała pani",
+    "correct?",
+    "right?",
+    "weren't you",
+    "wasn't it",
+    "you were definitely",
+    "definitely at the",
 )
 
 ACCUSATORY_PATTERNS: tuple[str, ...] = (

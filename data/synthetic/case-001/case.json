@@ -86,28 +86,44 @@
   "questions": [
     {
       "id": "q-001",
-      "text": "Prosze opisac zdarzenie wlasnymi slowami.",
+      "text": "Proszę opisać zdarzenie własnymi słowami.",
+      "text_i18n": {
+        "en": "Please describe the event in your own words.",
+        "pl": "Proszę opisać zdarzenie własnymi słowami."
+      },
       "source": "human",
       "question_type": "open",
       "topic_ids": ["topic-chronology", "topic-location", "topic-person"]
     },
     {
       "id": "q-002",
-      "text": "O ktorej godzinie to sie zaczelo?",
+      "text": "O której godzinie to się zaczęło?",
+      "text_i18n": {
+        "en": "What time did it start?",
+        "pl": "O której godzinie to się zaczęło?"
+      },
       "source": "human",
       "question_type": "chronological",
       "topic_ids": ["topic-chronology"]
     },
     {
       "id": "q-003",
-      "text": "Przeciez stal Pan przy stojaku rowerowym o 20:00, prawda?",
+      "text": "Przecież stał Pan przy stojaku rowerowym o 20:00, prawda?",
+      "text_i18n": {
+        "en": "You were definitely at the bicycle stand at 20:00, correct?",
+        "pl": "Przecież stał Pan przy stojaku rowerowym o 20:00, prawda?"
+      },
       "source": "human",
       "question_type": "challenge",
       "topic_ids": ["topic-location", "topic-chronology"]
     },
     {
       "id": "q-004",
-      "text": "Skad Pan to wie?",
+      "text": "Skąd Pan to wie?",
+      "text_i18n": {
+        "en": "How do you know that?",
+        "pl": "Skąd Pan to wie?"
+      },
       "source": "human",
       "question_type": "source_of_knowledge",
       "topic_ids": ["topic-source"]
@@ -117,7 +133,11 @@
     {
       "id": "a-001",
       "question_id": "q-001",
-      "text": "Widzialem mezczyzne przy stojaku rowerowym przed biblioteka. To bylo okolo 19:45. Potem odszedl z ciemnym rowerem.",
+      "text": "Widziałem mężczyznę przy stojaku rowerowym przed biblioteką. To było około 19:45. Potem odszedł z ciemnym rowerem.",
+      "text_i18n": {
+        "en": "I saw a man at the bicycle stand in front of the library. It was around 19:45. Then he left with a dark bicycle.",
+        "pl": "Widziałem mężczyznę przy stojaku rowerowym przed biblioteką. To było około 19:45. Potem odszedł z ciemnym rowerem."
+      },
       "topic_ids": ["topic-chronology", "topic-location", "topic-person"],
       "created_at": "2026-05-05T12:03:00Z",
       "claims": [
@@ -140,7 +160,11 @@
     {
       "id": "a-002",
       "question_id": "q-002",
-      "text": "Wydaje mi sie, ze zaczelo sie raczej po 20:10, bo wtedy wyszedlem z zajec.",
+      "text": "Wydaje mi się, że zaczęło się raczej po 20:10, bo wtedy wyszedłem z zajęć.",
+      "text_i18n": {
+        "en": "I think it started closer to 20:10 because that is when I left class.",
+        "pl": "Wydaje mi się, że zaczęło się raczej po 20:10, bo wtedy wyszedłem z zajęć."
+      },
       "topic_ids": ["topic-chronology"],
       "created_at": "2026-05-05T12:05:00Z",
       "claims": [
@@ -156,7 +180,11 @@
     {
       "id": "a-003",
       "question_id": "q-004",
-      "text": "Widzialem to osobiscie z chodnika po drugiej stronie ulicy.",
+      "text": "Widziałem to osobiście z chodnika po drugiej stronie ulicy.",
+      "text_i18n": {
+        "en": "I saw it personally from the sidewalk on the other side of the street.",
+        "pl": "Widziałem to osobiście z chodnika po drugiej stronie ulicy."
+      },
       "topic_ids": ["topic-source"],
       "created_at": "2026-05-05T12:08:00Z",
       "claims": [

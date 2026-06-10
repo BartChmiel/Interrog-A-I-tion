@@ -51,13 +51,14 @@ class CaseReviewPipelineTest(unittest.TestCase):
         self.assertIn("Drzwi", polish_case.answers[0].claims[1].source_text)
 
     def test_loads_starter_materials_for_each_synthetic_case(self) -> None:
+        expected_counts = {"case-001": 4, "case-002": 4, "case-003": 3}
         for case_id in ("case-001", "case-002", "case-003"):
             materials = load_synthetic_materials(
                 SYNTHETIC_ROOT / case_id / "materials.json",
                 locale="pl",
             )
 
-            self.assertEqual(len(materials), 3)
+            self.assertEqual(len(materials), expected_counts[case_id])
             self.assertTrue(all(material.id.startswith(case_id) for material in materials))
             self.assertTrue(all(material.content.strip() for material in materials))
 

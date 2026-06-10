@@ -59,6 +59,26 @@
         "en": "Synthetic patrol log. Patrol reached the library area at 20:22. Bicycle stand was checked. No dark bicycle matching the witness description was found nearby. The log does not establish the event time.",
         "pl": "Syntetyczny log patrolu. Patrol dotarł w rejon biblioteki o 20:22. Sprawdzono stojak rowerowy. W pobliżu nie znaleziono ciemnego roweru odpowiadającego opisowi świadka. Log nie ustala czasu zdarzenia."
       }
+    },
+    {
+      "id": "case-001-class-schedule",
+      "title": "Witness class schedule note",
+      "title_i18n": {
+        "en": "Witness class schedule note",
+        "pl": "Notatka o planie zajęć świadka"
+      },
+      "description": "Synthetic schedule excerpt supporting the later time estimate.",
+      "description_i18n": {
+        "en": "Synthetic schedule excerpt supporting the later time estimate.",
+        "pl": "Syntetyczny fragment planu zajęć wspierający późniejszą estymację czasu."
+      },
+      "source_type": "external_document",
+      "tags": ["time", "schedule", "chronology", "witness"],
+      "content": "Synthetic class schedule. Evening seminar ended at 20:05 in building B, about 120 meters from the library bicycle stand. Witness states they left the building shortly after the seminar ended.",
+      "content_i18n": {
+        "en": "Synthetic class schedule. Evening seminar ended at 20:05 in building B, about 120 meters from the library bicycle stand. Witness states they left the building shortly after the seminar ended.",
+        "pl": "Syntetyczny plan zajęć. Wieczorne seminarium zakończyło się o 20:05 w budynku B, około 120 metrów od stojaka rowerowego przy bibliotece. Świadek podaje, że wyszedł z budynku krótko po zakończeniu seminarium."
+      }
     }
   ]
 }

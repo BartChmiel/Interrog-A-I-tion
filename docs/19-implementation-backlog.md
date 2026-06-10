@@ -209,6 +209,12 @@ Implemented:
 
 Next:
 
-- richer per-case README summaries and starter materials,
 - stronger empty/loading states per operations tab,
 - extract large panels from `App.tsx` into maintainable components.
+
+Partially delivered in synthetic data:
+
+- richer per-case README summaries and suggested demo paths,
+- additional starter materials for case-001 and case-002,
+- open recording topics with material leads and README follow-up guidance,
+- Polish diacritics and i18n polish for case-001 answers and questions.

@@ -1,24 +1,35 @@
 # Synthetic Case 003
 
-Synthetic care facility medication discrepancy scenario.
+Recommended first supervisor-demo scenario: care-facility medication discrepancy.
 
-Purpose:
+## Purpose
 
 - demonstrate role-boundary awareness,
 - test contradictions across time and access claims,
 - include documentation-grounding questions,
-- leave potential monitoring uncovered for follow-up.
+- leave monitoring coverage open for follow-up,
+- support the default guided demo and tutorial path.
 
-## Content
+## Scenario Summary
 
-`case.json` describes a care facility worker interview about a missing medication dose.
+A care-facility worker is interviewed about a missing medication dose during an evening round.
+The account contains conflicting discovery times and competing claims about who held the cabinet
+key. Starter materials include medication logs, handover notes, and monitoring references.
 
-The scenario intentionally includes:
+## Expected Training Signals
 
-- an uncovered potential monitoring topic,
-- one potentially leading role-boundary question: `q-306`,
-- one potential time inconsistency: `18:40` vs `19:05`,
-- one access contradiction: key holder `supervisor` vs `witness`.
+| Signal | Where to look |
+| --- | --- |
+| Time inconsistency | answers with `18:40` vs `19:05` |
+| Access contradiction | supervisor vs witness key claims |
+| Leading role-boundary question | `q-306` |
+| Uncovered monitoring topic | `topic-care-monitoring` |
+| Material leads | `case-003-medication-log`, `case-003-key-handover` |
+
+## Suggested Demo Path
+
+Use the in-app tutorial (`&tutorial=1`) or the left-side demo path. This case is the default
+supervisor walkthrough documented in `docs/24-first-supervisor-demo.md`.
 
 ## Run Analysis
 
