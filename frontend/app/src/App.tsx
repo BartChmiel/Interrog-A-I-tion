@@ -1673,6 +1673,7 @@ export function App() {
                 <CollapsibleSection
                   accordionGroup="ops-monitor"
                   className="operations-section"
+                  defaultOpen
                   hint={text(locale, "expandWhenNeeded")}
                   meta={workspace?.manifest?.status ?? text(locale, "unknown")}
                   title={text(locale, "security")}
@@ -1720,6 +1721,7 @@ export function App() {
                 <CollapsibleSection
                   accordionGroup="ops-ai"
                   className="operations-section"
+                  defaultOpen
                   hint={text(locale, "expandWhenNeeded")}
                   meta={String(groundedSuggestions.length)}
                   title={text(locale, "groundedAi")}
@@ -1782,6 +1784,7 @@ export function App() {
               <CollapsibleSection
                 accordionGroup="ops-materials"
                 className="operations-section"
+                defaultOpen
                 hint={text(locale, "expandWhenNeeded")}
                 meta={`${workspaceMaterials.length} ${text(locale, "registered")}`}
                 title={text(locale, "materialRegister")}
