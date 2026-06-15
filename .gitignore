@@ -1,0 +1,34 @@
+# Local runtime data
+.env
+.env.*
+*.log
+*.sqlite
+*.sqlite3
+*.db
+.local/
+test-output/
+local-data/
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+.deps/
+.deps_stable/
+venv/
+
+# Node
+node_modules/
+.npm-cache/
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+
+# Sensitive project data
+data/private/
+data/cases/
+exports/private/

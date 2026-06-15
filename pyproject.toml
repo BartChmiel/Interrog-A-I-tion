@@ -1,0 +1,28 @@
+[project]
+name = "interrogaition"
+version = "0.1.0"
+description = "Local AI-assisted investigative interviewing prototype."
+requires-python = ">=3.11"
+readme = "README.md"
+authors = [
+  { name = "InterrogA(I)tion research project" }
+]
+dependencies = [
+  "fastapi==0.115.12",
+  "uvicorn==0.30.6"
+]
+
+[project.scripts]
+interrogaition = "interrogaition.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["backend"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "backend"

@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="InterrogA(I)tion">
+  <!-- speech bubble + tail -->
+  <circle cx="31" cy="29" r="20.5" fill="none" stroke="#0F1E33" stroke-width="5.5"/>
+  <path d="M43 44 L55 55 L46 37 Z" fill="#0F1E33"/>
+  <!-- dialogue lines flowing into the question -->
+  <path d="M18 24 H33 M18 30 H33 M18 36 H27" stroke="#0F1E33" stroke-width="4.2" stroke-linecap="round"/>
+  <path d="M34 26 C34 21.5 44 21.5 44 27 C44 31.5 38 31.5 38 37" stroke="#0F1E33" stroke-width="4.5" stroke-linecap="round"/>
+  <!-- accent dot (the embedded AI) -->
+  <circle cx="38" cy="44" r="3.4" fill="#4A78B7"/>
+</svg>

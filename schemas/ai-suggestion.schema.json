@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interrogaition.local/schemas/ai-suggestion.schema.json",
+  "title": "AISuggestion",
+  "type": "object",
+  "required": ["id", "type", "text", "reason", "status", "created_at"],
+  "properties": {
+    "id": { "type": "string" },
+    "type": {
+      "type": "string",
+      "enum": ["interview_plan", "follow_up_question", "gap", "potential_inconsistency", "neutrality_rewrite", "summary"]
+    },
+    "text": { "type": "string" },
+    "reason": { "type": "string" },
+    "linked_topics": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "linked_evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "edited", "rejected"]
+    },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

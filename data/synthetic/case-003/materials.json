@@ -1,0 +1,64 @@
+{
+  "materials": [
+    {
+      "id": "case-003-medication-log",
+      "title": "Medication log excerpt",
+      "title_i18n": {
+        "en": "Medication log excerpt",
+        "pl": "Fragment dokumentacji lekowej"
+      },
+      "description": "Synthetic medication documentation for timeline and source checks.",
+      "description_i18n": {
+        "en": "Synthetic medication documentation for timeline and source checks.",
+        "pl": "Syntetyczna dokumentacja lekowa do sprawdzenia chronologii i źródła wiedzy."
+      },
+      "source_type": "case_protocol",
+      "tags": ["medication", "log", "time", "source"],
+      "content": "Synthetic medication log. Evening round entry for room 12 was signed at 19:03. Paper log contains one corrected line and no electronic confirmation. Inventory note says one pain-medication dose required reconciliation.",
+      "content_i18n": {
+        "en": "Synthetic medication log. Evening round entry for room 12 was signed at 19:03. Paper log contains one corrected line and no electronic confirmation. Inventory note says one pain-medication dose required reconciliation.",
+        "pl": "Syntetyczna dokumentacja lekowa. Wpis wieczornego obchodu dla pokoju 12 podpisano o 19:03. Papierowy log zawiera jedną poprawioną linię i brak elektronicznego potwierdzenia. Notatka inwentaryzacyjna wskazuje, że jedna dawka leku przeciwbólowego wymagała uzgodnienia."
+      }
+    },
+    {
+      "id": "case-003-key-handover",
+      "title": "Medication cabinet key handover",
+      "title_i18n": {
+        "en": "Medication cabinet key handover",
+        "pl": "Przekazanie klucza do szafki z lekami"
+      },
+      "description": "Synthetic handover note for cabinet-access verification.",
+      "description_i18n": {
+        "en": "Synthetic handover note for cabinet-access verification.",
+        "pl": "Syntetyczna notatka przekazania do weryfikacji dostępu do szafki."
+      },
+      "source_type": "text_note",
+      "tags": ["access", "key", "cabinet", "supervisor", "witness"],
+      "content": "Synthetic handover note. Backup key assigned to supervisor at 17:50. Witness also had an individual medication cabinet key during the evening round. Cabinet access policy requires notation when a key is used outside scheduled rounds.",
+      "content_i18n": {
+        "en": "Synthetic handover note. Backup key assigned to supervisor at 17:50. Witness also had an individual medication cabinet key during the evening round. Cabinet access policy requires notation when a key is used outside scheduled rounds.",
+        "pl": "Syntetyczna notatka przekazania. Klucz zapasowy przydzielono przełożonej o 17:50. Świadek również posiadał indywidualny klucz do szafki z lekami podczas wieczornego obchodu. Procedura dostępu wymaga odnotowania użycia klucza poza planowym obchodem."
+      }
+    },
+    {
+      "id": "case-003-corridor-monitoring",
+      "title": "Corridor monitoring policy note",
+      "title_i18n": {
+        "en": "Corridor monitoring policy note",
+        "pl": "Notatka o monitoringu korytarza"
+      },
+      "description": "Synthetic note indicating possible monitoring or access-log evidence.",
+      "description_i18n": {
+        "en": "Synthetic note indicating possible monitoring or access-log evidence.",
+        "pl": "Syntetyczna notatka wskazująca możliwy monitoring albo logi dostępu."
+      },
+      "source_type": "external_document",
+      "tags": ["monitoring", "recording", "access", "corridor"],
+      "content": "Synthetic facility note. Corridor monitoring may cover the medication room entrance. Recording retention is 72 hours. Access log export status is unknown and should be verified before relying on timeline assumptions.",
+      "content_i18n": {
+        "en": "Synthetic facility note. Corridor monitoring may cover the medication room entrance. Recording retention is 72 hours. Access log export status is unknown and should be verified before relying on timeline assumptions.",
+        "pl": "Syntetyczna notatka placówki. Monitoring korytarza może obejmować wejście do pokoju lekowego. Retencja nagrań wynosi 72 godziny. Status eksportu logu dostępu jest nieznany i powinien zostać zweryfikowany przed opieraniem się na założeniach chronologicznych."
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interrogaition.local/schemas/question.schema.json",
+  "title": "Question",
+  "type": "object",
+  "required": ["id", "text", "source", "question_type", "topics"],
+  "properties": {
+    "id": { "type": "string" },
+    "text": { "type": "string" },
+    "source": {
+      "type": "string",
+      "enum": ["human", "ai", "imported"]
+    },
+    "question_type": {
+      "type": "string",
+      "enum": ["open", "clarifying", "chronological", "source_of_knowledge", "control", "summary", "challenge"]
+    },
+    "topics": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "neutrality_flags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["leading", "accusatory", "speculative", "compound", "unsupported_assumption"]
+      }
+    },
+    "rationale": { "type": "string" }
+  }
+}

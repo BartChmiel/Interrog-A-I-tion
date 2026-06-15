@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InterrogA(I)tion Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark">IA</div>
+          <div>
+            <h1>InterrogA(I)tion</h1>
+            <p id="case-subtitle"></p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="status-strip" id="status-strip"></div>
+          <div class="language-toggle" role="group" aria-label="Language">
+            <button class="lang-button is-active" data-locale="pl">PL</button>
+            <button class="lang-button" data-locale="en">EN</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="question-panel">
+          <div class="panel-header">
+            <h2 data-i18n="questions"></h2>
+            <span id="question-count"></span>
+          </div>
+          <div class="question-list" id="question-list"></div>
+        </aside>
+
+        <section class="interview-panel">
+          <div class="panel-header">
+            <div>
+              <h2 data-i18n="liveInterview"></h2>
+              <span id="active-role"></span>
+            </div>
+            <div class="session-clock">12:08</div>
+          </div>
+
+          <div class="active-question" id="active-question"></div>
+          <div class="answer-stream" id="answer-stream"></div>
+
+          <div class="answer-composer">
+            <textarea id="answer-input" rows="3"></textarea>
+            <button id="record-answer-button" type="button"></button>
+          </div>
+        </section>
+
+        <aside class="insight-panel">
+          <section>
+            <div class="panel-header compact">
+              <h2 data-i18n="indicators"></h2>
+              <span data-i18n="visibleToInterviewer"></span>
+            </div>
+            <div class="indicator-list" id="indicator-list"></div>
+          </section>
+
+          <section>
+            <div class="panel-header compact">
+              <h2 data-i18n="assistant"></h2>
+              <span data-i18n="localOnly"></span>
+            </div>
+            <div class="suggestion-list" id="suggestion-list"></div>
+          </section>
+
+          <section>
+            <div class="panel-header compact">
+              <h2 data-i18n="findings"></h2>
+              <span id="finding-count"></span>
+            </div>
+            <div class="finding-list" id="finding-list"></div>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://interrogaition.local/schemas/audit-event.schema.json",
+  "title": "AuditEvent",
+  "type": "object",
+  "required": ["id", "timestamp", "actor", "action", "object_type", "object_id"],
+  "properties": {
+    "id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "actor": {
+      "type": "string",
+      "enum": ["human", "ai", "system"]
+    },
+    "action": { "type": "string" },
+    "object_type": { "type": "string" },
+    "object_id": { "type": "string" },
+    "details": { "type": "object" },
+    "previous_hash": { "type": "string" },
+    "event_hash": { "type": "string" }
+  }
+}
