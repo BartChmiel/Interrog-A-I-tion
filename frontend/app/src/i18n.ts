@@ -245,6 +245,20 @@ export const copy = {
     operationsAi: "AI",
     operationsMaterials: "Materiały",
     operationsReview: "Przegląd",
+    operationsGuideLabel: "Następny krok",
+    operationsGuideMetrics: "Status operacyjny",
+    operationsGuideMonitorTitle: "Potwierdź środowisko i ślad",
+    operationsGuideMonitorDetail:
+      "Sprawdź lokalne bramki, szyfrowanie, audyt workspace i mapę sprawy przed pracą na sugestiach.",
+    operationsGuideAiTitle: "Przejrzyj sugestie przy aktywnym pytaniu",
+    operationsGuideAiDetail:
+      "Używaj tylko follow-upów ze źródłami i neutralnym brzmieniem. Decyzja operatora zapisuje się w audycie.",
+    operationsGuideMaterialsTitle: "Zweryfikuj materiały i powiązania",
+    operationsGuideMaterialsDetail:
+      "Otwórz podgląd, sprawdź hash i zaakceptuj albo odrzuć linki materiał-pytanie przed użyciem ich w rozmowie.",
+    operationsGuideReviewTitle: "Zamknij pętlę przeglądu",
+    operationsGuideReviewDetail:
+      "Po istotnej odpowiedzi sprawdź raport, STOP readiness, board i ślad audytu przed przejściem dalej.",
     missingTopicTitlePrefix: "Niepokryty temat",
     questionNeutralityTitle: "Pytanie może wymagać neutralizacji",
     potentialInconsistencyTitlePrefix: "Potencjalna niespójność",
@@ -687,6 +701,20 @@ export const copy = {
     operationsAi: "AI",
     operationsMaterials: "Materials",
     operationsReview: "Review",
+    operationsGuideLabel: "Next step",
+    operationsGuideMetrics: "Operational status",
+    operationsGuideMonitorTitle: "Confirm environment and trace",
+    operationsGuideMonitorDetail:
+      "Check local gates, encryption, workspace audit, and the case map before acting on suggestions.",
+    operationsGuideAiTitle: "Review suggestions for the active question",
+    operationsGuideAiDetail:
+      "Use only follow-ups with sources and neutral wording. Operator decisions are written to the audit trail.",
+    operationsGuideMaterialsTitle: "Verify materials and links",
+    operationsGuideMaterialsDetail:
+      "Open the preview, check the hash, and accept or reject material-question links before using them in the interview.",
+    operationsGuideReviewTitle: "Close the review loop",
+    operationsGuideReviewDetail:
+      "After a meaningful answer, check the report, STOP readiness, board, and audit trail before moving on.",
     missingTopicTitlePrefix: "Uncovered topic",
     questionNeutralityTitle: "Question may require neutralization",
     potentialInconsistencyTitlePrefix: "Potential inconsistency",

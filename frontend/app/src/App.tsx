@@ -1668,6 +1668,18 @@ export function App() {
                 title={text(locale, "operationsOfflineTitle")}
               />
             ) : null}
+            {apiMode === "online" ? (
+              <OperationsGuidanceCard
+                activeTab={activeOperationsTab}
+                answeredCount={answeredQuestionCount}
+                findingCount={visibleFindings.length}
+                locale={locale}
+                materialCount={workspaceMaterials.length}
+                questionCount={questions.length}
+                reportExported={sessionReportExported}
+                suggestionCount={groundedSuggestions.length}
+              />
+            ) : null}
             {activeOperationsTab === "monitor" ? (
               <>
                 <CollapsibleSection
@@ -1937,6 +1949,93 @@ export function App() {
         onStepChange={setTutorialStepIndex}
         onStepEnter={handleTutorialStepEnter}
       />
+    </div>
+  );
+}
+
+function OperationsGuidanceCard({
+  activeTab,
+  answeredCount,
+  findingCount,
+  locale,
+  materialCount,
+  questionCount,
+  reportExported,
+  suggestionCount,
+}: {
+  activeTab: OperationsTab;
+  answeredCount: number;
+  findingCount: number;
+  locale: Locale;
+  materialCount: number;
+  questionCount: number;
+  reportExported: boolean;
+  suggestionCount: number;
+}) {
+  const guidance: Record<OperationsTab, { detailKey: CopyKey; icon: ReactNode; titleKey: CopyKey }> = {
+    monitor: {
+      titleKey: "operationsGuideMonitorTitle",
+      detailKey: "operationsGuideMonitorDetail",
+      icon: <ShieldCheck size={17} />,
+    },
+    ai: {
+      titleKey: "operationsGuideAiTitle",
+      detailKey: "operationsGuideAiDetail",
+      icon: <Sparkles size={17} />,
+    },
+    materials: {
+      titleKey: "operationsGuideMaterialsTitle",
+      detailKey: "operationsGuideMaterialsDetail",
+      icon: <FolderOpen size={17} />,
+    },
+    review: {
+      titleKey: "operationsGuideReviewTitle",
+      detailKey: "operationsGuideReviewDetail",
+      icon: <ListChecks size={17} />,
+    },
+  };
+  const activeGuidance = guidance[activeTab];
+  const metrics = [
+    {
+      label: text(locale, "operatorAnswered"),
+      value: `${answeredCount}/${questionCount}`,
+    },
+    {
+      label: text(locale, "materialRecordCount"),
+      value: String(materialCount),
+    },
+    {
+      label: text(locale, "groundingSuggestionsShort"),
+      value: String(suggestionCount),
+    },
+    {
+      label: text(locale, "findingPluralMany"),
+      value: String(findingCount),
+    },
+    {
+      label: text(locale, "sessionReport"),
+      value: reportExported ? text(locale, "ready") : text(locale, "notReady"),
+    },
+  ];
+
+  return (
+    <div className="operations-guidance-card" data-tutorial="operations-guidance">
+      <div className="operations-guidance-main">
+        <span aria-hidden="true">{activeGuidance.icon}</span>
+        <div>
+          <small>{text(locale, "operationsGuideLabel")}</small>
+          <strong>{text(locale, activeGuidance.titleKey)}</strong>
+          <p>{text(locale, activeGuidance.detailKey)}</p>
+        </div>
+      </div>
+      <div className="operations-guidance-metrics" aria-label={text(locale, "operationsGuideMetrics")}>
+        {metrics.map((metric) => (
+          <span key={metric.label}>
+            <strong>{metric.value}</strong>
+            {metric.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

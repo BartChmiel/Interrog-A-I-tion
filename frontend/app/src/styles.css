@@ -854,7 +854,91 @@ h2 {
   gap: 14px;
 }
 
+.operations-guidance-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid rgba(52, 111, 183, 0.18);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(52, 111, 183, 0.08), rgba(255, 255, 255, 0.92)),
+    #fff;
+  box-shadow: 0 8px 22px rgba(25, 45, 70, 0.06);
+}
+
+.operations-guidance-main {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.operations-guidance-main > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  border: 1px solid rgba(52, 111, 183, 0.2);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.operations-guidance-main small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.operations-guidance-main strong {
+  display: block;
+  color: var(--heading);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.operations-guidance-main p {
+  margin: 4px 0 0;
+  color: var(--body);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.operations-guidance-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 6px;
+}
+
+.operations-guidance-metrics span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.15;
+  border: 1px solid rgba(138, 154, 171, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.operations-guidance-metrics strong {
+  color: var(--heading);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .operations-content > section:only-child {
+  grid-column: 1 / -1;
+}
+
+.operations-content[data-tab="materials"] > .operations-section {
   grid-column: 1 / -1;
 }
 
