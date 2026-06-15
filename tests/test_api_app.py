@@ -124,7 +124,7 @@ class ApiAppTest(unittest.TestCase):
         response = endpoint(app, "list_case_starter_materials")("case-003", locale="pl")
 
         self.assertEqual(response["case_id"], "case-003")
-        self.assertEqual(len(response["materials"]), 3)
+        self.assertEqual(len(response["materials"]), 5)
         self.assertIn("dokumentacji lekowej", response["materials"][0]["title"])
         self.assertIn("Syntetyczna dokumentacja lekowa", response["materials"][0]["content"])
 
@@ -165,11 +165,11 @@ class ApiAppTest(unittest.TestCase):
             ),
         )
 
-        self.assertEqual(first_seed["imported_count"], 4)
+        self.assertEqual(first_seed["imported_count"], 6)
         self.assertEqual(first_seed["skipped_count"], 0)
         self.assertEqual(second_seed["imported_count"], 0)
-        self.assertEqual(second_seed["skipped_count"], 4)
-        self.assertEqual(len(second_seed["materials"]), 4)
+        self.assertEqual(second_seed["skipped_count"], 6)
+        self.assertEqual(len(second_seed["materials"]), 6)
 
     def test_workspace_endpoint_flow(self) -> None:
         app = create_app(

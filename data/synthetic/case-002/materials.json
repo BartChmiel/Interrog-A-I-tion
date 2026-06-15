@@ -79,6 +79,46 @@
         "en": "Synthetic access-card export. Card STAFF-14 used at service corridor reader at 22:13. No customer-card event recorded for the corridor door in the same window. Export has not yet been matched to camera PH-03.",
         "pl": "Syntetyczny eksport kart dostępu. Karta STAFF-14 użyta przy czytniku korytarza serwisowego o 22:13. Brak zdarzenia karty klienta przy drzwiach korytarza w tym samym oknie. Eksport nie został jeszcze zestawiony z kamerą PH-03."
       }
+    },
+    {
+      "id": "case-002-shift-roster",
+      "title": "Late-shift staffing roster",
+      "title_i18n": {
+        "en": "Late-shift staffing roster",
+        "pl": "Grafik obsady późnej zmiany"
+      },
+      "description": "Synthetic roster for source, access, and staff-presence checks.",
+      "description_i18n": {
+        "en": "Synthetic roster for source, access, and staff-presence checks.",
+        "pl": "Syntetyczny grafik do kontroli źródła wiedzy, dostępu i obecności personelu."
+      },
+      "source_type": "external_document",
+      "tags": ["staff", "shift", "access", "source", "person"],
+      "content": "Synthetic shift roster. Staff member linked to card STAFF-14 was assigned to inventory preparation from 22:00 to 22:20. A second employee was assigned to the customer area until 22:30. The roster does not identify the unknown person, but it narrows who had routine service-corridor access.",
+      "content_i18n": {
+        "en": "Synthetic shift roster. Staff member linked to card STAFF-14 was assigned to inventory preparation from 22:00 to 22:20. A second employee was assigned to the customer area until 22:30. The roster does not identify the unknown person, but it narrows who had routine service-corridor access.",
+        "pl": "Syntetyczny grafik zmiany. Pracownik powiązany z kartą STAFF-14 był przypisany do przygotowania inwentaryzacji w godzinach 22:00-22:20. Drugi pracownik był przypisany do sali sprzedaży do 22:30. Grafik nie identyfikuje nieznanej osoby, ale zawęża krąg osób z rutynowym dostępem do korytarza serwisowego."
+      }
+    },
+    {
+      "id": "case-002-maintenance-ticket",
+      "title": "Service door maintenance ticket",
+      "title_i18n": {
+        "en": "Service door maintenance ticket",
+        "pl": "Zgłoszenie serwisowe drzwi zaplecza"
+      },
+      "description": "Synthetic maintenance ticket that adds a pre-incident door-status reference.",
+      "description_i18n": {
+        "en": "Synthetic maintenance ticket that adds a pre-incident door-status reference.",
+        "pl": "Syntetyczne zgłoszenie serwisowe z przedzdarzeniowym odniesieniem do stanu drzwi."
+      },
+      "source_type": "text_note",
+      "tags": ["door", "service", "locked", "open", "time", "access"],
+      "content": "Synthetic maintenance ticket. At 21:55 staff reported that the service door latch sometimes failed to close on first pull. Technician note at 22:41 says the door could remain visually closed while not fully latched. The ticket does not prove whether the door was open at 22:15.",
+      "content_i18n": {
+        "en": "Synthetic maintenance ticket. At 21:55 staff reported that the service door latch sometimes failed to close on first pull. Technician note at 22:41 says the door could remain visually closed while not fully latched. The ticket does not prove whether the door was open at 22:15.",
+        "pl": "Syntetyczne zgłoszenie serwisowe. O 21:55 personel zgłosił, że zatrzask drzwi serwisowych czasem nie domykał się przy pierwszym pociągnięciu. Notatka technika z 22:41 wskazuje, że drzwi mogły wyglądać na zamknięte, choć nie były w pełni zatrzaśnięte. Zgłoszenie nie dowodzi, czy drzwi były otwarte o 22:15."
+      }
     }
   ]
 }

@@ -59,6 +59,46 @@
         "en": "Synthetic facility note. Corridor monitoring may cover the medication room entrance. Recording retention is 72 hours. Access log export status is unknown and should be verified before relying on timeline assumptions.",
         "pl": "Syntetyczna notatka placówki. Monitoring korytarza może obejmować wejście do pokoju lekowego. Retencja nagrań wynosi 72 godziny. Status eksportu logu dostępu jest nieznany i powinien zostać zweryfikowany przed opieraniem się na założeniach chronologicznych."
       }
+    },
+    {
+      "id": "case-003-inventory-reconciliation",
+      "title": "Medication inventory reconciliation note",
+      "title_i18n": {
+        "en": "Medication inventory reconciliation note",
+        "pl": "Notatka z uzgodnienia stanu leków"
+      },
+      "description": "Synthetic reconciliation note for the missing-dose inventory topic.",
+      "description_i18n": {
+        "en": "Synthetic reconciliation note for the missing-dose inventory topic.",
+        "pl": "Syntetyczna notatka uzgodnieniowa dla tematu brakującej dawki."
+      },
+      "source_type": "text_note",
+      "tags": ["inventory", "reconciliation", "medication", "time", "source"],
+      "content": "Synthetic inventory note. At 19:22 the supervisor and witness counted the pain-medication blister and recorded one missing dose requiring reconciliation. The note references the paper medication log but does not identify who removed the dose or when.",
+      "content_i18n": {
+        "en": "Synthetic inventory note. At 19:22 the supervisor and witness counted the pain-medication blister and recorded one missing dose requiring reconciliation. The note references the paper medication log but does not identify who removed the dose or when.",
+        "pl": "Syntetyczna notatka inwentaryzacyjna. O 19:22 przełożona i świadek przeliczyły blister leku przeciwbólowego i odnotowały jedną brakującą dawkę wymagającą uzgodnienia. Notatka odwołuje się do papierowej dokumentacji lekowej, ale nie identyfikuje osoby, która zabrała dawkę, ani momentu jej zabrania."
+      }
+    },
+    {
+      "id": "case-003-evening-shift-roster",
+      "title": "Evening medication shift roster",
+      "title_i18n": {
+        "en": "Evening medication shift roster",
+        "pl": "Grafik wieczornego obchodu lekowego"
+      },
+      "description": "Synthetic roster for role-boundary and cabinet-access checks.",
+      "description_i18n": {
+        "en": "Synthetic roster for role-boundary and cabinet-access checks.",
+        "pl": "Syntetyczny grafik do kontroli granicy roli i dostępu do szafki."
+      },
+      "source_type": "external_document",
+      "tags": ["role", "witness", "supervisor", "access", "cabinet", "schedule"],
+      "content": "Synthetic evening roster. Witness was assigned to medication delivery for rooms 10-14 from 18:30 to 19:15. Supervisor was assigned as backup key holder and inventory reviewer. The roster supports treating the worker as a witness at the start, while preserving the role-boundary question if cabinet access becomes central.",
+      "content_i18n": {
+        "en": "Synthetic evening roster. Witness was assigned to medication delivery for rooms 10-14 from 18:30 to 19:15. Supervisor was assigned as backup key holder and inventory reviewer. The roster supports treating the worker as a witness at the start, while preserving the role-boundary question if cabinet access becomes central.",
+        "pl": "Syntetyczny grafik wieczorny. Świadek była przypisana do podania leków w pokojach 10-14 w godzinach 18:30-19:15. Przełożona była wskazana jako osoba z kluczem zapasowym i osoba weryfikująca stan leków. Grafik wspiera traktowanie pracownicy jako świadka na początku, przy zachowaniu pytania o granicę roli, jeśli dostęp do szafki stanie się centralny."
+      }
     }
   ]
 }

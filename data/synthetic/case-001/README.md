@@ -13,8 +13,9 @@ Baseline synthetic scenario for bicycle-theft witness interviewing.
 ## Scenario Summary
 
 A student witness reports seeing a man at a library bicycle stand around 19:45, then gives a later
-start-time estimate after leaving class. A campus camera note and patrol log exist, but the
-recording topic has not yet been explored in the live interview.
+start-time estimate after leaving class. A campus camera note, patrol log, entrance log, class
+schedule, and owner report exist, but the recording topic has not yet been explored in the live
+interview.
 
 ## Expected Training Signals
 
@@ -23,14 +24,16 @@ recording topic has not yet been explored in the live interview.
 | Time inconsistency | answers `a-001` vs `a-002` (`19:45` vs `20:10`) |
 | Leading question | `q-003` |
 | Uncovered recording topic | `topic-recording` — ask a neutral follow-up about camera C-12 |
-| Material leads | `case-001-security-camera-note`, `case-001-class-schedule` |
+| Route/time cross-check | `case-001-class-schedule`, `case-001-library-entry-log` |
+| Object/victim details | `case-001-owner-report` |
+| Material leads | `case-001-security-camera-note`, `case-001-class-schedule`, `case-001-library-entry-log` |
 | Source-of-knowledge check | answer `a-003` |
 
 ## Suggested Demo Path
 
 1. Open dossier and review priority gaps.
 2. Record or inspect answers for chronology.
-3. Open Materials and compare camera note with the witness schedule note.
+3. Open Materials and compare camera note, witness schedule, entrance log, and owner report.
 4. Use Grounded AI for a neutral follow-up on time or recording coverage.
 5. Review findings and export a research session report.
 

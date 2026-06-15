@@ -79,6 +79,46 @@
         "en": "Synthetic class schedule. Evening seminar ended at 20:05 in building B, about 120 meters from the library bicycle stand. Witness states they left the building shortly after the seminar ended.",
         "pl": "Syntetyczny plan zajęć. Wieczorne seminarium zakończyło się o 20:05 w budynku B, około 120 metrów od stojaka rowerowego przy bibliotece. Świadek podaje, że wyszedł z budynku krótko po zakończeniu seminarium."
       }
+    },
+    {
+      "id": "case-001-library-entry-log",
+      "title": "Library entrance access log",
+      "title_i18n": {
+        "en": "Library entrance access log",
+        "pl": "Log wejścia do biblioteki"
+      },
+      "description": "Synthetic access-log excerpt for route and time cross-checking.",
+      "description_i18n": {
+        "en": "Synthetic access-log excerpt for route and time cross-checking.",
+        "pl": "Syntetyczny fragment logu dostępu do kontroli trasy i czasu."
+      },
+      "source_type": "external_document",
+      "tags": ["time", "location", "library", "access", "route"],
+      "content": "Synthetic entrance log. Student card assigned to the witness was used in building B at 20:04 and at the library entrance at 20:11. The log confirms movement near the library, but it does not confirm observation of the bicycle stand or the suspect.",
+      "content_i18n": {
+        "en": "Synthetic entrance log. Student card assigned to the witness was used in building B at 20:04 and at the library entrance at 20:11. The log confirms movement near the library, but it does not confirm observation of the bicycle stand or the suspect.",
+        "pl": "Syntetyczny log wejścia. Karty studenckiej przypisanej do świadka użyto w budynku B o 20:04 oraz przy wejściu do biblioteki o 20:11. Log potwierdza przemieszczanie się w rejonie biblioteki, ale nie potwierdza obserwacji stojaka rowerowego ani podejrzanej osoby."
+      }
+    },
+    {
+      "id": "case-001-owner-report",
+      "title": "Bicycle owner report excerpt",
+      "title_i18n": {
+        "en": "Bicycle owner report excerpt",
+        "pl": "Fragment zgłoszenia właściciela roweru"
+      },
+      "description": "Synthetic victim report that adds object details and a separate time reference.",
+      "description_i18n": {
+        "en": "Synthetic victim report that adds object details and a separate time reference.",
+        "pl": "Syntetyczne zgłoszenie pokrzywdzonego z opisem przedmiotu i osobnym odniesieniem czasowym."
+      },
+      "source_type": "case_protocol",
+      "tags": ["bicycle", "owner", "person", "location", "time"],
+      "content": "Synthetic owner report. The owner describes a matte black trekking bicycle with a silver rear rack and reports locking it at the library stand around 19:30. The owner noticed the bicycle missing at 20:18 after leaving the reading room. The owner did not see the person who removed it.",
+      "content_i18n": {
+        "en": "Synthetic owner report. The owner describes a matte black trekking bicycle with a silver rear rack and reports locking it at the library stand around 19:30. The owner noticed the bicycle missing at 20:18 after leaving the reading room. The owner did not see the person who removed it.",
+        "pl": "Syntetyczne zgłoszenie właściciela. Właściciel opisuje matowy czarny rower trekkingowy ze srebrnym bagażnikiem i podaje, że zabezpieczył go przy stojaku bibliotecznym około 19:30. Brak roweru zauważył o 20:18 po wyjściu z czytelni. Właściciel nie widział osoby, która go zabrała."
+      }
     }
   ]
 }

@@ -14,7 +14,8 @@ Synthetic late-night pharmacy incident scenario.
 
 A pharmacy employee describes a person near the service corridor around 22:15, later reports the
 service door as locked, and references alarm-panel timing from a log. Materials include alarm,
-door, camera, and access-card exports that have not yet been fully reconciled in the interview.
+door, camera, access-card, roster, and maintenance records that have not yet been fully reconciled
+in the interview.
 
 ## Expected Training Signals
 
@@ -24,13 +25,15 @@ door, camera, and access-card exports that have not yet been fully reconciled in
 | Leading question | `q-205` |
 | Mixed source of knowledge | answer `a-204` |
 | Uncovered recording topic | `topic-pharmacy-recording` — reconcile PH-03 with access-card export |
-| Material leads | `case-002-access-card-log`, `case-002-camera-layout` |
+| Routine access narrowing | `case-002-shift-roster` |
+| Door-status context | `case-002-service-door-note`, `case-002-maintenance-ticket` |
+| Material leads | `case-002-access-card-log`, `case-002-camera-layout`, `case-002-maintenance-ticket` |
 
 ## Suggested Demo Path
 
 1. Review dossier focus topics for access and alarm timing.
 2. Inspect answers for the open vs locked door conflict.
-3. Open Materials and compare alarm log, door note, and access-card export.
+3. Open Materials and compare alarm log, door note, access-card export, roster, and maintenance ticket.
 4. Use Grounded AI for a neutral clarification on corridor access or recordings.
 5. Review the investigative board and export the session report.
 

@@ -14,7 +14,8 @@ Recommended first supervisor-demo scenario: care-facility medication discrepancy
 
 A care-facility worker is interviewed about a missing medication dose during an evening round.
 The account contains conflicting discovery times and competing claims about who held the cabinet
-key. Starter materials include medication logs, handover notes, and monitoring references.
+key. Starter materials include medication logs, handover notes, monitoring references, inventory
+reconciliation, and the evening medication roster.
 
 ## Expected Training Signals
 
@@ -23,8 +24,10 @@ key. Starter materials include medication logs, handover notes, and monitoring r
 | Time inconsistency | answers with `18:40` vs `19:05` |
 | Access contradiction | supervisor vs witness key claims |
 | Leading role-boundary question | `q-306` |
-| Uncovered monitoring topic | `topic-care-monitoring` |
-| Material leads | `case-003-medication-log`, `case-003-key-handover` |
+| Uncovered monitoring topic | `topic-care-recording` |
+| Inventory reconciliation | `case-003-inventory-reconciliation` |
+| Role-boundary context | `case-003-evening-shift-roster` |
+| Material leads | `case-003-medication-log`, `case-003-key-handover`, `case-003-inventory-reconciliation` |
 
 ## Suggested Demo Path
 
