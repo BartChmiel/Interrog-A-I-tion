@@ -857,8 +857,8 @@ h2 {
 .operations-guidance-card {
   grid-column: 1 / -1;
   display: grid;
-  gap: 11px;
-  padding: 12px;
+  gap: 9px;
+  padding: 10px;
   border: 1px solid rgba(52, 111, 183, 0.18);
   border-radius: var(--radius);
   background:
@@ -932,6 +932,87 @@ h2 {
   color: var(--heading);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.operations-guidance-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 7px;
+}
+
+.operations-guidance-action {
+  min-width: 0;
+  min-height: 50px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    transform 0.16s ease;
+}
+
+.operations-guidance-action:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.operations-guidance-action:disabled {
+  cursor: default;
+  opacity: 0.68;
+}
+
+.operations-guidance-action > span:first-child {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-strong);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.operations-guidance-action[data-variant="primary"] {
+  border-color: rgba(52, 111, 183, 0.28);
+  background: linear-gradient(180deg, #fff 0, rgba(239, 246, 255, 0.92) 100%);
+}
+
+.operations-guidance-action[data-variant="primary"] > span:first-child {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.operations-guidance-action > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.operations-guidance-action strong {
+  color: var(--heading);
+  font-size: 11px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.operations-guidance-action em {
+  display: -webkit-box;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.3;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
 }
 
 .operations-content > section:only-child {

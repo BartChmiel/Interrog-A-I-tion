@@ -168,6 +168,16 @@ type StopReadinessGate = {
   icon: ReactNode;
 };
 
+type OperationsGuidanceAction = {
+  id: string;
+  detail: string;
+  disabled?: boolean;
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  variant?: "primary" | "secondary";
+};
+
 const emptyMaterialDraft: MaterialDraft = {
   title: "",
   content: "",
@@ -1385,6 +1395,48 @@ export function App() {
       icon: <ListChecks size={15} />,
     },
   ];
+  const primaryGuidanceAction = visibleOperatorActions[0];
+  const linkedActiveQuestionMaterials = activeQuestionId
+    ? materialQuestionLinks
+        .filter((link) => link.question_id === activeQuestionId)
+        .map((link) => workspaceMaterials.find((material) => material.id === link.material_id))
+        .filter((material): material is MaterialRecord => Boolean(material))
+    : [];
+  const firstGuidanceMaterial = linkedActiveQuestionMaterials[0] ?? workspaceMaterials[0];
+  const operationsGuidanceActions: OperationsGuidanceAction[] = [
+    primaryGuidanceAction
+      ? {
+          id: `priority-${primaryGuidanceAction.id}`,
+          label: text(locale, "operationsActionPriority"),
+          detail: `${primaryGuidanceAction.title}: ${primaryGuidanceAction.detail}`,
+          icon: operatorActionIcon(primaryGuidanceAction.kind),
+          onClick: () => runOperatorAction(primaryGuidanceAction),
+          variant: "primary",
+        }
+      : {
+          id: "priority-empty",
+          label: text(locale, "operationsActionNoPriority"),
+          detail: text(locale, "operationsActionNoPriorityDetail"),
+          disabled: true,
+          icon: <CheckCircle2 size={16} />,
+          onClick: () => undefined,
+          variant: "primary",
+        },
+    ...operationsTabQuickActions({
+      activeTab: activeOperationsTab,
+      firstMaterial: firstGuidanceMaterial,
+      locale,
+      onOpenAi: () => setActiveOperationsTab("ai"),
+      onOpenMaterials: () => setActiveOperationsTab("materials"),
+      onOpenMonitor: () => setActiveOperationsTab("monitor"),
+      onOpenReview: () => {
+        setActiveOperationsTab("review");
+        setDemoReviewVisited(true);
+      },
+      onPreviewMaterial: (materialId) => void toggleMaterialPreview(materialId),
+      onRegenerateAi: () => void refreshGroundedSuggestions(),
+    }),
+  ];
 
   return (
     <div className="app-shell">
@@ -1671,6 +1723,7 @@ export function App() {
             {apiMode === "online" ? (
               <OperationsGuidanceCard
                 activeTab={activeOperationsTab}
+                actions={operationsGuidanceActions}
                 answeredCount={answeredQuestionCount}
                 findingCount={visibleFindings.length}
                 locale={locale}
@@ -1955,6 +2008,7 @@ export function App() {
 
 function OperationsGuidanceCard({
   activeTab,
+  actions,
   answeredCount,
   findingCount,
   locale,
@@ -1964,6 +2018,7 @@ function OperationsGuidanceCard({
   suggestionCount,
 }: {
   activeTab: OperationsTab;
+  actions: OperationsGuidanceAction[];
   answeredCount: number;
   findingCount: number;
   locale: Locale;
@@ -2036,8 +2091,110 @@ function OperationsGuidanceCard({
           </span>
         ))}
       </div>
+      <div className="operations-guidance-actions" aria-label={text(locale, "operationsGuideActions")}>
+        {actions.map((action) => (
+          <button
+            className="operations-guidance-action"
+            data-variant={action.variant ?? "secondary"}
+            disabled={action.disabled}
+            key={action.id}
+            title={action.detail}
+            type="button"
+            onClick={action.onClick}
+          >
+            <span aria-hidden="true">{action.icon}</span>
+            <span>
+              <strong>{action.label}</strong>
+              <em>{action.detail}</em>
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
+}
+
+function operationsTabQuickActions({
+  activeTab,
+  firstMaterial,
+  locale,
+  onOpenAi,
+  onOpenMaterials,
+  onOpenMonitor,
+  onOpenReview,
+  onPreviewMaterial,
+  onRegenerateAi,
+}: {
+  activeTab: OperationsTab;
+  firstMaterial: MaterialRecord | undefined;
+  locale: Locale;
+  onOpenAi: () => void;
+  onOpenMaterials: () => void;
+  onOpenMonitor: () => void;
+  onOpenReview: () => void;
+  onPreviewMaterial: (materialId: string) => void;
+  onRegenerateAi: () => void;
+}): OperationsGuidanceAction[] {
+  const openMaterialsAction: OperationsGuidanceAction = {
+    id: "open-materials",
+    label: text(locale, "operationsActionOpenMaterials"),
+    detail: text(locale, "operationsActionOpenMaterialsDetail"),
+    icon: <FolderOpen size={16} />,
+    onClick: onOpenMaterials,
+  };
+  const openAiAction: OperationsGuidanceAction = {
+    id: "open-ai",
+    label: text(locale, "operationsActionOpenAi"),
+    detail: text(locale, "operationsActionOpenAiDetail"),
+    icon: <Sparkles size={16} />,
+    onClick: onOpenAi,
+  };
+  const openReviewAction: OperationsGuidanceAction = {
+    id: "open-review",
+    label: text(locale, "operationsActionOpenReview"),
+    detail: text(locale, "operationsActionOpenReviewDetail"),
+    icon: <ListChecks size={16} />,
+    onClick: onOpenReview,
+  };
+  const openMonitorAction: OperationsGuidanceAction = {
+    id: "open-monitor",
+    label: text(locale, "operationsActionOpenMonitor"),
+    detail: text(locale, "operationsActionOpenMonitorDetail"),
+    icon: <ShieldCheck size={16} />,
+    onClick: onOpenMonitor,
+  };
+  const previewMaterialAction: OperationsGuidanceAction = {
+    id: firstMaterial ? `preview-${firstMaterial.id}` : "preview-empty",
+    label: text(locale, "operationsActionPreviewMaterial"),
+    detail: firstMaterial?.title ?? text(locale, "operationsActionPreviewMaterialUnavailable"),
+    disabled: !firstMaterial,
+    icon: <Eye size={16} />,
+    onClick: () => {
+      if (firstMaterial) {
+        onPreviewMaterial(firstMaterial.id);
+      }
+    },
+  };
+
+  if (activeTab === "monitor") {
+    return [openAiAction, openMaterialsAction];
+  }
+  if (activeTab === "ai") {
+    return [
+      {
+        id: "regenerate-ai",
+        label: text(locale, "operationsActionRegenerateAi"),
+        detail: text(locale, "operationsActionRegenerateAiDetail"),
+        icon: <RefreshCw size={16} />,
+        onClick: onRegenerateAi,
+      },
+      openMaterialsAction,
+    ];
+  }
+  if (activeTab === "materials") {
+    return [previewMaterialAction, openReviewAction];
+  }
+  return [openMonitorAction, openAiAction];
 }
 
 function OperatorWorkflowPanel({
