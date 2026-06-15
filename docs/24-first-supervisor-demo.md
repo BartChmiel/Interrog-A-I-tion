@@ -46,9 +46,9 @@ The first demo includes:
 
 The interview workspace is split into three zones:
 
-- **Case prep** (left) — demo path, dossier, and case context.
-- **Live interview** (center) — active question, answer composer, and answer history.
-- **Operations** (right) — materials, grounded AI, operator queue, and review.
+- **Case prep** (left) - demo path, dossier, and case context.
+- **Live interview** (center) - active question, answer composer, and answer history.
+- **Operations** (right) - materials, grounded AI, operator queue, and review.
 
 Side rails can collapse to keep focus on the live interview. Secondary panels stay
 collapsed until opened, so the default view stays readable during a walkthrough.
@@ -82,15 +82,67 @@ top bar anytime.
 
 The demo uses synthetic material only.
 
+## Pre-Send Quality Gate
+
+Before sharing the repository link, verify:
+
+- GitHub Actions CI is visible and passing on `main`.
+- The local backend test suite passes:
+
+```powershell
+$env:PYTHONPATH='backend'
+python -m unittest discover -s tests
+```
+
+- The frontend typecheck and production build pass:
+
+```powershell
+cd frontend/app
+npm run build
+```
+
+- The demo opens on `case-003` with a fresh session/workspace.
+- The first screen clearly shows that this is a synthetic research prototype.
+- The Review tab shows STOP readiness, provenance, and the non-official report boundary.
+- No real case material, personal data, secrets, local databases, or generated exports are committed.
+
+## Five-Minute Review Script
+
+For a short supervisor walkthrough:
+
+1. Show the README and this demo document to establish scope and boundaries.
+2. Open `case-003` with `&tutorial=1`.
+3. Show the case dossier and priority gaps.
+4. Record one short synthetic answer in the live interview area.
+5. Seed/open Materials and show hashes, previews, and material-question links.
+6. Open Grounded AI and show source-backed suggestions plus human use/edit/reject controls.
+7. Open Review and show STOP readiness, investigative board, provenance timeline, and report export.
+
+The walkthrough should emphasize that the prototype is local-first and auditable, and that
+all AI-assisted outputs remain advisory.
+
+## Suggested Review Questions
+
+Useful questions for the first academic review:
+
+- Is the scope appropriate for a forensic computing project with a later master's thesis path?
+- Which part should become the strongest research contribution: local security, grounded AI,
+  audit/provenance, interviewing methodology, or evaluation?
+- Are the ethical boundaries and non-goals clear enough?
+- Should the next semester focus more on encrypted storage, evaluation scenarios, UI workflow,
+  or controlled local-model experiments?
+- Which artifacts would be most useful for assessment: live demo, exported report, architecture
+  diagram, evaluation protocol, or threat model?
+
 ## Demo Pack Controls
 
 The left sidebar **Demo path** panel includes supervisor-demo helpers:
 
-- **Fresh demo** — reloads the page with a new session and workspace for the
+- **Fresh demo** - reloads the page with a new session and workspace for the
   current case, so each walkthrough starts from a clean local state.
-- **Copy summary** — copies a compact text snapshot (case, coverage, materials,
+- **Copy summary** - copies a compact text snapshot (case, coverage, materials,
   audit counts, advisory boundary) for notes or email follow-up.
-- **Demo checklist** — tracks which walkthrough steps have been touched in the
+- **Demo checklist** - tracks which walkthrough steps have been touched in the
   current session.
 
 ## Suggested Walkthrough

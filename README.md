@@ -1,5 +1,7 @@
 # InterrogA(I)tion
 
+[![CI](https://github.com/BartChmiel/Interrog-A-I-tion/actions/workflows/ci.yml/badge.svg)](https://github.com/BartChmiel/Interrog-A-I-tion/actions/workflows/ci.yml)
+
 ![InterrogA(I)tion](assets/brand/header-banner.png)
 
 InterrogA(I)tion is a local-first, auditable research prototype for AI-assisted investigative interviewing. It is designed for privacy-preserving interview preparation, live note-taking, grounded follow-up suggestions, topic coverage review, evidence alignment, and provenance tracking.

@@ -16,6 +16,7 @@ The repository should present a coherent research prototype:
 - No sensitive personal data.
 - No secrets, keys, or tokens.
 - Tests pass.
+- GitHub Actions CI passes on `main`.
 - README avoids lie-detection or operational-readiness claims.
 - Documentation clearly states that the system is advisory and human-controlled.
 - `.gitignore` covers local databases, exports, generated workspaces, and secrets.

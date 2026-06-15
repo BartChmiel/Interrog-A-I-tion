@@ -197,6 +197,29 @@ Next:
 - verify downloaded zip bundles offline with the CLI integrity tool,
 - attach export bundle hash to workspace audit after STOP review.
 
+## Milestone 9: Case Workflow Deepening
+
+Status: in progress.
+
+Implemented:
+
+- case progress navigator with stage navigation (dossier -> interview -> materials -> AI -> review -> report),
+- scenario badges and supervisor-demo marker in the case catalog,
+- operational session context in the header and interview strip,
+- operations offline guidance when the local API is unavailable.
+
+Next:
+
+- stronger empty/loading states per operations tab,
+- extract large panels from `App.tsx` into maintainable components.
+
+Partially delivered in synthetic data:
+
+- richer per-case README summaries and suggested demo paths,
+- additional starter materials for case-001 and case-002,
+- open recording topics with material leads and README follow-up guidance,
+- Polish diacritics and i18n polish for case-001 answers and questions.
+
 ## Milestone 10: Grounded AI Panel UX
 
 Status: implemented for the first developer-facing AI workflow polish.
@@ -217,26 +240,3 @@ Implemented additionally:
 - ZIP export bundle with session-report.md, manifest.json, and optional session-report.json,
 - inline manifest verification badge in Review,
 - grounding pack topic-row diff highlighting.
-
-## Milestone 9: Case Workflow Deepening
-
-Status: in progress.
-
-Implemented:
-
-- case progress navigator with stage navigation (dossier → interview → materials → AI → review → report),
-- scenario badges and supervisor-demo marker in the case catalog,
-- operational session context in the header and interview strip,
-- operations offline guidance when the local API is unavailable.
-
-Next:
-
-- stronger empty/loading states per operations tab,
-- extract large panels from `App.tsx` into maintainable components.
-
-Partially delivered in synthetic data:
-
-- richer per-case README summaries and suggested demo paths,
-- additional starter materials for case-001 and case-002,
-- open recording topics with material leads and README follow-up guidance,
-- Polish diacritics and i18n polish for case-001 answers and questions.
