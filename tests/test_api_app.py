@@ -47,6 +47,7 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(endpoint(app, "locales")(), {"locales": ["en", "pl"]})
 
     def test_environment_health_endpoint_reports_readiness_checks(self) -> None:
+        TEST_OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
         app = create_app(
             workspace_manager=CaseWorkspaceManager(
                 TEST_OUTPUT_ROOT / f"health-workspaces-{uuid.uuid4()}",
