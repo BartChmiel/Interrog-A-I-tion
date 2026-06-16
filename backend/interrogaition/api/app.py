@@ -74,6 +74,7 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
         return default
 
 from interrogaition.analysis.credibility_indicators import generate_indicators
+from interrogaition.analysis.claim_extraction import answer_with_extracted_claims
 from interrogaition.analysis.evidence_alignment import build_evidence_alignment
 from interrogaition.analysis.evidence_map import build_evidence_map
 from interrogaition.analysis.grounding_context import build_grounding_context_pack
@@ -1477,20 +1478,24 @@ def create_app(
             )
         _validate_answer_request(case, request)
 
-        answer = Answer(
-            id=request.id,
-            question_id=request.question_id,
-            text=request.text,
-            topic_ids=tuple(request.topic_ids),
-            claims=tuple(
-                Claim(
-                    id=raw["id"],
-                    subject=raw["subject"],
-                    attribute=raw["attribute"],
-                    value=raw["value"],
-                    source_text=raw.get("source_text", ""),
-                )
-                for raw in request.claims
+        supplied_claims = tuple(
+            Claim(
+                id=raw["id"],
+                subject=raw["subject"],
+                attribute=raw["attribute"],
+                value=raw["value"],
+                source_text=raw.get("source_text", ""),
+            )
+            for raw in request.claims
+        )
+        answer = answer_with_extracted_claims(
+            case,
+            Answer(
+                id=request.id,
+                question_id=request.question_id,
+                text=request.text,
+                topic_ids=tuple(request.topic_ids),
+                claims=supplied_claims,
             ),
         )
         updated = add_answer(session, answer=answer, event_id=request.event_id)
@@ -1505,6 +1510,8 @@ def create_app(
                 "case_id": session.case_id,
                 "question_id": answer.question_id,
                 "topic_ids": list(answer.topic_ids),
+                "claim_count": len(answer.claims),
+                "claims_extracted": not bool(request.claims) and bool(answer.claims),
             },
         )
         return _to_jsonable(updated)

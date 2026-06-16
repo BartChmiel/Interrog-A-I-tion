@@ -900,7 +900,7 @@ class ApiAppTest(unittest.TestCase):
             AddAnswerRequest(
                 id="api-answer-001",
                 question_id="q-001",
-                text="I saw the person near the bicycle stand.",
+                text="At 19:45 I saw the person near the bicycle stand.",
                 topic_ids=["topic-location"],
                 event_id="api-event-answer-001",
             ),
@@ -908,6 +908,13 @@ class ApiAppTest(unittest.TestCase):
 
         self.assertEqual(len(updated["answers"]), 1)
         self.assertEqual(updated["events"][-1]["event_type"], "answer_added")
+        self.assertIn(
+            ("event", "time", "19:45"),
+            {
+                (claim["subject"], claim["attribute"], claim["value"])
+                for claim in updated["answers"][0]["claims"]
+            },
+        )
 
         review = review_session("api-session-001", locale="en")
 
@@ -922,6 +929,8 @@ class ApiAppTest(unittest.TestCase):
 
         self.assertTrue(audit["chain_valid"])
         self.assertEqual(audit["session_id"], "api-session-001")
+        self.assertEqual(audit["events"][1]["details"]["claim_count"], 2)
+        self.assertTrue(audit["events"][1]["details"]["claims_extracted"])
         self.assertEqual(
             [event["action"] for event in audit["events"]],
             ["session_started", "answer_added", "review_refreshed"],
