@@ -21,6 +21,41 @@ export type Question = {
   neutrality_flags?: string[];
 };
 
+export type QuestionDraft = {
+  id: string;
+  workspace_id: string;
+  case_id: string;
+  session_id: string | null;
+  participant_id: string | null;
+  text: string;
+  source: string;
+  question_type: string;
+  topic_ids: string[];
+  source_material_ids: string[];
+  source_object_ids: string[];
+  status: string;
+  locale: Locale;
+  rationale: string;
+  created_by: string;
+  created_at: string;
+  audit_event_id: string;
+  event_hash: string | null;
+};
+
+export type QuestionDraftListResponse = {
+  workspace_id: string;
+  case_id: string;
+  session_id: string | null;
+  drafts: QuestionDraft[];
+  chain_valid: boolean;
+};
+
+export type QuestionDraftResponse = {
+  draft: QuestionDraft;
+  audit_event: AuditEvent;
+  chain_valid: boolean;
+};
+
 export type Answer = {
   id: string;
   question_id: string;

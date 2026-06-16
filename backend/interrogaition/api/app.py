@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-from dataclasses import asdict, dataclass, field, is_dataclass
+import uuid
+from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -95,7 +96,18 @@ from interrogaition.ai.local_model_runtime import (
     run_local_model_smoke,
 )
 from interrogaition.ai.model_client import ModelClient
-from interrogaition.domain.models import Actor, Answer, AuditEvent, Claim, Case, Priority, SuggestionStatus
+from interrogaition.domain.models import (
+    Actor,
+    Answer,
+    AuditEvent,
+    Claim,
+    Case,
+    Priority,
+    Question,
+    QuestionSource,
+    QuestionType,
+    SuggestionStatus,
+)
 from interrogaition.domain.session import (
     InterviewSession,
     ParticipantRole,
@@ -168,6 +180,7 @@ class AddAnswerRequest:
     event_id: str
     topic_ids: list[str] = field(default_factory=list)
     claims: list[dict[str, str]] = field(default_factory=list)
+    workspace_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -264,6 +277,20 @@ class OperatorActionDecisionRequest:
     prompt_hash: str = ""
     context_hash: str = ""
     output_hash: str = ""
+    role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
+@dataclass(frozen=True)
+class CreateQuestionDraftRequest:
+    material_id: str
+    case_id: str | None = None
+    session_id: str | None = None
+    participant_id: str | None = None
+    topic_id: str | None = None
+    source_object_ids: list[str] = field(default_factory=list)
+    action_id: str = ""
+    locale: str = "en"
+    created_by: str = "local-ui"
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
 
 
@@ -796,6 +823,120 @@ def create_app(
             "chain_valid": store.verify_audit_chain(),
         }
 
+    @app.get("/workspaces/{workspace_id}/question-drafts")
+    def list_workspace_question_drafts(
+        workspace_id: str,
+        case_id: str | None = Query(default=None),
+        session_id: str | None = Query(default=None),
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        effective_case_id = case_id or workspace.manifest.case_id
+        if effective_case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+
+        events = _question_draft_events(
+            _workspace_audit_events(store.list_audit_events(), workspace_id),
+            case_id=effective_case_id,
+            session_id=session_id,
+        )
+        return {
+            "workspace_id": workspace_id,
+            "case_id": effective_case_id,
+            "session_id": session_id,
+            "drafts": [_question_draft_from_event(event) for event in events],
+            "chain_valid": store.verify_audit_chain(),
+        }
+
+    @app.post("/workspaces/{workspace_id}/question-drafts")
+    def create_workspace_question_draft(
+        workspace_id: str,
+        request: CreateQuestionDraftRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+            registry = MaterialRegistry(workspace)
+            material = next(
+                (item for item in registry.list_materials() if item.id == request.material_id),
+                None,
+            )
+            if material is None:
+                raise MaterialRegistryError(f"Unknown material: {request.material_id}.")
+            material_text = registry.read_material_text(request.material_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.WRITE_INTERVIEW,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        case_id = request.case_id or workspace.manifest.case_id
+        if case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+        case = _load_synthetic_case(case_id, locale=request.locale)
+        topic = None
+        if request.topic_id:
+            topic = next((item for item in case.topics if item.id == request.topic_id), None)
+            if topic is None:
+                raise HTTPException(status_code=400, detail=f"Unknown topic_id: {request.topic_id}.")
+
+        draft = _build_material_question_draft(
+            workspace_id=workspace_id,
+            case_id=case_id,
+            session_id=request.session_id,
+            participant_id=request.participant_id,
+            material_id=request.material_id,
+            material_title=material.title,
+            material_text=material_text,
+            topic_id=request.topic_id,
+            topic_label=topic.label if topic is not None else "",
+            source_object_ids=request.source_object_ids,
+            action_id=request.action_id,
+            locale=request.locale,
+            created_by=request.created_by,
+        )
+        audit_event = store.append_audit_event(
+            actor=Actor.AI,
+            action="question_draft_created",
+            object_type="question_draft",
+            object_id=draft["id"],
+            details={
+                "workspace_id": workspace_id,
+                "case_id": case_id,
+                "session_id": request.session_id,
+                "participant_id": request.participant_id,
+                "created_by": request.created_by,
+                "material_id": request.material_id,
+                "topic_id": request.topic_id,
+                "action_id": request.action_id,
+                "source_object_ids": draft["source_object_ids"],
+                "draft": draft,
+            },
+        )
+        return {
+            "draft": _question_draft_from_event(audit_event),
+            "audit_event": _to_jsonable(audit_event),
+            "chain_valid": store.verify_audit_chain(),
+        }
+
     @app.get("/workspaces/{workspace_id}/evidence-map")
     def get_workspace_evidence_map(
         workspace_id: str,
@@ -815,6 +956,11 @@ def create_app(
         decisions = derive_material_link_decisions(
             _workspace_audit_events(store.list_audit_events(), workspace_id)
         )
+        question_drafts = _question_draft_questions(
+            _workspace_audit_events(store.list_audit_events(), workspace_id),
+            case_id=case_id,
+            session_id=session_id,
+        )
         context = _build_evidence_context(
             case_id=case_id,
             locale=locale,
@@ -822,6 +968,7 @@ def create_app(
             store=store,
             material_texts=material_texts,
             material_link_decisions=decisions,
+            question_drafts=question_drafts,
         )
         return {
             "evidence_map": _to_jsonable(context["evidence_map"]),
@@ -845,12 +992,18 @@ def create_app(
         except MaterialRegistryError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        question_drafts = _question_draft_questions(
+            _workspace_audit_events(store.list_audit_events(), workspace_id),
+            case_id=case_id,
+            session_id=session_id,
+        )
         context = _build_evidence_context(
             case_id=case_id,
             locale=locale,
             session_id=session_id,
             store=store,
             material_texts=material_texts,
+            question_drafts=question_drafts,
         )
         case_view = context["case"]
         if question_id:
@@ -885,12 +1038,18 @@ def create_app(
         except MaterialRegistryError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        question_drafts = _question_draft_questions(
+            _workspace_audit_events(store.list_audit_events(), workspace_id),
+            case_id=case_id,
+            session_id=session_id,
+        )
         context = _build_evidence_context(
             case_id=case_id,
             locale=locale,
             session_id=session_id,
             store=store,
             material_texts=material_texts,
+            question_drafts=question_drafts,
         )
         case_view = context["case"]
         if question_id:
@@ -1302,6 +1461,20 @@ def create_app(
             raise HTTPException(status_code=404, detail="Session not found.")
 
         case = _load_synthetic_case(session.case_id, locale="en")
+        if request.workspace_id:
+            workspace = _open_session_workspace(
+                workspace_manager=workspace_manager,
+                workspace_id=request.workspace_id,
+                case_id=session.case_id,
+            )
+            case = _case_with_question_drafts(
+                case,
+                _question_draft_questions(
+                    _workspace_audit_events(store.list_audit_events(), workspace.manifest.workspace_id),
+                    case_id=session.case_id,
+                    session_id=session_id,
+                ),
+            )
         _validate_answer_request(case, request)
 
         answer = Answer(
@@ -1340,12 +1513,28 @@ def create_app(
     def review_session_endpoint(
         session_id: str,
         locale: str = Query(default="en"),
+        workspace_id: str | None = Query(default=None),
     ) -> dict[str, Any]:
         session = store.get_session(session_id)
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
 
         case = _load_synthetic_case(session.case_id, locale=locale)
+        effective_workspace_id = workspace_id if isinstance(workspace_id, str) and workspace_id else None
+        if effective_workspace_id:
+            workspace = _open_session_workspace(
+                workspace_manager=workspace_manager,
+                workspace_id=effective_workspace_id,
+                case_id=session.case_id,
+            )
+            case = _case_with_question_drafts(
+                case,
+                _question_draft_questions(
+                    _workspace_audit_events(store.list_audit_events(), workspace.manifest.workspace_id),
+                    case_id=session.case_id,
+                    session_id=session_id,
+                ),
+            )
         snapshot = review_live_session(case, session)
         case_view = merge_session_answers(case, session)
         indicators = generate_indicators(case_view, snapshot.review)
@@ -1494,6 +1683,69 @@ def _workspace_audit_events(
     )
 
 
+def _question_draft_events(
+    events: tuple[AuditEvent, ...],
+    *,
+    case_id: str | None,
+    session_id: str | None,
+) -> tuple[AuditEvent, ...]:
+    return tuple(
+        event
+        for event in events
+        if event.object_type == "question_draft"
+        and event.action == "question_draft_created"
+        and (case_id is None or event.details.get("case_id") == case_id)
+        and (session_id is None or event.details.get("session_id") in {None, session_id})
+    )
+
+
+def _question_draft_from_event(event: AuditEvent) -> dict[str, Any]:
+    details = event.details
+    raw_draft = details.get("draft", {})
+    draft = dict(raw_draft) if isinstance(raw_draft, dict) else {}
+    draft.setdefault("id", event.object_id)
+    draft.setdefault("workspace_id", details.get("workspace_id"))
+    draft.setdefault("case_id", details.get("case_id"))
+    draft.setdefault("session_id", details.get("session_id"))
+    draft.setdefault("participant_id", details.get("participant_id"))
+    draft.setdefault("created_by", details.get("created_by", ""))
+    draft.setdefault("created_at", event.timestamp.isoformat())
+    draft.setdefault("source_object_ids", list(details.get("source_object_ids", ())))
+    draft["audit_event_id"] = event.id
+    draft["event_hash"] = event.event_hash
+    return draft
+
+
+def _question_draft_questions(
+    events: tuple[AuditEvent, ...],
+    *,
+    case_id: str | None,
+    session_id: str | None,
+) -> tuple[Question, ...]:
+    drafts = (_question_draft_from_event(event) for event in _question_draft_events(
+        events,
+        case_id=case_id,
+        session_id=session_id,
+    ))
+    questions: list[Question] = []
+    for draft in drafts:
+        question_id = str(draft.get("id", "")).strip()
+        text = str(draft.get("text", "")).strip()
+        if not question_id or not text:
+            continue
+        questions.append(
+            Question(
+                id=question_id,
+                text=text,
+                source=QuestionSource.AI,
+                question_type=QuestionType.CLARIFYING,
+                topic_ids=tuple(str(topic_id) for topic_id in draft.get("topic_ids", ())),
+                rationale=str(draft.get("rationale", "")),
+            )
+        )
+    return tuple(questions)
+
+
 def _operator_action_decision_events(
     events: tuple[AuditEvent, ...],
     *,
@@ -1542,6 +1794,101 @@ def _operator_action_decision_from_event(event: AuditEvent) -> dict[str, Any]:
     }
 
 
+def _build_material_question_draft(
+    *,
+    workspace_id: str,
+    case_id: str,
+    session_id: str | None,
+    participant_id: str | None,
+    material_id: str,
+    material_title: str,
+    material_text: str,
+    topic_id: str | None,
+    topic_label: str,
+    source_object_ids: list[str],
+    action_id: str,
+    locale: str,
+    created_by: str,
+) -> dict[str, Any]:
+    focus = topic_label.strip() or _material_focus_phrase(material_title, material_text)
+    normalized_locale = "pl" if locale == "pl" else "en"
+    text = (
+        f"Proszę opisać, co wie Pan/Pani o kwestii „{focus}” oraz jak odnosi się ona "
+        f"do materiału „{material_title}”."
+        if normalized_locale == "pl"
+        else f'Please describe what you know about "{focus}" and how it relates to the material "{material_title}".'
+    )
+    rationale = (
+        f"Szkic utworzony z materiału „{material_title}” w celu neutralnego wyjaśnienia tematu."
+        if normalized_locale == "pl"
+        else f'Draft created from material "{material_title}" to clarify the topic neutrally.'
+    )
+    topic_ids = [topic_id] if topic_id else []
+    deduped_sources = _dedupe_preserving_order(
+        [material_id, *(topic_ids or []), action_id, *source_object_ids]
+    )
+    return {
+        "id": f"draft-{uuid.uuid4().hex[:12]}",
+        "workspace_id": workspace_id,
+        "case_id": case_id,
+        "session_id": session_id,
+        "participant_id": participant_id,
+        "text": text,
+        "source": QuestionSource.AI.value,
+        "question_type": QuestionType.CLARIFYING.value,
+        "topic_ids": topic_ids,
+        "source_material_ids": [material_id],
+        "source_object_ids": deduped_sources,
+        "status": "proposed",
+        "locale": normalized_locale,
+        "rationale": rationale,
+        "created_by": created_by,
+    }
+
+
+def _material_focus_phrase(material_title: str, material_text: str) -> str:
+    candidates = [
+        material_title.strip(),
+        " ".join(material_text.strip().replace("\n", " ").split()[:8]),
+    ]
+    return next((candidate for candidate in candidates if candidate), "registered case material")
+
+
+def _dedupe_preserving_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        normalized = str(value).strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _case_with_question_drafts(case: Case, question_drafts: tuple[Question, ...]) -> Case:
+    existing_ids = {question.id for question in case.questions}
+    additions = tuple(question for question in question_drafts if question.id not in existing_ids)
+    if not additions:
+        return case
+    return replace(case, questions=(*case.questions, *additions))
+
+
+def _open_session_workspace(
+    *,
+    workspace_manager: CaseWorkspaceManager,
+    workspace_id: str,
+    case_id: str,
+) -> CaseWorkspace:
+    try:
+        workspace = workspace_manager.open_workspace(workspace_id)
+    except WorkspaceError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if workspace.manifest.case_id != case_id:
+        raise HTTPException(status_code=400, detail="workspace case_id does not match session.")
+    return workspace
+
+
 def _workspace_response(workspace: CaseWorkspace) -> dict[str, Any]:
     return {
         "root_path": str(workspace.root_path),
@@ -1564,8 +1911,12 @@ def _build_evidence_context(
     store: SessionStore,
     material_texts: tuple[MaterialText, ...],
     material_link_decisions: MaterialLinkDecisionLog | None = None,
+    question_drafts: tuple[Question, ...] = (),
 ) -> dict[str, Any]:
-    case = _load_synthetic_case(case_id, locale=locale)
+    case = _case_with_question_drafts(
+        _load_synthetic_case(case_id, locale=locale),
+        question_drafts,
+    )
     session = store.get_session(session_id) if session_id else None
     case_view = merge_session_answers(case, session) if session else case
     review = review_case(case_view)

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from interrogaition.api.app import (
     AddAnswerRequest,
+    CreateQuestionDraftRequest,
     CreateWorkspaceRequest,
     ExportBundleRequest,
     ExportFileContent,
@@ -197,6 +198,8 @@ class ApiAppTest(unittest.TestCase):
         record_suggestion_decision = endpoint(app, "record_workspace_grounded_suggestion_decision")
         record_operator_decision = endpoint(app, "record_workspace_operator_action_decision")
         list_operator_decisions = endpoint(app, "list_workspace_operator_action_decisions")
+        create_question_draft = endpoint(app, "create_workspace_question_draft")
+        list_question_drafts = endpoint(app, "list_workspace_question_drafts")
         get_workspace_audit = endpoint(app, "get_workspace_audit")
         preview_export_integrity = endpoint(app, "preview_workspace_export_integrity")
         verify_material = endpoint(app, "verify_workspace_material")
@@ -269,6 +272,20 @@ class ApiAppTest(unittest.TestCase):
                 rationale=first_link["rationale"],
             ),
         )
+        question_draft_response = create_question_draft(
+            "api-workspace-001",
+            CreateQuestionDraftRequest(
+                material_id="api-material-001",
+                case_id="case-001",
+                topic_id="topic-location",
+                source_object_ids=["api-material-001", "topic-location"],
+                action_id="material-only-topic-location",
+                locale="en",
+                created_by="investigator-001",
+            ),
+        )
+        question_drafts = list_question_drafts("api-workspace-001", case_id="case-001", session_id=None)
+        question_draft = question_draft_response["draft"]
         evidence_map = get_evidence_map(
             "api-workspace-001",
             case_id="case-001",
@@ -373,8 +390,16 @@ class ApiAppTest(unittest.TestCase):
         self.assertTrue(link_decision["chain_valid"])
         self.assertEqual(link_decision["audit_event"]["action"], "material_question_link_accepted")
         self.assertEqual(link_decision["audit_event"]["details"]["material_id"], first_link["material_id"])
+        self.assertEqual(question_draft["question_type"], "clarifying")
+        self.assertEqual(question_draft["topic_ids"], ["topic-location"])
+        self.assertIn("Initial protocol note", question_draft["text"])
+        self.assertIn("api-material-001", question_draft["source_material_ids"])
+        self.assertEqual(len(question_drafts["drafts"]), 1)
+        self.assertEqual(question_drafts["drafts"][0]["id"], question_draft["id"])
+        self.assertTrue(question_drafts["chain_valid"])
         self.assertEqual(evidence_map["evidence_map"]["case_id"], "case-001")
         self.assertEqual(evidence_map["evidence_map"]["summary"]["total_materials"], 1)
+        self.assertEqual(evidence_map["evidence_map"]["summary"]["total_questions"], 5)
         self.assertIn(
             "api-material-001",
             {
@@ -437,7 +462,9 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(len(operator_decisions["decisions"]), 1)
         self.assertEqual(operator_decisions["decisions"][0]["event_hash"], operator_decision["decision"]["event_hash"])
         self.assertTrue(workspace_audit["chain_valid"])
-        generated_event = workspace_audit["events"][1]
+        generated_event = next(
+            event for event in workspace_audit["events"] if event["action"] == "grounded_suggestions_generated"
+        )
         self.assertEqual(
             generated_event["details"]["prompt_artifact_id"],
             grounded_suggestions["prompt_artifact"]["artifact_id"],
@@ -469,6 +496,7 @@ class ApiAppTest(unittest.TestCase):
             [event["action"] for event in workspace_audit["events"]],
             [
                 "material_question_link_accepted",
+                "question_draft_created",
                 "grounded_suggestions_generated",
                 "grounded_suggestion_accepted",
                 "operator_action_opened",
@@ -520,6 +548,82 @@ class ApiAppTest(unittest.TestCase):
             )
 
         self.assertEqual(caught.exception.status_code, 400)
+
+    def test_question_drafts_can_be_answered_with_workspace_context(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"draft-workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        register_material = endpoint(app, "register_workspace_material")
+        create_question_draft = endpoint(app, "create_workspace_question_draft")
+        start_session = endpoint(app, "start_session")
+        add_answer_endpoint = endpoint(app, "add_session_answer")
+        review_session = endpoint(app, "review_session_endpoint")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-003",
+                created_by="investigator-001",
+                workspace_id="api-workspace-draft-answer",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+        register_material(
+            "api-workspace-draft-answer",
+            RegisterMaterialRequest(
+                id="api-draft-material-001",
+                title="Medication cabinet access note",
+                content="The evening note references the medication cabinet key handover.",
+                created_by="investigator-001",
+                source_type=MaterialSourceType.CASE_PROTOCOL,
+                tags=["protocol", "synthetic"],
+            ),
+        )
+        draft = create_question_draft(
+            "api-workspace-draft-answer",
+            CreateQuestionDraftRequest(
+                material_id="api-draft-material-001",
+                case_id="case-003",
+                session_id="session-draft-answer",
+                participant_id="person-001",
+                topic_id="topic-care-access",
+                locale="en",
+                created_by="investigator-001",
+            ),
+        )["draft"]
+        start_session(
+            StartSessionRequest(
+                session_id="session-draft-answer",
+                case_id="case-003",
+                participant_id="person-001",
+                initial_role=ParticipantRole.WITNESS,
+            )
+        )
+        updated_session = add_answer_endpoint(
+            "session-draft-answer",
+            AddAnswerRequest(
+                id="answer-draft-001",
+                question_id=draft["id"],
+                text="I saw the key handover near the cabinet.",
+                event_id="event-answer-draft-001",
+                topic_ids=["topic-care-access"],
+                workspace_id="api-workspace-draft-answer",
+            ),
+        )
+        review = review_session(
+            "session-draft-answer",
+            locale="en",
+            workspace_id="api-workspace-draft-answer",
+        )
+
+        self.assertEqual(updated_session["answers"][0]["question_id"], draft["id"])
+        self.assertEqual(review["snapshot"]["review"]["case_id"], "case-003")
+        self.assertIn("topic-care-access", review["snapshot"]["review"]["covered_topic_ids"])
+        self.assertIn("Total questions: 7", review["report_markdown"])
 
     def test_operator_action_decision_validates_access_and_question_target(self) -> None:
         app = create_app(

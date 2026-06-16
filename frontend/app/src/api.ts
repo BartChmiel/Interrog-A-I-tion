@@ -28,6 +28,8 @@ import type {
   OperatorActionDecisionListResponse,
   OperatorActionDecisionResponse,
   OperatorActionDecisionType,
+  QuestionDraftListResponse,
+  QuestionDraftResponse,
   RuntimeConfig,
   SeedMaterialsResponse,
   SessionAuditResponse,
@@ -46,6 +48,7 @@ export type AddAnswerPayload = {
   event_id: string;
   topic_ids: string[];
   claims: [];
+  workspace_id?: string;
 };
 
 export type RegisterMaterialPayload = {
@@ -99,6 +102,14 @@ export type OperatorActionDecisionPayload = {
   output_hash?: string;
 };
 
+export type CreateQuestionDraftPayload = {
+  material_id: string;
+  topic_id?: string | null;
+  source_object_ids?: string[];
+  action_id?: string;
+  locale: string;
+};
+
 export async function loadCaseCatalog(config: RuntimeConfig, locale: string): Promise<CaseCatalogResponse> {
   return fetchJson(config, `/cases?locale=${locale}`);
 }
@@ -140,7 +151,8 @@ export async function loadSessionReview(
   config: RuntimeConfig,
   locale: string,
 ): Promise<SessionReviewResponse> {
-  return fetchJson(config, `/sessions/${config.sessionId}/review?locale=${locale}`);
+  const query = new URLSearchParams({ locale, workspace_id: config.workspaceId });
+  return fetchJson(config, `/sessions/${config.sessionId}/review?${query.toString()}`);
 }
 
 export async function loadSessionAudit(config: RuntimeConfig): Promise<SessionAuditResponse> {
@@ -243,6 +255,34 @@ export async function ensureModelArtifactIsolation(
 
 export async function loadWorkspaceMaterials(config: RuntimeConfig): Promise<MaterialListResponse> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/materials`);
+}
+
+export async function loadWorkspaceQuestionDrafts(
+  config: RuntimeConfig,
+): Promise<QuestionDraftListResponse> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({
+    case_id: config.caseId,
+    session_id: config.sessionId,
+  });
+  return fetchJson(config, `/workspaces/${workspaceId}/question-drafts?${query.toString()}`);
+}
+
+export async function createWorkspaceQuestionDraft(
+  config: RuntimeConfig,
+  payload: CreateQuestionDraftPayload,
+): Promise<QuestionDraftResponse> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/question-drafts`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      case_id: config.caseId,
+      session_id: config.sessionId,
+      participant_id: config.participantId,
+      created_by: "local-ui",
+      role: "investigator",
+    }),
+  });
 }
 
 export async function seedWorkspaceMaterials(

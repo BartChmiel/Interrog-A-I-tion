@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import {
   addAnswer,
+  createWorkspaceQuestionDraft,
   ensureModelArtifactIsolation,
   ensureWorkspace,
   loadCaseCatalog,
@@ -45,6 +46,7 @@ import {
   loadModelArtifactManifest,
   loadModelArtifactIsolation,
   loadOperatorActionDecisions,
+  loadWorkspaceQuestionDrafts,
   loadSessionAudit,
   loadWorkspaceMaterialPreview,
   loadSessionReview,
@@ -109,6 +111,7 @@ import type {
   MaterialVerification,
   OperatorActionDecision,
   OperatorActionDecisionType,
+  QuestionDraft,
   QuestionView,
   ReviewFinding,
   RuntimeConfig,
@@ -171,6 +174,7 @@ type MaterialTask = {
   priority: OperatorAction["priority"];
   materialId?: string;
   questionId?: string;
+  topicId?: string;
   sourceObjectIds: string[];
   link?: MaterialQuestionLink;
 };
@@ -234,6 +238,7 @@ export function App() {
   const [workspaceAudit, setWorkspaceAudit] = useState<WorkspaceAuditResponse | null>(null);
   const [sessionAudit, setSessionAudit] = useState<SessionAuditResponse | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
+  const [questionDrafts, setQuestionDrafts] = useState<QuestionDraft[]>([]);
   const [materialQuestionLinks, setMaterialQuestionLinks] = useState<MaterialQuestionLink[]>([]);
   const [materialQuestionLinkDecisions, setMaterialQuestionLinkDecisions] = useState<Record<string, MaterialQuestionLinkDecision>>({});
   const [materialPreviews, setMaterialPreviews] = useState<Record<string, MaterialPreview>>({});
@@ -290,6 +295,7 @@ export function App() {
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMaterialSubmitting, setIsMaterialSubmitting] = useState(false);
+  const [isQuestionDraftSubmitting, setIsQuestionDraftSubmitting] = useState(false);
   const [isArtifactIsolationSubmitting, setIsArtifactIsolationSubmitting] = useState(false);
   const [isModelSmokeRunning, setIsModelSmokeRunning] = useState(false);
   const didInitializeApi = useRef(false);
@@ -300,16 +306,21 @@ export function App() {
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
 
   const questions = useMemo<QuestionView[]>(() => {
-    return caseData?.questions.length ? caseData.questions.map(toQuestionView) : seedQuestions;
-  }, [caseData]);
+    const caseQuestions = caseData?.questions.length ? caseData.questions.map(toQuestionView) : seedQuestions;
+    const dynamicQuestions = questionDrafts.map((draft) => questionDraftToQuestionView(draft, locale));
+    return mergeQuestionViews(caseQuestions, dynamicQuestions);
+  }, [caseData, locale, questionDrafts]);
 
   const activeQuestion = questions.find((question) => question.id === activeQuestionId) ?? questions[0];
   const materialsById = useMemo(() => {
     return new Map(workspaceMaterials.map((material) => [material.id, material]));
   }, [workspaceMaterials]);
   const activeQuestionLinks = useMemo(() => {
-    return materialQuestionLinks.filter((link) => link.question_id === activeQuestion?.id);
-  }, [activeQuestion?.id, materialQuestionLinks]);
+    const directLinks = materialQuestionLinks.filter((link) => link.question_id === activeQuestion?.id);
+    const draft = questionDrafts.find((candidate) => candidate.id === activeQuestion?.id);
+    const draftLinks = draft ? questionDraftToMaterialLinks(draft) : [];
+    return mergeMaterialQuestionLinks(directLinks, draftLinks);
+  }, [activeQuestion?.id, materialQuestionLinks, questionDrafts]);
 
   const answerViews = useMemo(() => {
     const base = caseData?.answers.length
@@ -604,6 +615,7 @@ export function App() {
         artifactManifest,
         artifactIsolation,
         materialList,
+        draftList,
         materialLinks,
         nextEvidenceMap,
         operatorDecisions,
@@ -613,6 +625,7 @@ export function App() {
         loadModelArtifactManifest(config),
         loadModelArtifactIsolation(config),
         loadWorkspaceMaterials(config),
+        loadQuestionDraftsOrEmpty(),
         loadMaterialQuestionLinksOrEmpty(locale),
         loadEvidenceMapOrNull(locale),
         loadOperatorActionDecisionsOrEmpty(),
@@ -628,6 +641,7 @@ export function App() {
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
       setWorkspaceMaterials(sortMaterials(materialList.materials));
+      setQuestionDrafts(sortQuestionDrafts(draftList));
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
       setOperatorActionDecisions(operatorDecisions);
@@ -645,6 +659,7 @@ export function App() {
       setWorkspaceAudit(null);
       setSessionAudit(null);
       setWorkspaceMaterials([]);
+      setQuestionDrafts([]);
       setMaterialQuestionLinks([]);
       setMaterialQuestionLinkDecisions({});
       setMaterialPreviews({});
@@ -663,6 +678,20 @@ export function App() {
       return materialLinks.links;
     } catch (error) {
       console.warn("Could not refresh material-question links.", error);
+      return [];
+    }
+  }
+
+  async function loadQuestionDraftsOrEmpty(): Promise<QuestionDraft[]> {
+    try {
+      const response = await loadWorkspaceQuestionDrafts(config);
+      return response.drafts;
+    } catch (error) {
+      const apiError = error as ApiError;
+      if (apiError.status === 404) {
+        return [];
+      }
+      console.warn("Could not refresh workspace question drafts.", error);
       return [];
     }
   }
@@ -824,6 +853,7 @@ export function App() {
         caseReview,
         starterMaterials,
         sessionReview,
+        draftList,
         materialLinks,
         nextEvidenceMap,
         nextGroundedSuggestions,
@@ -832,6 +862,7 @@ export function App() {
         loadCaseReview(config, nextLocale),
         loadCaseStarterMaterials(config, nextLocale).catch(() => ({ case_id: config.caseId, materials: [] })),
         loadSessionReview(config, nextLocale),
+        loadQuestionDraftsOrEmpty(),
         loadMaterialQuestionLinksOrEmpty(nextLocale),
         loadEvidenceMapOrNull(nextLocale),
         loadGroundedSuggestionsOrEmpty(nextLocale, activeQuestionId),
@@ -847,6 +878,7 @@ export function App() {
       setReview(sessionReview.snapshot.review);
       setFindings(sessionReview.snapshot.review.findings);
       setReportMarkdown(sessionReview.report_markdown);
+      setQuestionDrafts(sortQuestionDrafts(draftList));
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
       applyGroundedSuggestions(nextGroundedSuggestions);
@@ -898,6 +930,7 @@ export function App() {
         event_id: `ui-event-answer-${timestamp}`,
         topic_ids: activeQuestion.topicIds,
         claims: [],
+        workspace_id: config.workspaceId,
       });
       const [sessionReview, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
         loadSessionReview(config, locale),
@@ -1082,6 +1115,51 @@ export function App() {
       void refreshAuditTrails();
     }
     setStatusKey(decision === "accepted" ? "linkAccepted" : "linkRejected");
+  }
+
+  async function createQuestionDraftFromMaterialTask(task: MaterialTask) {
+    if (!task.materialId) {
+      setStatusKey("materialFailed");
+      return;
+    }
+    if (apiMode !== "online" || !workspace) {
+      setStatusKey("offline");
+      return;
+    }
+
+    setIsQuestionDraftSubmitting(true);
+    try {
+      const response = await createWorkspaceQuestionDraft(config, {
+        material_id: task.materialId,
+        topic_id: task.topicId ?? null,
+        source_object_ids: task.sourceObjectIds,
+        action_id: task.id,
+        locale,
+      });
+      const draft = response.draft;
+      setQuestionDrafts((current) => sortQuestionDrafts(upsertQuestionDraft(current, draft)));
+      setActiveQuestionId(draft.id);
+      setActiveOperationsTab("monitor");
+      const [sessionReview, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
+        loadSessionReview(config, locale),
+        loadEvidenceMapOrNull(locale),
+        loadGroundedSuggestionsOrEmpty(locale, draft.id),
+      ]);
+      setSession(sessionReview.session);
+      setIndicators(sessionReview.indicators);
+      setReview(sessionReview.snapshot.review);
+      setFindings(sessionReview.snapshot.review.findings);
+      setReportMarkdown(sessionReview.report_markdown);
+      setEvidenceMap(nextEvidenceMap);
+      applyGroundedSuggestions(nextGroundedSuggestions);
+      void refreshAuditTrails();
+      setStatusKey("questionDraftCreated");
+    } catch (error) {
+      console.error("Could not create question draft.", error);
+      setStatusKey("questionDraftFailed");
+    } finally {
+      setIsQuestionDraftSubmitting(false);
+    }
   }
 
   function selectActiveQuestion(questionId: string) {
@@ -1902,10 +1980,12 @@ export function App() {
                   links={materialQuestionLinks}
                   materials={workspaceMaterials}
                   tasks={materialTasks}
+                  isQuestionDraftSubmitting={isQuestionDraftSubmitting}
                   activePreviewId={activeMaterialPreviewId}
                   previews={materialPreviews}
                   verifications={materialVerifications}
                   onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
+                  onCreateQuestionDraft={(task) => void createQuestionDraftFromMaterialTask(task)}
                   onDraftChange={setMaterialDraft}
                   onOpenQuestion={(questionId) => selectActiveQuestion(questionId)}
                   onPreview={(materialId) => void toggleMaterialPreview(materialId)}
@@ -2994,6 +3074,7 @@ function buildMaterialTasks({
       priority: "medium",
       materialId: materialOnlyTopic.material_ids[0],
       questionId: materialOnlyTopic.question_ids[0],
+      topicId: materialOnlyTopic.topic_id,
       sourceObjectIds: [
         materialOnlyTopic.topic_id,
         ...materialOnlyTopic.material_ids,
@@ -3012,6 +3093,7 @@ function buildMaterialTasks({
       priority: contestedTopic.priority === "high" ? "high" : "medium",
       materialId: contestedTopic.material_ids[0],
       questionId: contestedTopic.question_ids[0],
+      topicId: contestedTopic.topic_id,
       sourceObjectIds: [
         contestedTopic.topic_id,
         ...contestedTopic.material_ids,
@@ -3714,7 +3796,9 @@ function MaterialsPanel({
   locale,
   materials,
   tasks,
+  isQuestionDraftSubmitting,
   onDecideLink,
+  onCreateQuestionDraft,
   onDraftChange,
   onOpenQuestion,
   onPreview,
@@ -3733,7 +3817,9 @@ function MaterialsPanel({
   locale: Locale;
   materials: MaterialRecord[];
   tasks: MaterialTask[];
+  isQuestionDraftSubmitting: boolean;
   onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
+  onCreateQuestionDraft: (task: MaterialTask) => void;
   onDraftChange: (draft: MaterialDraft) => void;
   onOpenQuestion: (questionId: string) => void;
   onPreview: (materialId: string) => void;
@@ -3780,7 +3866,9 @@ function MaterialsPanel({
       <MaterialTasksPanel
         locale={locale}
         tasks={tasks}
+        isQuestionDraftSubmitting={isQuestionDraftSubmitting}
         onDecideLink={onDecideLink}
+        onCreateQuestionDraft={onCreateQuestionDraft}
         onOpenQuestion={onOpenQuestion}
         onPreview={onPreview}
       />
@@ -3889,13 +3977,17 @@ function MaterialsPanel({
 function MaterialTasksPanel({
   locale,
   tasks,
+  isQuestionDraftSubmitting,
   onDecideLink,
+  onCreateQuestionDraft,
   onOpenQuestion,
   onPreview,
 }: {
   locale: Locale;
   tasks: MaterialTask[];
+  isQuestionDraftSubmitting: boolean;
   onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
+  onCreateQuestionDraft: (task: MaterialTask) => void;
   onOpenQuestion: (questionId: string) => void;
   onPreview: (materialId: string) => void;
 }) {
@@ -3931,6 +4023,16 @@ function MaterialTasksPanel({
                   <button type="button" onClick={() => onOpenQuestion(task.questionId!)}>
                     <Send size={13} />
                     {text(locale, "materialTaskOpenQuestion")}
+                  </button>
+                ) : null}
+                {canCreateQuestionFromMaterialTask(task) ? (
+                  <button
+                    type="button"
+                    disabled={isQuestionDraftSubmitting}
+                    onClick={() => onCreateQuestionDraft(task)}
+                  >
+                    <Pencil size={13} />
+                    {text(locale, "materialTaskCreateQuestion")}
                   </button>
                 ) : null}
                 {task.materialId ? (
@@ -3973,6 +4075,13 @@ function materialTaskIcon(kind: MaterialTaskKind): ReactNode {
     return <Plus size={15} />;
   }
   return <Network size={15} />;
+}
+
+function canCreateQuestionFromMaterialTask(task: MaterialTask): boolean {
+  return Boolean(
+    task.materialId &&
+      (task.kind === "material_only" || task.kind === "contested_topic"),
+  );
 }
 
 function MaterialCard({
@@ -4157,6 +4266,28 @@ function MaterialPreviewPanel({
 
 function materialQuestionLinkKey(link: MaterialQuestionLink): string {
   return `${link.material_id}:${link.question_id}`;
+}
+
+function questionDraftToMaterialLinks(draft: QuestionDraft): MaterialQuestionLink[] {
+  return draft.source_material_ids.map((materialId) => ({
+    material_id: materialId,
+    question_id: draft.id,
+    topic_ids: draft.topic_ids,
+    matched_terms: [],
+    confidence: 1,
+    rationale: draft.rationale,
+  }));
+}
+
+function mergeMaterialQuestionLinks(
+  primary: MaterialQuestionLink[],
+  secondary: MaterialQuestionLink[],
+): MaterialQuestionLink[] {
+  const linksByKey = new Map<string, MaterialQuestionLink>();
+  for (const link of [...primary, ...secondary]) {
+    linksByKey.set(materialQuestionLinkKey(link), link);
+  }
+  return Array.from(linksByKey.values());
 }
 
 function materialQuestionLinkDecisionLabel(
@@ -4604,6 +4735,57 @@ function parseTags(value: string): string[] {
 
 function createMaterialId(): string {
   return `material-${Date.now()}`;
+}
+
+function questionDraftToQuestionView(draft: QuestionDraft, locale: Locale): QuestionView {
+  return {
+    id: draft.id,
+    text: { [draft.locale]: draft.text, [locale]: draft.text },
+    type: questionTypeLabelFromDraft(draft.question_type, locale),
+    topicIds: draft.topic_ids,
+    source: draft.source,
+  };
+}
+
+function questionTypeLabelFromDraft(questionType: string, locale: Locale): Record<Locale, string> {
+  const fallback = questionType || "clarifying";
+  if (fallback === "clarifying") {
+    return {
+      en: "clarifying",
+      pl: "doprecyzowujące",
+    };
+  }
+  return {
+    en: fallback,
+    pl: locale === "pl" ? fallback : fallback,
+  };
+}
+
+function mergeQuestionViews(
+  baseQuestions: QuestionView[],
+  dynamicQuestions: QuestionView[],
+): QuestionView[] {
+  const byId = new Map<string, QuestionView>();
+  for (const question of [...baseQuestions, ...dynamicQuestions]) {
+    byId.set(question.id, question);
+  }
+  return Array.from(byId.values());
+}
+
+function upsertQuestionDraft(current: QuestionDraft[], draft: QuestionDraft): QuestionDraft[] {
+  const withoutDraft = current.filter((item) => item.id !== draft.id);
+  return [...withoutDraft, draft];
+}
+
+function sortQuestionDrafts(drafts: QuestionDraft[]): QuestionDraft[] {
+  return [...drafts].sort((left, right) => {
+    const rightTime = Date.parse(right.created_at);
+    const leftTime = Date.parse(left.created_at);
+    if (rightTime !== leftTime) {
+      return rightTime - leftTime;
+    }
+    return left.id.localeCompare(right.id);
+  });
 }
 
 function sortMaterials(materials: MaterialRecord[]): MaterialRecord[] {
