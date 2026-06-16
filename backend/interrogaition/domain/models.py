@@ -53,6 +53,13 @@ class SuggestionStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class ClaimReviewStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    EDITED = "edited"
+    REJECTED = "rejected"
+
+
 class Priority(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
@@ -85,6 +92,12 @@ class Claim:
     attribute: str
     value: str
     source_text: str = ""
+    review_status: ClaimReviewStatus = ClaimReviewStatus.ACCEPTED
+    extraction_rule: str = ""
+    extraction_hash: str = ""
+    confidence: float | None = None
+    source_start: int | None = None
+    source_end: int | None = None
 
 
 @dataclass(frozen=True)

@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from interrogaition.domain.models import Actor, Answer, AuditEvent, Claim
+from interrogaition.domain.models import Actor, Answer, AuditEvent, Claim, ClaimReviewStatus
 from interrogaition.domain.session import (
     InterviewSession,
     LiveNote,
@@ -211,6 +211,12 @@ class SQLiteSessionStore:
                     attribute TEXT NOT NULL,
                     value TEXT NOT NULL,
                     source_text TEXT NOT NULL,
+                    review_status TEXT NOT NULL DEFAULT 'accepted',
+                    extraction_rule TEXT NOT NULL DEFAULT '',
+                    extraction_hash TEXT NOT NULL DEFAULT '',
+                    confidence REAL,
+                    source_start INTEGER,
+                    source_end INTEGER,
                     FOREIGN KEY (answer_id) REFERENCES answers(id) ON DELETE CASCADE
                 );
 
@@ -263,6 +269,8 @@ class SQLiteSessionStore:
                 END;
                 """
             )
+            self._migrate_claim_review_status()
+            self._migrate_claim_trace_fields()
 
     def _insert_session(self, session: InterviewSession) -> None:
         self._connection.execute(
@@ -329,9 +337,11 @@ class SQLiteSessionStore:
                 self._connection.execute(
                     """
                     INSERT INTO claims (
-                        id, answer_id, ordinal, subject, attribute, value, source_text
+                        id, answer_id, ordinal, subject, attribute, value, source_text,
+                        review_status, extraction_rule, extraction_hash,
+                        confidence, source_start, source_end
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         claim.id,
@@ -341,6 +351,12 @@ class SQLiteSessionStore:
                         claim.attribute,
                         claim.value,
                         claim.source_text,
+                        claim.review_status.value,
+                        claim.extraction_rule,
+                        claim.extraction_hash,
+                        claim.confidence,
+                        claim.source_start,
+                        claim.source_end,
                     ),
                 )
 
@@ -445,7 +461,9 @@ class SQLiteSessionStore:
     def _load_claims(self, answer_id: str) -> tuple[Claim, ...]:
         rows = self._connection.execute(
             """
-            SELECT id, subject, attribute, value, source_text
+            SELECT
+                id, subject, attribute, value, source_text, review_status,
+                extraction_rule, extraction_hash, confidence, source_start, source_end
             FROM claims
             WHERE answer_id = ?
             ORDER BY ordinal ASC
@@ -459,9 +477,37 @@ class SQLiteSessionStore:
                 attribute=row["attribute"],
                 value=row["value"],
                 source_text=row["source_text"],
+                review_status=ClaimReviewStatus(row["review_status"]),
+                extraction_rule=row["extraction_rule"],
+                extraction_hash=row["extraction_hash"],
+                confidence=row["confidence"],
+                source_start=row["source_start"],
+                source_end=row["source_end"],
             )
             for row in rows
         )
+
+    def _migrate_claim_review_status(self) -> None:
+        rows = self._connection.execute("PRAGMA table_info(claims)").fetchall()
+        column_names = {row["name"] for row in rows}
+        if "review_status" not in column_names:
+            self._connection.execute(
+                "ALTER TABLE claims ADD COLUMN review_status TEXT NOT NULL DEFAULT 'accepted'"
+            )
+
+    def _migrate_claim_trace_fields(self) -> None:
+        rows = self._connection.execute("PRAGMA table_info(claims)").fetchall()
+        column_names = {row["name"] for row in rows}
+        migrations = {
+            "extraction_rule": "ALTER TABLE claims ADD COLUMN extraction_rule TEXT NOT NULL DEFAULT ''",
+            "extraction_hash": "ALTER TABLE claims ADD COLUMN extraction_hash TEXT NOT NULL DEFAULT ''",
+            "confidence": "ALTER TABLE claims ADD COLUMN confidence REAL",
+            "source_start": "ALTER TABLE claims ADD COLUMN source_start INTEGER",
+            "source_end": "ALTER TABLE claims ADD COLUMN source_end INTEGER",
+        }
+        for column_name, statement in migrations.items():
+            if column_name not in column_names:
+                self._connection.execute(statement)
 
     def _load_notes(self, session_id: str) -> tuple[LiveNote, ...]:
         rows = self._connection.execute(

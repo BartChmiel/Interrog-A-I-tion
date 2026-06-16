@@ -1,13 +1,10 @@
-"""Deterministic narrative consistency checks.
-
-The first version works on structured claims attached to synthetic answers.
-In later versions, local AI can extract these claims from natural language.
-"""
+"""Deterministic narrative consistency checks."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from interrogaition.analysis.claim_review import is_claim_analysis_ready
 from interrogaition.domain.models import Answer, Claim
 
 
@@ -26,6 +23,8 @@ def find_claim_conflicts(answers: list[Answer]) -> list[ClaimConflict]:
 
     for answer in answers:
         for claim in answer.claims:
+            if not is_claim_analysis_ready(claim):
+                continue
             key = (_normalize(claim.subject), _normalize(claim.attribute))
             grouped.setdefault(key, []).append((answer.id, claim))
 

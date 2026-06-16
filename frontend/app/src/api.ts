@@ -2,6 +2,8 @@ import type {
   CaseCatalogResponse,
   CaseReviewResponse,
   CaseStarterMaterialsResponse,
+  ClaimReviewDecisionResponse,
+  ClaimReviewStatus,
   EncryptionStatus,
   EnvironmentHealth,
   GroundedSuggestionDecision,
@@ -102,6 +104,15 @@ export type OperatorActionDecisionPayload = {
   output_hash?: string;
 };
 
+export type ClaimReviewPayload = {
+  decision: ClaimReviewStatus;
+  subject: string;
+  attribute: string;
+  value: string;
+  source_text: string;
+  operator_note?: string;
+};
+
 export type CreateQuestionDraftPayload = {
   material_id: string;
   topic_id?: string | null;
@@ -144,6 +155,23 @@ export async function addAnswer(
   return fetchJson(config, `/sessions/${config.sessionId}/answers`, {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function reviewSessionClaim(
+  config: RuntimeConfig,
+  answerId: string,
+  claimId: string,
+  payload: ClaimReviewPayload,
+): Promise<ClaimReviewDecisionResponse> {
+  const encodedAnswerId = encodeURIComponent(answerId);
+  const encodedClaimId = encodeURIComponent(claimId);
+  return fetchJson(config, `/sessions/${config.sessionId}/answers/${encodedAnswerId}/claims/${encodedClaimId}/review`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      actor_id: "local-ui",
+    }),
   });
 }
 

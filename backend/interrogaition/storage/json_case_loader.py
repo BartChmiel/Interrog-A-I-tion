@@ -11,6 +11,7 @@ from interrogaition.domain.models import (
     Answer,
     Case,
     Claim,
+    ClaimReviewStatus,
     Priority,
     Question,
     QuestionSource,
@@ -81,6 +82,12 @@ def _load_claim(data: dict[str, Any], locale: str) -> Claim:
         attribute=data["attribute"],
         value=data["value"],
         source_text=_localized_value(data, "source_text", locale),
+        review_status=ClaimReviewStatus(data.get("review_status", ClaimReviewStatus.ACCEPTED.value)),
+        extraction_rule=data.get("extraction_rule", ""),
+        extraction_hash=data.get("extraction_hash", ""),
+        confidence=data.get("confidence"),
+        source_start=data.get("source_start"),
+        source_end=data.get("source_end"),
     )
 
 

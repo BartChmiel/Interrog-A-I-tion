@@ -43,6 +43,12 @@ class SQLiteSessionStoreTest(unittest.TestCase):
                         subject="event",
                         attribute="location",
                         value="bicycle stand",
+                        source_text="I saw a person near the bicycle stand.",
+                        extraction_rule="manual-test-rule.v1",
+                        extraction_hash="a" * 64,
+                        confidence=0.91,
+                        source_start=20,
+                        source_end=33,
                     ),
                 ),
             ),
@@ -66,7 +72,13 @@ class SQLiteSessionStoreTest(unittest.TestCase):
         assert loaded is not None
         self.assertEqual(loaded.id, "sqlite-session-001")
         self.assertEqual(len(loaded.answers), 1)
-        self.assertEqual(loaded.answers[0].claims[0].value, "bicycle stand")
+        loaded_claim = loaded.answers[0].claims[0]
+        self.assertEqual(loaded_claim.value, "bicycle stand")
+        self.assertEqual(loaded_claim.extraction_rule, "manual-test-rule.v1")
+        self.assertEqual(loaded_claim.extraction_hash, "a" * 64)
+        self.assertEqual(loaded_claim.confidence, 0.91)
+        self.assertEqual(loaded_claim.source_start, 20)
+        self.assertEqual(loaded_claim.source_end, 33)
         self.assertEqual(len(loaded.events), 2)
 
         audit_events = reopened.list_audit_events()

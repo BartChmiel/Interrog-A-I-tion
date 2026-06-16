@@ -7,10 +7,13 @@ review, not truthfulness, guilt, or psychological assessments.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+import hashlib
+import json
 import re
 import unicodedata
 
-from interrogaition.domain.models import Answer, Case, Claim, Question
+from interrogaition.domain.models import Answer, Case, Claim, ClaimReviewStatus, Question
 
 
 _TIME_RE = re.compile(r"\b(?:[01]?\d|2[0-3])[:.][0-5]\d\b")
@@ -38,6 +41,14 @@ _POLISH_TRANSLATION = str.maketrans(
 )
 
 
+@dataclass(frozen=True)
+class _MarkerMatch:
+    value: str
+    marker: str
+    source_start: int | None
+    source_end: int | None
+
+
 def extract_live_answer_claims(
     *,
     case: Case,
@@ -50,53 +61,81 @@ def extract_live_answer_claims(
     claims: list[Claim] = []
     normalized_text = _normalize(answer_text)
 
-    for value in _time_values(answer_text):
+    for value, source_start, source_end in _time_values(answer_text):
         claims.append(
             _claim(
                 answer_id=answer_id,
+                case_id=case.id,
+                question_id=question.id,
+                answer_text=answer_text,
                 ordinal=len(claims) + 1,
                 subject=_time_subject(case, question, normalized_text),
                 attribute=_time_attribute(case, question, normalized_text),
                 value=value,
                 source_text=_source_sentence(answer_text, value),
+                extraction_rule="time-expression.v1",
+                confidence=0.86,
+                source_start=source_start,
+                source_end=source_end,
             )
         )
 
-    for value, marker in _key_holder_values(answer_text):
+    for match in _key_holder_values(answer_text):
         claims.append(
             _claim(
                 answer_id=answer_id,
+                case_id=case.id,
+                question_id=question.id,
+                answer_text=answer_text,
                 ordinal=len(claims) + 1,
                 subject="medication_cabinet",
                 attribute="key_holder",
-                value=value,
-                source_text=_source_sentence(answer_text, marker),
+                value=match.value,
+                source_text=_source_sentence(answer_text, match.marker),
+                extraction_rule="medication-cabinet-key-holder.v1",
+                confidence=0.78,
+                source_start=match.source_start,
+                source_end=match.source_end,
             )
         )
 
-    door_status = _service_door_status(normalized_text)
+    door_status = _service_door_status(answer_text, normalized_text)
     if door_status:
         claims.append(
             _claim(
                 answer_id=answer_id,
+                case_id=case.id,
+                question_id=question.id,
+                answer_text=answer_text,
                 ordinal=len(claims) + 1,
                 subject="service_door",
                 attribute="status",
-                value=door_status,
+                value=door_status.value,
                 source_text=answer_text.strip(),
+                extraction_rule="service-door-status.v1",
+                confidence=0.74,
+                source_start=door_status.source_start,
+                source_end=door_status.source_end,
             )
         )
 
-    source_of_knowledge = _source_of_knowledge(normalized_text)
+    source_of_knowledge = _source_of_knowledge(answer_text, normalized_text)
     if source_of_knowledge:
         claims.append(
             _claim(
                 answer_id=answer_id,
+                case_id=case.id,
+                question_id=question.id,
+                answer_text=answer_text,
                 ordinal=len(claims) + 1,
                 subject=_source_subject(case, question),
                 attribute="source_of_knowledge",
-                value=source_of_knowledge,
+                value=source_of_knowledge.value,
                 source_text=answer_text.strip(),
+                extraction_rule="source-of-knowledge.v1",
+                confidence=0.72,
+                source_start=source_of_knowledge.source_start,
+                source_end=source_of_knowledge.source_end,
             )
         )
 
@@ -131,23 +170,94 @@ def answer_with_extracted_claims(case: Case, answer: Answer) -> Answer:
 def _claim(
     *,
     answer_id: str,
+    case_id: str,
+    question_id: str,
+    answer_text: str,
     ordinal: int,
     subject: str,
     attribute: str,
     value: str,
     source_text: str,
+    extraction_rule: str,
+    confidence: float,
+    source_start: int | None,
+    source_end: int | None,
 ) -> Claim:
+    extraction_hash = calculate_claim_extraction_hash(
+        case_id=case_id,
+        question_id=question_id,
+        answer_id=answer_id,
+        answer_text=answer_text,
+        extraction_rule=extraction_rule,
+        subject=subject,
+        attribute=attribute,
+        value=value,
+        source_text=source_text,
+        confidence=confidence,
+        source_start=source_start,
+        source_end=source_end,
+    )
     return Claim(
         id=f"{answer_id}-claim-{ordinal:02d}",
         subject=subject,
         attribute=attribute,
         value=value,
         source_text=source_text,
+        review_status=ClaimReviewStatus.PENDING,
+        extraction_rule=extraction_rule,
+        extraction_hash=extraction_hash,
+        confidence=confidence,
+        source_start=source_start,
+        source_end=source_end,
     )
 
 
-def _time_values(text: str) -> tuple[str, ...]:
-    return tuple(match.group(0).replace(".", ":") for match in _TIME_RE.finditer(text))
+def calculate_claim_extraction_hash(
+    *,
+    case_id: str,
+    question_id: str,
+    answer_id: str,
+    answer_text: str,
+    extraction_rule: str,
+    subject: str,
+    attribute: str,
+    value: str,
+    source_text: str,
+    confidence: float,
+    source_start: int | None,
+    source_end: int | None,
+) -> str:
+    """Return a stable hash for the original deterministic claim candidate."""
+
+    payload = {
+        "schema": "claim-extraction-candidate.v1",
+        "case_id": case_id,
+        "question_id": question_id,
+        "answer_id": answer_id,
+        "answer_text_sha256": hashlib.sha256(answer_text.encode("utf-8")).hexdigest(),
+        "extraction_rule": extraction_rule,
+        "subject": subject,
+        "attribute": attribute,
+        "value": value,
+        "source_text": source_text,
+        "confidence": confidence,
+        "source_start": source_start,
+        "source_end": source_end,
+    }
+    canonical_payload = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+
+
+def _time_values(text: str) -> tuple[tuple[str, int, int], ...]:
+    return tuple(
+        (match.group(0).replace(".", ":"), match.start(), match.end())
+        for match in _TIME_RE.finditer(text)
+    )
 
 
 def _time_subject(case: Case, question: Question, normalized_text: str) -> str:
@@ -171,41 +281,96 @@ def _time_attribute(case: Case, question: Question, normalized_text: str) -> str
     return "time"
 
 
-def _key_holder_values(text: str) -> tuple[tuple[str, str], ...]:
+def _key_holder_values(text: str) -> tuple[_MarkerMatch, ...]:
     normalized = _normalize(text)
-    values: list[tuple[str, str]] = []
+    values: list[_MarkerMatch] = []
     if any(marker in normalized for marker in ("supervisor", "przelozon", "kierownik")):
-        values.append(("supervisor", "supervisor"))
+        source_start, source_end = _first_marker_span(
+            text,
+            ("supervisor", "prze\u0142o\u017con", "przelozon", "kierownik"),
+        )
+        values.append(
+            _MarkerMatch(
+                value="supervisor",
+                marker=_marker_text(text, source_start, source_end, "supervisor"),
+                source_start=source_start,
+                source_end=source_end,
+            )
+        )
     if any(marker in normalized for marker in ("own key", "my key", "wlasn", "uzylem")):
-        values.append(("witness", "key"))
+        source_start, source_end = _first_marker_span(
+            text,
+            ("own key", "my key", "w\u0142as", "wlas", "u\u017cy\u0142em", "u\u017cy\u0142am", "uzylem", "uzylam"),
+        )
+        values.append(
+            _MarkerMatch(
+                value="witness",
+                marker=_marker_text(text, source_start, source_end, "key"),
+                source_start=source_start,
+                source_end=source_end,
+            )
+        )
     return tuple(values)
 
 
-def _service_door_status(normalized_text: str) -> str | None:
+def _service_door_status(text: str, normalized_text: str) -> _MarkerMatch | None:
     if "service door" not in normalized_text and "drzwi serwis" not in normalized_text:
         return None
     if any(marker in normalized_text for marker in ("locked", "zamkn")):
-        return "locked"
+        source_start, source_end = _first_marker_span(text, ("locked", "zamkn"))
+        return _MarkerMatch(
+            value="locked",
+            marker=_marker_text(text, source_start, source_end, "locked"),
+            source_start=source_start,
+            source_end=source_end,
+        )
     if any(marker in normalized_text for marker in ("open", "otwart")):
-        return "open"
+        source_start, source_end = _first_marker_span(text, ("open", "otwart"))
+        return _MarkerMatch(
+            value="open",
+            marker=_marker_text(text, source_start, source_end, "open"),
+            source_start=source_start,
+            source_end=source_end,
+        )
     return None
 
 
-def _source_of_knowledge(normalized_text: str) -> str | None:
+def _source_of_knowledge(text: str, normalized_text: str) -> _MarkerMatch | None:
+    direct_markers = (
+        "own observation",
+        "direct observation",
+        "saw",
+        "widzia\u0142",
+        "widzial",
+        "osobi\u015bcie",
+        "osobiscie",
+    )
+    documentation_markers = (
+        "documentation",
+        "document",
+        "log",
+        "recording",
+        "camera",
+        "dokument",
+        "nagran",
+        "monitoring",
+    )
     direct = any(
         marker in normalized_text
-        for marker in ("own observation", "direct observation", "saw", "widzial", "osobiscie")
+        for marker in direct_markers
     )
     documentation = any(
         marker in normalized_text
-        for marker in ("documentation", "document", "log", "recording", "camera", "dokument", "nagran", "monitoring")
+        for marker in documentation_markers
     )
+    source_start, source_end = _first_marker_span(text, (*direct_markers, *documentation_markers))
+    marker = _marker_text(text, source_start, source_end, "source")
     if direct and documentation:
-        return "direct observation and documentation"
+        return _MarkerMatch("direct observation and documentation", marker, source_start, source_end)
     if direct:
-        return "direct observation"
+        return _MarkerMatch("direct observation", marker, source_start, source_end)
     if documentation:
-        return "documentation"
+        return _MarkerMatch("documentation", marker, source_start, source_end)
     return None
 
 
@@ -220,6 +385,21 @@ def _source_sentence(text: str, marker: str) -> str:
         if marker.lower() in sentence.lower():
             return sentence.strip()
     return text.strip()
+
+
+def _first_marker_span(text: str, markers: tuple[str, ...]) -> tuple[int | None, int | None]:
+    lowered = text.casefold()
+    for marker in markers:
+        index = lowered.find(marker.casefold())
+        if index >= 0:
+            return index, index + len(marker)
+    return None, None
+
+
+def _marker_text(text: str, start: int | None, end: int | None, fallback: str) -> str:
+    if start is None or end is None:
+        return fallback
+    return text[start:end]
 
 
 def _normalize(value: str) -> str:

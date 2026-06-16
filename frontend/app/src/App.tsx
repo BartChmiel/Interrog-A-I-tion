@@ -56,6 +56,7 @@ import {
   recordGroundedSuggestionDecision,
   recordMaterialQuestionLinkDecision,
   recordOperatorActionDecision,
+  reviewSessionClaim,
   registerWorkspaceMaterial,
   runLocalModelSmoke,
   seedWorkspaceMaterials,
@@ -83,6 +84,8 @@ import type {
   CaseCatalogItem,
   CaseData,
   CaseTopic,
+  ClaimReviewStatus,
+  ClaimView,
   EncryptionStatus,
   EnvironmentHealth,
   EnvironmentHealthState,
@@ -294,6 +297,7 @@ export function App() {
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reviewingClaimIds, setReviewingClaimIds] = useState<Set<string>>(new Set());
   const [isMaterialSubmitting, setIsMaterialSubmitting] = useState(false);
   const [isQuestionDraftSubmitting, setIsQuestionDraftSubmitting] = useState(false);
   const [isArtifactIsolationSubmitting, setIsArtifactIsolationSubmitting] = useState(false);
@@ -326,9 +330,9 @@ export function App() {
     const base = caseData?.answers.length
       ? caseData.answers.map((answer) => toAnswerView(answer, locale))
       : seedAnswers;
-    const sessionAnswers = session?.answers.map((answer) => toAnswerView(answer, locale)) ?? [];
-    const localAnswerViews = localAnswers.map((answer) => toAnswerView(answer, locale));
-    return [...base, ...localAnswerViews, ...sessionAnswers];
+    const sessionAnswers = (session?.answers.map((answer) => toAnswerView(answer, locale)) ?? []).slice().reverse();
+    const localAnswerViews = localAnswers.map((answer) => toAnswerView(answer, locale)).slice().reverse();
+    return [...sessionAnswers, ...localAnswerViews, ...base];
   }, [caseData, locale, localAnswers, session]);
 
   useEffect(() => {
@@ -953,6 +957,52 @@ export function App() {
       setStatusKey("saveFailed");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function recordClaimReview(
+    answer: AnswerView,
+    claim: ClaimView,
+    decision: ClaimReviewStatus,
+    finalClaim: ClaimView = claim,
+  ) {
+    if (apiMode !== "online" || !session) {
+      setStatusKey("offline");
+      return;
+    }
+
+    setReviewingClaimIds((current) => new Set(current).add(claim.id));
+    try {
+      await reviewSessionClaim(config, answer.id, claim.id, {
+        decision,
+        subject: finalClaim.subject,
+        attribute: finalClaim.attribute,
+        value: finalClaim.value,
+        source_text: finalClaim.sourceText,
+      });
+      const [sessionReview, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
+        loadSessionReview(config, locale),
+        loadEvidenceMapOrNull(locale),
+        loadGroundedSuggestionsOrEmpty(locale, activeQuestion?.id ?? activeQuestionId),
+      ]);
+      setSession(sessionReview.session);
+      setIndicators(sessionReview.indicators);
+      setReview(sessionReview.snapshot.review);
+      setFindings(sessionReview.snapshot.review.findings);
+      setReportMarkdown(sessionReview.report_markdown);
+      setEvidenceMap(nextEvidenceMap);
+      applyGroundedSuggestions(nextGroundedSuggestions);
+      setStatusKey("claimReviewSaved");
+      void refreshAuditTrails();
+    } catch (error) {
+      console.error("Could not review claim.", error);
+      setStatusKey("claimReviewFailed");
+    } finally {
+      setReviewingClaimIds((current) => {
+        const next = new Set(current);
+        next.delete(claim.id);
+        return next;
+      });
     }
   }
 
@@ -1755,7 +1805,9 @@ export function App() {
                       answer={answer}
                       key={answer.id}
                       locale={locale}
+                      onReview={recordClaimReview}
                       question={questionsById.get(answer.questionId)}
+                      reviewingClaimIds={reviewingClaimIds}
                     />
                   ))
                 ) : (
@@ -4916,12 +4968,33 @@ function QuestionListItem({
 function AnswerHistoryCard({
   answer,
   locale,
+  onReview,
   question,
+  reviewingClaimIds,
 }: {
   answer: AnswerView;
   locale: Locale;
+  onReview: (
+    answer: AnswerView,
+    claim: ClaimView,
+    decision: ClaimReviewStatus,
+    finalClaim?: ClaimView,
+  ) => void | Promise<void>;
   question: QuestionView | undefined;
+  reviewingClaimIds: Set<string>;
 }) {
+  function editClaim(claim: ClaimView) {
+    const nextValue = window.prompt(text(locale, "claimReviewEditPrompt"), claim.value);
+    if (nextValue === null) {
+      return;
+    }
+    const value = nextValue.trim();
+    if (!value) {
+      return;
+    }
+    void onReview(answer, claim, "edited", { ...claim, value });
+  }
+
   return (
     <article className="answer-card">
       <div className="answer-card-header">
@@ -4937,8 +5010,70 @@ function AnswerHistoryCard({
         </p>
       ) : null}
       <p>{localize(answer.text, locale)}</p>
+      {answer.claims?.length ? (
+        <div className="claim-review-list">
+          <div className="claim-review-list-header">
+            <strong>{text(locale, "claimReviewTitle")}</strong>
+            <span>{answer.claims.length}</span>
+          </div>
+          {answer.claims.map((claim) => {
+            const disabled = reviewingClaimIds.has(claim.id);
+            return (
+              <div className="claim-review-item" data-state={claim.reviewStatus} key={claim.id}>
+                <div className="claim-review-main">
+                  <span className="claim-review-status">{claimReviewStatusLabel(claim.reviewStatus, locale)}</span>
+                  <strong>
+                    {claim.subject} / {claim.attribute}
+                  </strong>
+                  <span>{claim.value}</span>
+                  {claim.sourceText ? <em title={claim.sourceText}>{claim.sourceText}</em> : null}
+                </div>
+                <div className="claim-review-actions">
+                  <button
+                    type="button"
+                    aria-label={`${text(locale, "claimReviewAccept")}: ${claim.value}`}
+                    title={text(locale, "claimReviewAccept")}
+                    disabled={disabled}
+                    onClick={() => void onReview(answer, claim, "accepted")}
+                  >
+                    <Check size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${text(locale, "claimReviewEdit")}: ${claim.value}`}
+                    title={text(locale, "claimReviewEdit")}
+                    disabled={disabled}
+                    onClick={() => editClaim(claim)}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`${text(locale, "claimReviewReject")}: ${claim.value}`}
+                    title={text(locale, "claimReviewReject")}
+                    disabled={disabled}
+                    onClick={() => void onReview(answer, claim, "rejected")}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </article>
   );
+}
+
+function claimReviewStatusLabel(status: ClaimReviewStatus, locale: Locale): string {
+  const keys: Record<ClaimReviewStatus, CopyKey> = {
+    pending: "claimReviewPending",
+    accepted: "claimReviewAccepted",
+    edited: "claimReviewEdited",
+    rejected: "claimReviewRejected",
+  };
+  return text(locale, keys[status]);
 }
 
 function PanelHeader({

@@ -97,6 +97,14 @@ export function toAnswerView(answer: Answer, locale: Locale): AnswerView {
     questionId: answer.question_id,
     time: seed?.time ?? formatTime(answer.created_at, locale),
     text: seed?.text ?? { pl: answer.text, en: answer.text },
+    claims: (answer.claims ?? []).map((claim) => ({
+      id: claim.id,
+      subject: claim.subject,
+      attribute: claim.attribute,
+      value: claim.value,
+      sourceText: claim.source_text ?? "",
+      reviewStatus: claim.review_status ?? "accepted",
+    })),
   };
 }
 

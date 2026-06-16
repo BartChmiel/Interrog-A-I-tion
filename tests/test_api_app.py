@@ -4,6 +4,7 @@ from pathlib import Path
 
 from interrogaition.api.app import (
     AddAnswerRequest,
+    ClaimReviewDecisionRequest,
     CreateQuestionDraftRequest,
     CreateWorkspaceRequest,
     ExportBundleRequest,
@@ -21,7 +22,7 @@ from interrogaition.api.app import (
     create_app,
 )
 from interrogaition.ai.local_model_runtime import LocalModelRuntimeConfig
-from interrogaition.domain.models import SuggestionStatus
+from interrogaition.domain.models import ClaimReviewStatus, SuggestionStatus
 from interrogaition.domain.session import ParticipantRole
 from interrogaition.security.access_policy import WorkspaceAction, WorkspaceRole
 from interrogaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
@@ -882,6 +883,7 @@ class ApiAppTest(unittest.TestCase):
         start = endpoint(app, "start_session")
         add_answer = endpoint(app, "add_session_answer")
         review_session = endpoint(app, "review_session_endpoint")
+        get_claim_provenance = endpoint(app, "get_session_claim_provenance")
 
         session = start(
             StartSessionRequest(
@@ -915,6 +917,19 @@ class ApiAppTest(unittest.TestCase):
                 for claim in updated["answers"][0]["claims"]
             },
         )
+        self.assertTrue(
+            all(claim["review_status"] == "pending" for claim in updated["answers"][0]["claims"])
+        )
+        time_claim = next(
+            claim
+            for claim in updated["answers"][0]["claims"]
+            if claim["attribute"] == "time"
+        )
+        self.assertEqual(time_claim["extraction_rule"], "time-expression.v1")
+        self.assertEqual(len(time_claim["extraction_hash"]), 64)
+        self.assertEqual(time_claim["confidence"], 0.86)
+        self.assertEqual(time_claim["source_start"], 3)
+        self.assertEqual(time_claim["source_end"], 8)
 
         review = review_session("api-session-001", locale="en")
 
@@ -932,9 +947,101 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(audit["events"][1]["details"]["claim_count"], 2)
         self.assertTrue(audit["events"][1]["details"]["claims_extracted"])
         self.assertEqual(
+            audit["events"][1]["details"]["extraction_trace"][0]["extraction_rule"],
+            "time-expression.v1",
+        )
+        self.assertEqual(
+            audit["events"][1]["details"]["extraction_trace"][0]["source_start"],
+            3,
+        )
+        self.assertEqual(
+            audit["events"][1]["details"]["extraction_trace"][0]["extraction_hash"],
+            time_claim["extraction_hash"],
+        )
+        self.assertEqual(
             [event["action"] for event in audit["events"]],
             ["session_started", "answer_added", "review_refreshed"],
         )
+
+        provenance = get_claim_provenance("api-session-001")
+        self.assertTrue(provenance["chain_valid"])
+        self.assertEqual(provenance["session_id"], "api-session-001")
+        self.assertEqual(provenance["claim_count"], 2)
+        self.assertEqual(provenance["extracted_claim_count"], 2)
+        self.assertEqual(provenance["verified_claim_count"], 2)
+        self.assertEqual(provenance["issue_count"], 0)
+        self.assertEqual(provenance["issues"], [])
+        self.assertTrue(all(record["valid"] for record in provenance["records"]))
+        self.assertIn(
+            time_claim["extraction_hash"],
+            {record["extraction_hash"] for record in provenance["records"]},
+        )
+
+    def test_claim_review_endpoint_updates_claim_and_audit(self) -> None:
+        app = create_app()
+        start = endpoint(app, "start_session")
+        add_answer = endpoint(app, "add_session_answer")
+        review_claim = endpoint(app, "review_session_claim")
+        get_audit = endpoint(app, "get_session_audit")
+        get_claim_provenance = endpoint(app, "get_session_claim_provenance")
+
+        start(
+            StartSessionRequest(
+                session_id="api-session-claim-review",
+                case_id="case-001",
+                participant_id="person-001",
+                initial_role=ParticipantRole.WITNESS,
+            )
+        )
+        updated = add_answer(
+            "api-session-claim-review",
+            AddAnswerRequest(
+                id="api-answer-claim-review",
+                question_id="q-001",
+                text="At 19:45 I saw the person near the bicycle stand.",
+                topic_ids=["topic-location"],
+                event_id="api-event-claim-review-answer",
+            ),
+        )
+        claim = updated["answers"][0]["claims"][0]
+
+        response = review_claim(
+            "api-session-claim-review",
+            "api-answer-claim-review",
+            claim["id"],
+            ClaimReviewDecisionRequest(
+                decision=ClaimReviewStatus.EDITED,
+                subject=claim["subject"],
+                attribute=claim["attribute"],
+                value="19:50",
+                source_text=claim["source_text"],
+                operator_note="Corrected after operator review.",
+            ),
+        )
+
+        reviewed_claim = response["session"]["answers"][0]["claims"][0]
+        audit = get_audit("api-session-claim-review")
+
+        self.assertTrue(response["chain_valid"])
+        self.assertEqual(reviewed_claim["value"], "19:50")
+        self.assertEqual(reviewed_claim["review_status"], "edited")
+        self.assertEqual(reviewed_claim["extraction_rule"], "time-expression.v1")
+        self.assertEqual(reviewed_claim["extraction_hash"], claim["extraction_hash"])
+        self.assertEqual(audit["events"][-1]["action"], "claim_edited")
+        self.assertEqual(audit["events"][-1]["details"]["before"]["review_status"], "pending")
+        self.assertEqual(audit["events"][-1]["details"]["after"]["review_status"], "edited")
+        self.assertEqual(
+            audit["events"][-1]["details"]["after"]["extraction_rule"],
+            "time-expression.v1",
+        )
+        self.assertEqual(
+            audit["events"][-1]["details"]["after"]["extraction_hash"],
+            claim["extraction_hash"],
+        )
+        provenance = get_claim_provenance("api-session-claim-review")
+        self.assertEqual(provenance["issue_count"], 0)
+        self.assertEqual(provenance["verified_claim_count"], 2)
+        self.assertIn("edited", {record["review_status"] for record in provenance["records"]})
 
     def test_start_session_rejects_duplicate_session_id(self) -> None:
         app = create_app()

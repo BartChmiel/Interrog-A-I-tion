@@ -75,6 +75,7 @@ except Exception:  # pragma: no cover - exercised in restricted local environmen
 
 from interrogaition.analysis.credibility_indicators import generate_indicators
 from interrogaition.analysis.claim_extraction import answer_with_extracted_claims
+from interrogaition.analysis.claim_provenance import verify_session_claim_provenance
 from interrogaition.analysis.evidence_alignment import build_evidence_alignment
 from interrogaition.analysis.evidence_map import build_evidence_map
 from interrogaition.analysis.grounding_context import build_grounding_context_pack
@@ -102,6 +103,7 @@ from interrogaition.domain.models import (
     Answer,
     AuditEvent,
     Claim,
+    ClaimReviewStatus,
     Case,
     Priority,
     Question,
@@ -180,8 +182,19 @@ class AddAnswerRequest:
     text: str
     event_id: str
     topic_ids: list[str] = field(default_factory=list)
-    claims: list[dict[str, str]] = field(default_factory=list)
+    claims: list[dict[str, Any]] = field(default_factory=list)
     workspace_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ClaimReviewDecisionRequest:
+    decision: ClaimReviewStatus
+    subject: str = ""
+    attribute: str = ""
+    value: str = ""
+    source_text: str = ""
+    actor_id: str = "local-ui"
+    operator_note: str = ""
 
 
 @dataclass(frozen=True)
@@ -1485,6 +1498,12 @@ def create_app(
                 attribute=raw["attribute"],
                 value=raw["value"],
                 source_text=raw.get("source_text", ""),
+                review_status=ClaimReviewStatus(raw.get("review_status", ClaimReviewStatus.ACCEPTED.value)),
+                extraction_rule=raw.get("extraction_rule", ""),
+                extraction_hash=raw.get("extraction_hash", ""),
+                confidence=raw.get("confidence"),
+                source_start=raw.get("source_start"),
+                source_end=raw.get("source_end"),
             )
             for raw in request.claims
         )
@@ -1512,9 +1531,67 @@ def create_app(
                 "topic_ids": list(answer.topic_ids),
                 "claim_count": len(answer.claims),
                 "claims_extracted": not bool(request.claims) and bool(answer.claims),
+                "extraction_trace": (
+                    [_claim_audit_snapshot(claim) for claim in answer.claims]
+                    if not request.claims
+                    else []
+                ),
             },
         )
         return _to_jsonable(updated)
+
+    @app.post("/sessions/{session_id}/answers/{answer_id}/claims/{claim_id}/review")
+    def review_session_claim(
+        session_id: str,
+        answer_id: str,
+        claim_id: str,
+        request: ClaimReviewDecisionRequest,
+    ) -> dict[str, Any]:
+        session = store.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
+        answer = next((item for item in session.answers if item.id == answer_id), None)
+        if answer is None:
+            raise HTTPException(status_code=404, detail="Answer not found.")
+
+        claim = next((item for item in answer.claims if item.id == claim_id), None)
+        if claim is None:
+            raise HTTPException(status_code=404, detail="Claim not found.")
+
+        _validate_claim_review_decision(request)
+        updated_claim = _reviewed_claim(claim, request)
+        updated_answer = replace(
+            answer,
+            claims=tuple(updated_claim if item.id == claim_id else item for item in answer.claims),
+        )
+        updated_session = replace(
+            session,
+            answers=tuple(updated_answer if item.id == answer_id else item for item in session.answers),
+        )
+        store.save_session(updated_session)
+        audit_event = store.append_audit_event(
+            actor=Actor.HUMAN,
+            action=f"claim_{request.decision.value}",
+            object_type="claim",
+            object_id=claim_id,
+            details={
+                "session_id": session_id,
+                "case_id": session.case_id,
+                "answer_id": answer_id,
+                "question_id": answer.question_id,
+                "decision": request.decision.value,
+                "actor_id": request.actor_id,
+                "operator_note": request.operator_note,
+                "before": _claim_audit_snapshot(claim),
+                "after": _claim_audit_snapshot(updated_claim),
+            },
+        )
+        return {
+            "session": _to_jsonable(updated_session),
+            "audit_event": _to_jsonable(audit_event),
+            "chain_valid": store.verify_audit_chain(),
+        }
 
     @app.get("/sessions/{session_id}/review")
     def review_session_endpoint(
@@ -1582,6 +1659,21 @@ def create_app(
             "chain_valid": store.verify_audit_chain(),
             "events": _to_jsonable(events),
         }
+
+    @app.get("/sessions/{session_id}/claim-provenance")
+    def get_session_claim_provenance(session_id: str) -> dict[str, Any]:
+        session = store.get_session(session_id)
+        if session is None:
+            raise HTTPException(status_code=404, detail="Session not found.")
+
+        events = _session_audit_events(store.list_audit_events(), session_id)
+        return _to_jsonable(
+            verify_session_claim_provenance(
+                session=session,
+                audit_events=events,
+                chain_valid=store.verify_audit_chain(),
+            )
+        )
 
     return app
 
@@ -1986,6 +2078,53 @@ def _validate_answer_request(case: Case, request: AddAnswerRequest) -> None:
                 status_code=400,
                 detail=f"Claim {index} is missing required field(s): {fields}.",
             )
+        try:
+            ClaimReviewStatus(raw_claim.get("review_status", ClaimReviewStatus.ACCEPTED.value))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Claim {index} has unsupported review_status.") from exc
+
+
+def _validate_claim_review_decision(request: ClaimReviewDecisionRequest) -> None:
+    if request.decision not in {
+        ClaimReviewStatus.ACCEPTED,
+        ClaimReviewStatus.EDITED,
+        ClaimReviewStatus.REJECTED,
+    }:
+        raise HTTPException(status_code=400, detail="Unsupported claim review decision.")
+
+    if request.decision == ClaimReviewStatus.EDITED:
+        for field_name in ("subject", "attribute", "value"):
+            _require_non_empty(field_name, getattr(request, field_name))
+
+
+def _reviewed_claim(claim: Claim, request: ClaimReviewDecisionRequest) -> Claim:
+    if request.decision == ClaimReviewStatus.EDITED:
+        return replace(
+            claim,
+            subject=request.subject.strip(),
+            attribute=request.attribute.strip(),
+            value=request.value.strip(),
+            source_text=request.source_text.strip() or claim.source_text,
+            review_status=ClaimReviewStatus.EDITED,
+        )
+
+    return replace(claim, review_status=request.decision)
+
+
+def _claim_audit_snapshot(claim: Claim) -> dict[str, object]:
+    return {
+        "id": claim.id,
+        "subject": claim.subject,
+        "attribute": claim.attribute,
+        "value": claim.value,
+        "source_text": claim.source_text,
+        "review_status": claim.review_status.value,
+        "extraction_rule": claim.extraction_rule,
+        "extraction_hash": claim.extraction_hash,
+        "confidence": claim.confidence,
+        "source_start": claim.source_start,
+        "source_end": claim.source_end,
+    }
 
 
 def _validate_grounded_suggestion_decision(

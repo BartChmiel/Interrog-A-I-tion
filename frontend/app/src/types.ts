@@ -65,12 +65,24 @@ export type Answer = {
   claims?: Claim[];
 };
 
+export type ClaimReviewStatus = "pending" | "accepted" | "edited" | "rejected";
+
 export type Claim = {
   id: string;
   subject: string;
   attribute: string;
   value: string;
   source_text?: string;
+  review_status?: ClaimReviewStatus;
+};
+
+export type ClaimView = {
+  id: string;
+  subject: string;
+  attribute: string;
+  value: string;
+  sourceText: string;
+  reviewStatus: ClaimReviewStatus;
 };
 
 export type TopicPriority = "high" | "medium" | "low";
@@ -178,6 +190,12 @@ export type SessionReviewResponse = {
   };
   indicators: Indicator[];
   report_markdown: string;
+};
+
+export type ClaimReviewDecisionResponse = {
+  session: InterviewSession;
+  audit_event: AuditEvent;
+  chain_valid: boolean;
 };
 
 export type EncryptionStatus = {
@@ -724,4 +742,5 @@ export type AnswerView = {
   questionId: string;
   text: LocalizedText;
   time: string;
+  claims?: ClaimView[];
 };

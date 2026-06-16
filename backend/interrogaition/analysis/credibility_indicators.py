@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from statistics import mean
 
+from interrogaition.analysis.claim_review import is_claim_analysis_ready
 from interrogaition.analysis.interview_review import InterviewReview, review_case
 from interrogaition.domain.indicators import Indicator, IndicatorCategory, IndicatorFactor
 from interrogaition.domain.models import Case
@@ -140,7 +141,7 @@ def _source_of_knowledge_indicator(case: Case, review: InterviewReview) -> Indic
         claim.id
         for answer in case.answers
         for claim in answer.claims
-        if claim.attribute == "source_of_knowledge"
+        if claim.attribute == "source_of_knowledge" and is_claim_analysis_ready(claim)
     )
     covered_source_topics = tuple(
         topic_id for topic_id in source_topic_ids if topic_id in review.covered_topic_ids
