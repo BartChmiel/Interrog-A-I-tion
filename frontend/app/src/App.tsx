@@ -86,6 +86,7 @@ import type {
   EnvironmentHealthState,
   EvidenceAlignment,
   EvidenceMap,
+  EvidenceTopicNode,
   EvidenceTopicStatus,
   GroundedSuggestionDecision,
   GroundedSuggestion,
@@ -158,6 +159,20 @@ type OperatorAction = {
   targetQuestionId?: string;
   targetTab?: OperationsTab;
   sourceObjectIds?: string[];
+};
+
+type MaterialTaskKind = "review_link" | "verify_material" | "material_only" | "contested_topic";
+
+type MaterialTask = {
+  id: string;
+  kind: MaterialTaskKind;
+  title: string;
+  detail: string;
+  priority: OperatorAction["priority"];
+  materialId?: string;
+  questionId?: string;
+  sourceObjectIds: string[];
+  link?: MaterialQuestionLink;
 };
 
 type StopReadinessGate = {
@@ -341,6 +356,27 @@ export function App() {
 
   const visibleIndicators = indicators.length ? indicators : seedIndicators;
   const visibleFindings = findings.length ? findings : seedFindings;
+  const materialTasks = useMemo(
+    () =>
+      buildMaterialTasks({
+        decisions: materialQuestionLinkDecisions,
+        evidenceMap,
+        links: materialQuestionLinks,
+        locale,
+        materials: workspaceMaterials,
+        questions,
+        verifications: materialVerifications,
+      }),
+    [
+      evidenceMap,
+      materialQuestionLinkDecisions,
+      materialQuestionLinks,
+      locale,
+      materialVerifications,
+      questions,
+      workspaceMaterials,
+    ],
+  );
   const operatorActions = useMemo(
     () =>
       buildOperatorActions({
@@ -350,6 +386,7 @@ export function App() {
         findings: visibleFindings,
         links: materialQuestionLinks,
         locale,
+        materialTasks,
         materials: workspaceMaterials,
         questions,
       }),
@@ -358,6 +395,7 @@ export function App() {
       answerViews,
       evidenceMap,
       materialQuestionLinks,
+      materialTasks,
       locale,
       questions,
       visibleFindings,
@@ -1863,11 +1901,13 @@ export function App() {
                   locale={locale}
                   links={materialQuestionLinks}
                   materials={workspaceMaterials}
+                  tasks={materialTasks}
                   activePreviewId={activeMaterialPreviewId}
                   previews={materialPreviews}
                   verifications={materialVerifications}
                   onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
                   onDraftChange={setMaterialDraft}
+                  onOpenQuestion={(questionId) => selectActiveQuestion(questionId)}
                   onPreview={(materialId) => void toggleMaterialPreview(materialId)}
                   onSubmit={() => void registerMaterial()}
                   onVerify={(materialId) => void verifyMaterial(materialId)}
@@ -2887,6 +2927,140 @@ function topicPriorityLabel(topic: CaseTopic, locale: Locale): string {
   return labels[locale][topic.priority];
 }
 
+function buildMaterialTasks({
+  decisions,
+  evidenceMap,
+  links,
+  locale,
+  materials,
+  questions,
+  verifications,
+}: {
+  decisions: Record<string, MaterialQuestionLinkDecision>;
+  evidenceMap: EvidenceMap | null;
+  links: MaterialQuestionLink[];
+  locale: Locale;
+  materials: MaterialRecord[];
+  questions: QuestionView[];
+  verifications: Record<string, MaterialVerification>;
+}): MaterialTask[] {
+  const materialsById = new Map(materials.map((material) => [material.id, material]));
+  const questionsById = new Map(questions.map((question) => [question.id, question]));
+  const tasks: MaterialTask[] = [];
+
+  const pendingLink = [...links]
+    .filter((link) => !decisions[materialQuestionLinkKey(link)])
+    .sort((left, right) => right.confidence - left.confidence)[0];
+  if (pendingLink) {
+    const material = materialsById.get(pendingLink.material_id);
+    const question = questionsById.get(pendingLink.question_id);
+    tasks.push({
+      id: `review-link-${pendingLink.material_id}-${pendingLink.question_id}`,
+      kind: "review_link",
+      title: text(locale, "materialTaskReviewLink"),
+      detail: `${material?.title ?? pendingLink.material_id} -> ${
+        question?.id ?? pendingLink.question_id
+      } (${text(locale, "confidenceShort")} ${pendingLink.confidence.toFixed(2)})`,
+      priority: pendingLink.confidence >= 0.85 ? "high" : "medium",
+      materialId: pendingLink.material_id,
+      questionId: pendingLink.question_id,
+      sourceObjectIds: [pendingLink.material_id, pendingLink.question_id, ...pendingLink.topic_ids],
+      link: pendingLink,
+    });
+  }
+
+  const unverifiedMaterial = materials.find(
+    (material) => materialVerificationState(verifications[material.id]) !== "ready",
+  );
+  if (unverifiedMaterial) {
+    tasks.push({
+      id: `verify-${unverifiedMaterial.id}`,
+      kind: "verify_material",
+      title: text(locale, "materialTaskVerifyIntegrity"),
+      detail: `${unverifiedMaterial.title} / ${shortHash(unverifiedMaterial.sha256)}`,
+      priority: "medium",
+      materialId: unverifiedMaterial.id,
+      sourceObjectIds: [unverifiedMaterial.id],
+    });
+  }
+
+  const materialOnlyTopic = firstEvidenceTopicByStatus(evidenceMap, "material_only");
+  if (materialOnlyTopic) {
+    tasks.push({
+      id: `material-only-${materialOnlyTopic.topic_id}`,
+      kind: "material_only",
+      title: text(locale, "materialTaskMaterialOnlyTopic"),
+      detail: buildEvidenceTopicTaskDetail(materialOnlyTopic, materialsById),
+      priority: "medium",
+      materialId: materialOnlyTopic.material_ids[0],
+      questionId: materialOnlyTopic.question_ids[0],
+      sourceObjectIds: [
+        materialOnlyTopic.topic_id,
+        ...materialOnlyTopic.material_ids,
+        ...materialOnlyTopic.question_ids,
+      ],
+    });
+  }
+
+  const contestedTopic = firstEvidenceTopicByStatus(evidenceMap, "contested");
+  if (contestedTopic) {
+    tasks.push({
+      id: `contested-${contestedTopic.topic_id}`,
+      kind: "contested_topic",
+      title: text(locale, "materialTaskContestedTopic"),
+      detail: buildEvidenceTopicTaskDetail(contestedTopic, materialsById),
+      priority: contestedTopic.priority === "high" ? "high" : "medium",
+      materialId: contestedTopic.material_ids[0],
+      questionId: contestedTopic.question_ids[0],
+      sourceObjectIds: [
+        contestedTopic.topic_id,
+        ...contestedTopic.material_ids,
+        ...contestedTopic.question_ids,
+      ],
+    });
+  }
+
+  const uniqueTasks = new Map<string, MaterialTask>();
+  for (const task of tasks) {
+    uniqueTasks.set(task.id, task);
+  }
+
+  return Array.from(uniqueTasks.values())
+    .sort((left, right) => priorityRank(left.priority) - priorityRank(right.priority))
+    .slice(0, 4);
+}
+
+function firstEvidenceTopicByStatus(
+  evidenceMap: EvidenceMap | null,
+  status: EvidenceTopicStatus,
+): EvidenceTopicNode | undefined {
+  return evidenceMap?.topic_nodes
+    .filter((node) => node.status === status)
+    .sort(
+      (left, right) =>
+        priorityRank(evidenceTopicPriorityToOperatorPriority(left.priority)) -
+        priorityRank(evidenceTopicPriorityToOperatorPriority(right.priority)),
+    )[0];
+}
+
+function evidenceTopicPriorityToOperatorPriority(priority: string): OperatorAction["priority"] {
+  if (priority === "high" || priority === "medium" || priority === "low") {
+    return priority;
+  }
+  return "medium";
+}
+
+function buildEvidenceTopicTaskDetail(
+  node: EvidenceTopicNode,
+  materialsById: Map<string, MaterialRecord>,
+): string {
+  const materialTitles = node.material_ids
+    .slice(0, 2)
+    .map((materialId) => materialsById.get(materialId)?.title ?? materialId)
+    .join(", ");
+  return materialTitles ? `${node.label}: ${materialTitles}` : node.label;
+}
+
 function buildOperatorActions({
   activeQuestionId,
   answerViews,
@@ -2894,6 +3068,7 @@ function buildOperatorActions({
   findings,
   links,
   locale,
+  materialTasks,
   materials,
   questions,
 }: {
@@ -2903,6 +3078,7 @@ function buildOperatorActions({
   findings: ReviewFinding[];
   links: MaterialQuestionLink[];
   locale: Locale;
+  materialTasks: MaterialTask[];
   materials: MaterialRecord[];
   questions: QuestionView[];
 }): OperatorAction[] {
@@ -2964,17 +3140,17 @@ function buildOperatorActions({
     });
   }
 
-  if (evidenceMap?.summary.material_only_topics) {
+  const priorityMaterialTask = materialTasks[0];
+  if (priorityMaterialTask) {
     actions.push({
-      id: "material-only-topics",
+      id: `material-task-${priorityMaterialTask.id}`,
       kind: "materials",
-      title: text(locale, "operatorTurnMaterialIntoQuestion"),
-      detail: `${evidenceMap.summary.material_only_topics} ${text(locale, "statusMaterialOnly")}`,
-      priority: "medium",
+      title: priorityMaterialTask.title,
+      detail: priorityMaterialTask.detail,
+      priority: priorityMaterialTask.priority,
+      targetQuestionId: priorityMaterialTask.questionId,
       targetTab: "materials",
-      sourceObjectIds: evidenceMap.topic_nodes
-        .filter((node) => node.status === "material_only")
-        .flatMap((node) => [node.topic_id, ...node.material_ids]),
+      sourceObjectIds: priorityMaterialTask.sourceObjectIds,
     });
   }
 
@@ -3537,8 +3713,10 @@ function MaterialsPanel({
   links,
   locale,
   materials,
+  tasks,
   onDecideLink,
   onDraftChange,
+  onOpenQuestion,
   onPreview,
   onSubmit,
   onVerify,
@@ -3554,8 +3732,10 @@ function MaterialsPanel({
   links: MaterialQuestionLink[];
   locale: Locale;
   materials: MaterialRecord[];
+  tasks: MaterialTask[];
   onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
   onDraftChange: (draft: MaterialDraft) => void;
+  onOpenQuestion: (questionId: string) => void;
   onPreview: (materialId: string) => void;
   onSubmit: () => void;
   onVerify: (materialId: string) => void;
@@ -3596,6 +3776,14 @@ function MaterialsPanel({
           </span>
         </div>
       </div>
+
+      <MaterialTasksPanel
+        locale={locale}
+        tasks={tasks}
+        onDecideLink={onDecideLink}
+        onOpenQuestion={onOpenQuestion}
+        onPreview={onPreview}
+      />
 
       <div className="material-list">
         {materials.length ? (
@@ -3696,6 +3884,95 @@ function MaterialsPanel({
       {body}
     </section>
   );
+}
+
+function MaterialTasksPanel({
+  locale,
+  tasks,
+  onDecideLink,
+  onOpenQuestion,
+  onPreview,
+}: {
+  locale: Locale;
+  tasks: MaterialTask[];
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
+  onOpenQuestion: (questionId: string) => void;
+  onPreview: (materialId: string) => void;
+}) {
+  return (
+    <section className="material-task-panel">
+      <div className="material-task-header">
+        <div>
+          <strong>{text(locale, "materialTasks")}</strong>
+          <span>{text(locale, "materialTasksDetail")}</span>
+        </div>
+        <em>
+          {formatCount(tasks.length, locale, {
+            singular: text(locale, "materialTaskCountOne"),
+            pluralFew: text(locale, "materialTaskCountFew"),
+            pluralMany: text(locale, "materialTaskCountMany"),
+          })}
+        </em>
+      </div>
+      {tasks.length ? (
+        <div className="material-task-list">
+          {tasks.map((task) => (
+            <article className="material-task-card" data-priority={task.priority} key={task.id}>
+              <div className="material-task-card-main">
+                <span className="material-task-icon">{materialTaskIcon(task.kind)}</span>
+                <div>
+                  <strong>{task.title}</strong>
+                  <p>{task.detail}</p>
+                  <em>{operatorPriorityLabel(task.priority, locale)}</em>
+                </div>
+              </div>
+              <div className="material-task-actions">
+                {task.questionId ? (
+                  <button type="button" onClick={() => onOpenQuestion(task.questionId!)}>
+                    <Send size={13} />
+                    {text(locale, "materialTaskOpenQuestion")}
+                  </button>
+                ) : null}
+                {task.materialId ? (
+                  <button type="button" onClick={() => onPreview(task.materialId!)}>
+                    <Eye size={13} />
+                    {text(locale, "previewMaterial")}
+                  </button>
+                ) : null}
+                {task.link ? (
+                  <>
+                    <button type="button" onClick={() => onDecideLink(task.link!, "accepted")}>
+                      <Check size={13} />
+                      {text(locale, "acceptLink")}
+                    </button>
+                    <button type="button" onClick={() => onDecideLink(task.link!, "rejected")}>
+                      <X size={13} />
+                      {text(locale, "rejectLink")}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-state">{text(locale, "noMaterialTasks")}</p>
+      )}
+    </section>
+  );
+}
+
+function materialTaskIcon(kind: MaterialTaskKind): ReactNode {
+  if (kind === "verify_material") {
+    return <ShieldCheck size={15} />;
+  }
+  if (kind === "contested_topic") {
+    return <AlertTriangle size={15} />;
+  }
+  if (kind === "material_only") {
+    return <Plus size={15} />;
+  }
+  return <Network size={15} />;
 }
 
 function MaterialCard({
