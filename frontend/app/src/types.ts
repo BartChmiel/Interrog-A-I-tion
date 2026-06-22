@@ -246,6 +246,51 @@ export type LocalModelSmokeResult = {
   completion_tokens: number | null;
 };
 
+export type WorkspaceSecurityIssue = {
+  code: string;
+  severity: string;
+  detail: string;
+  remediation: string;
+};
+
+export type WorkspaceSecurityReport = {
+  workspace_id: string;
+  case_id: string;
+  state: EnvironmentHealthState;
+  data_sensitivity: "synthetic" | "anonymized" | "sensitive";
+  storage_mode: "plain_sqlite_prototype" | "encrypted_required";
+  allows_sensitive_material: boolean;
+  requires_encrypted_storage: boolean;
+  encryption_backend: "standard_sqlite" | "sqlcipher";
+  encryption_available: boolean;
+  encryption_version: string | null;
+  encryption_checked_at: string;
+  issue_count: number;
+  issues: WorkspaceSecurityIssue[];
+};
+
+export type ModelExperimentIssue = {
+  code: string;
+  severity: string;
+  detail: string;
+  remediation: string;
+};
+
+export type ModelExperimentReadiness = {
+  state: EnvironmentHealthState;
+  provider: string;
+  effective_provider: string;
+  configured_model: string;
+  stop_review_approved: boolean;
+  workspace_id: string | null;
+  workspace_security_state: EnvironmentHealthState | null;
+  artifact_isolation_state: EnvironmentHealthState | null;
+  can_run_real_smoke: boolean;
+  can_enable_live_output: boolean;
+  issue_count: number;
+  issues: ModelExperimentIssue[];
+};
+
 export type ModelArtifactIsolationStatus = {
   workspace_id: string;
   state: EnvironmentHealthState;

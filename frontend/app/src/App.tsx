@@ -41,6 +41,7 @@ import {
   loadEnvironmentHealth,
   loadEvidenceMap,
   loadGroundedSuggestions,
+  loadLocalModelExperimentReadiness,
   loadLocalModelConfig,
   loadMaterialQuestionLinks,
   loadModelArtifactManifest,
@@ -52,6 +53,7 @@ import {
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceAudit,
+  loadWorkspaceSecurity,
   loadWorkspaceMaterials,
   recordGroundedSuggestionDecision,
   recordMaterialQuestionLinkDecision,
@@ -102,6 +104,7 @@ import type {
   InterviewReview,
   Locale,
   LocalModelConfig,
+  ModelExperimentReadiness,
   LocalModelSmokeResult,
   ModelArtifactManifest,
   ModelArtifactIsolationStatus,
@@ -123,6 +126,7 @@ import type {
   WorkspaceAccessDecision,
   WorkspaceAuditResponse,
   WorkspaceResponse,
+  WorkspaceSecurityReport,
 } from "./types";
 import {
   caseAssistantHints,
@@ -234,9 +238,11 @@ export function App() {
   const [environmentHealth, setEnvironmentHealth] = useState<EnvironmentHealth | null>(null);
   const [localModelConfig, setLocalModelConfig] = useState<LocalModelConfig | null>(null);
   const [localModelSmoke, setLocalModelSmoke] = useState<LocalModelSmokeResult | null>(null);
+  const [modelExperimentReadiness, setModelExperimentReadiness] = useState<ModelExperimentReadiness | null>(null);
   const [modelArtifactManifest, setModelArtifactManifest] = useState<ModelArtifactManifest | null>(null);
   const [modelArtifactIsolation, setModelArtifactIsolation] = useState<ModelArtifactIsolationStatus | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
+  const [workspaceSecurity, setWorkspaceSecurity] = useState<WorkspaceSecurityReport | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
   const [workspaceAudit, setWorkspaceAudit] = useState<WorkspaceAuditResponse | null>(null);
   const [sessionAudit, setSessionAudit] = useState<SessionAuditResponse | null>(null);
@@ -618,6 +624,8 @@ export function App() {
         access,
         artifactManifest,
         artifactIsolation,
+        workspaceSecurityReport,
+        experimentReadiness,
         materialList,
         draftList,
         materialLinks,
@@ -628,6 +636,8 @@ export function App() {
         loadWorkspaceAccess(config),
         loadModelArtifactManifest(config),
         loadModelArtifactIsolation(config),
+        loadWorkspaceSecurity(config),
+        loadLocalModelExperimentReadiness(config),
         loadWorkspaceMaterials(config),
         loadQuestionDraftsOrEmpty(),
         loadMaterialQuestionLinksOrEmpty(locale),
@@ -641,6 +651,8 @@ export function App() {
       setLocalModelConfig(modelConfig);
       setModelArtifactManifest(artifactManifest);
       setModelArtifactIsolation(artifactIsolation);
+      setWorkspaceSecurity(workspaceSecurityReport);
+      setModelExperimentReadiness(experimentReadiness);
       setWorkspaceAudit(auditTrail);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
@@ -656,9 +668,11 @@ export function App() {
       setEnvironmentHealth(null);
       setLocalModelConfig(null);
       setLocalModelSmoke(null);
+      setModelExperimentReadiness(null);
       setModelArtifactManifest(null);
       setModelArtifactIsolation(null);
       setWorkspace(null);
+      setWorkspaceSecurity(null);
       setWorkspaceAccess(null);
       setWorkspaceAudit(null);
       setSessionAudit(null);
@@ -1099,12 +1113,14 @@ export function App() {
     setIsArtifactIsolationSubmitting(true);
     try {
       const isolation = await ensureModelArtifactIsolation(config);
-      const [health, manifest] = await Promise.all([
+      const [health, manifest, readiness] = await Promise.all([
         loadEnvironmentHealth(config),
         loadModelArtifactManifest(config),
+        loadLocalModelExperimentReadiness(config),
       ]);
       setModelArtifactIsolation(isolation);
       setModelArtifactManifest(manifest);
+      setModelExperimentReadiness(readiness);
       setEnvironmentHealth(health);
       setStatusKey("artifactIsolationReady");
     } catch (error) {
@@ -1924,12 +1940,14 @@ export function App() {
                     locale={locale}
                     localModelConfig={localModelConfig}
                     localModelSmoke={localModelSmoke}
+                    modelExperimentReadiness={modelExperimentReadiness}
                     modelArtifactManifest={modelArtifactManifest}
                     modelArtifactIsolation={modelArtifactIsolation}
                     materials={workspaceMaterials}
                     onArtifactIsolation={() => void initializeModelArtifactIsolation()}
                     onModelSmoke={(executeReal) => void smokeLocalModel(executeReal)}
                     workspace={workspace}
+                    workspaceSecurity={workspaceSecurity}
                   />
                 </CollapsibleSection>
                 <CollapsibleSection
@@ -4362,12 +4380,14 @@ function SecurityPanel({
   locale,
   localModelConfig,
   localModelSmoke,
+  modelExperimentReadiness,
   modelArtifactManifest,
   modelArtifactIsolation,
   materials,
   onArtifactIsolation,
   onModelSmoke,
   workspace,
+  workspaceSecurity,
 }: {
   accessDecision: WorkspaceAccessDecision | null;
   auditedGroundedDecisionCount: number;
@@ -4381,17 +4401,20 @@ function SecurityPanel({
   locale: Locale;
   localModelConfig: LocalModelConfig | null;
   localModelSmoke: LocalModelSmokeResult | null;
+  modelExperimentReadiness: ModelExperimentReadiness | null;
   modelArtifactManifest: ModelArtifactManifest | null;
   modelArtifactIsolation: ModelArtifactIsolationStatus | null;
   materials: MaterialRecord[];
   onArtifactIsolation: () => void;
   onModelSmoke: (executeReal: boolean) => void;
   workspace: WorkspaceResponse | null;
+  workspaceSecurity: WorkspaceSecurityReport | null;
 }) {
   const manifest = workspace?.manifest;
   const encryptionReady = encryptionStatus?.available === true;
   const accessReady = accessDecision?.allowed === true;
   const workspaceState = manifest ? "ready" : "unknown";
+  const workspaceSecurityState = workspaceSecurity?.state ?? "unknown";
   const storageState = !manifest
     ? "unknown"
     : manifest.storage_mode === "encrypted_required"
@@ -4401,6 +4424,7 @@ function SecurityPanel({
   const accessState = accessDecision ? (accessReady ? "ready" : "blocked") : "unknown";
   const exportState = manifest ? "ready" : "unknown";
   const materialsState = manifest ? "ready" : "unknown";
+  const experimentState = modelExperimentReadiness?.state ?? "unknown";
   const modelState = localModelConfig
     ? localModelConfig.real_model_enabled
       ? "warning"
@@ -4417,6 +4441,16 @@ function SecurityPanel({
     : text(locale, "unknown");
   const exportDetail = manifest ? text(locale, "manifestReady") : text(locale, "unknown");
   const materialsDetail = manifest ? text(locale, "registered") : text(locale, "unknown");
+  const workspaceSecurityDetail = workspaceSecurity
+    ? workspaceSecurity.issue_count
+      ? workspaceSecurity.issues[0]?.detail ?? text(locale, "blocked")
+      : text(locale, workspaceSecurity.allows_sensitive_material ? "sensitiveReady" : "syntheticOnly")
+    : text(locale, "unknown");
+  const experimentDetail = modelExperimentReadiness
+    ? modelExperimentReadiness.issue_count
+      ? modelExperimentReadiness.issues[0]?.detail ?? text(locale, "blocked")
+      : text(locale, "controlledSmokeReady")
+    : text(locale, "unknown");
   const modelDetail = localModelConfig
     ? localModelConfig.live_output_enabled
       ? text(locale, "liveModelEnabled")
@@ -4449,6 +4483,13 @@ function SecurityPanel({
           value={storageModeLabel(manifest?.storage_mode, locale)}
         />
         <SecurityItem
+          detail={workspaceSecurityDetail}
+          icon={<ShieldQuestion size={15} />}
+          state={workspaceSecurityState}
+          title={text(locale, "workspaceSecurity")}
+          value={workspaceSecurity ? text(locale, workspaceSecurity.requires_encrypted_storage ? "encryptedRequired" : "syntheticOnly") : text(locale, "unknown")}
+        />
+        <SecurityItem
           detail={encryptionDetail}
           icon={<KeyRound size={15} />}
           state={encryptionState}
@@ -4468,6 +4509,13 @@ function SecurityPanel({
           state={exportState}
           title={text(locale, "exportIntegrity")}
           value={manifest ? text(locale, "ready") : text(locale, "unknown")}
+        />
+        <SecurityItem
+          detail={experimentDetail}
+          icon={<Sparkles size={15} />}
+          state={experimentState}
+          title={text(locale, "modelExperimentGate")}
+          value={modelExperimentReadiness?.can_run_real_smoke ? text(locale, "controlledSmokeReady") : text(locale, "stopReviewRequired")}
         />
       </div>
       <AiRuntimeStatusCard
@@ -4517,7 +4565,8 @@ function SecurityPanel({
               !localModelConfig ||
               isModelSmokeRunning ||
               localModelConfig.provider !== "ollama" ||
-              !localModelConfig.real_model_enabled
+              !localModelConfig.real_model_enabled ||
+              modelExperimentReadiness?.can_run_real_smoke !== true
             }
             type="button"
             onClick={() => onModelSmoke(true)}

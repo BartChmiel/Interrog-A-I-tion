@@ -15,6 +15,7 @@ import type {
   GroundedSuggestionsResponse,
   InterviewSession,
   LocalModelConfig,
+  ModelExperimentReadiness,
   LocalModelSmokeResult,
   ModelArtifactManifest,
   ModelArtifactIsolationStatus,
@@ -39,6 +40,7 @@ import type {
   WorkspaceAuditResponse,
   WorkspaceAccessDecision,
   WorkspaceResponse,
+  WorkspaceSecurityReport,
 } from "./types";
 
 export type ApiError = Error & { status?: number };
@@ -209,6 +211,17 @@ export async function runLocalModelSmoke(
   });
 }
 
+export async function loadLocalModelExperimentReadiness(
+  config: RuntimeConfig,
+  stopReviewApproved = false,
+): Promise<ModelExperimentReadiness> {
+  const query = new URLSearchParams({
+    workspace_id: config.workspaceId,
+    stop_review_approved: String(stopReviewApproved),
+  });
+  return fetchJson(config, `/ai/local-model/experiment-readiness?${query.toString()}`);
+}
+
 export async function loadWorkspace(config: RuntimeConfig): Promise<WorkspaceResponse> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}`);
 }
@@ -253,6 +266,10 @@ export async function loadWorkspaceAccess(
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({ role, action });
   return fetchJson(config, `/workspaces/${workspaceId}/access?${query.toString()}`);
+}
+
+export async function loadWorkspaceSecurity(config: RuntimeConfig): Promise<WorkspaceSecurityReport> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/security`);
 }
 
 export async function loadWorkspaceAudit(config: RuntimeConfig): Promise<WorkspaceAuditResponse> {
