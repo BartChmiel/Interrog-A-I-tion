@@ -3,7 +3,9 @@
 ## Immediate Next Step
 
 Prepare the thesis evaluation path and the next security gate: encrypted workspace creation and a
-controlled real-model experiment behind STOP review.
+controlled real-model experiment behind STOP review. The backend now has workspace security and
+real-model experiment readiness reports; the next step is operator-facing UX and a documented
+STOP approval record before any real model smoke run.
 
 The live-session core, supervisor-demo UX, and deterministic AI path are already in place. Do not
 rush Ollama into the default demo workflow.
@@ -56,7 +58,7 @@ Success criteria:
 
 ## Milestone 3: Local Model Abstraction
 
-Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, a deterministic grounding context pack, and developer-gated live grounded suggestions via Ollama when `INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1`. The default demo path remains deterministic.
+Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, a STOP-gated real-model experiment readiness report, a deterministic grounding context pack, and developer-gated live grounded suggestions via Ollama when `INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1`. The default demo path remains deterministic.
 
 Tasks:
 
@@ -67,6 +69,7 @@ Tasks:
 - add Ollama adapter behind the interface,
 - add local model runtime config,
 - add deterministic smoke endpoint and UI control,
+- add STOP-gated real-model experiment readiness endpoint,
 - add guardrail checks before returning suggestions,
 - add grounding pack prompt contract.
 
@@ -121,7 +124,7 @@ Success criteria:
 
 ## Milestone 6: Security Path
 
-Status: started. SQLite session persistence, a hash-chained append-only audit log, audited operator work-queue decisions, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, environment health reporting, workspace-local model artifact isolation with hash-chained deduplicating artifact write manifests, grounded suggestion prompt/context/output artifact capture, export integrity manifests with optional model artifact provenance references, a workspace material register, bounded material previews, deterministic material-question grounding links with matched-term audit details, audited material-question link decisions, a first topic-level case evidence map, an advisory Evidence Alignment Indicator, an AI grounding context pack, live-visible grounded suggestions, and audited grounded-suggestion decisions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
+Status: started. SQLite session persistence, a hash-chained append-only audit log, audited operator work-queue decisions, a prototype per-case workspace boundary, SQLCipher runtime readiness checks, workspace-level security reports, environment health reporting, workspace-local model artifact isolation with hash-chained deduplicating artifact write manifests, grounded suggestion prompt/context/output artifact capture, export integrity manifests with optional model artifact provenance references, a workspace material register, bounded material previews, deterministic material-question grounding links with matched-term audit details, audited material-question link decisions, a first topic-level case evidence map, an advisory Evidence Alignment Indicator, an AI grounding context pack, live-visible grounded suggestions, and audited grounded-suggestion decisions are implemented. Encryption is not implemented yet, and real model output is not yet trusted for institutional live use.
 
 Tasks:
 
@@ -143,6 +146,7 @@ Tasks:
 - audited accepted/edited/rejected grounded-suggestion decisions,
 - SQLite storage,
 - SQLCipher research spike,
+- workspace security report endpoint,
 - environment health check,
 - workspace-local model artifact isolation,
 - hash-chained model artifact write manifests,

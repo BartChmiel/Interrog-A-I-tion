@@ -115,6 +115,7 @@ Workspace endpoints:
 POST /workspaces
 GET /workspaces/{workspace_id}
 GET /workspaces/{workspace_id}/access
+GET /workspaces/{workspace_id}/security
 GET /workspaces/{workspace_id}/model-artifacts
 POST /workspaces/{workspace_id}/model-artifacts/isolation
 GET /workspaces/{workspace_id}/model-artifacts/manifest
@@ -127,6 +128,7 @@ Local model runtime readiness is exposed separately from live suggestions:
 
 ```text
 GET /ai/local-model/config
+GET /ai/local-model/experiment-readiness
 POST /ai/local-model/smoke
 ```
 

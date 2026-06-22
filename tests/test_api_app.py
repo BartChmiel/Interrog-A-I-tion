@@ -99,6 +99,69 @@ class ApiAppTest(unittest.TestCase):
         self.assertFalse(smoke["real_model_invoked"])
         self.assertIn("disabled", smoke["detail"])
 
+    def test_local_model_experiment_readiness_requires_stop_and_workspace_gates(self) -> None:
+        app = create_app()
+        readiness = endpoint(app, "get_local_model_experiment_readiness")()
+
+        self.assertEqual(readiness["state"], "blocked")
+        self.assertFalse(readiness["can_run_real_smoke"])
+        self.assertIn(
+            "stop_review_required",
+            {issue["code"] for issue in readiness["issues"]},
+        )
+        self.assertIn(
+            "workspace_required",
+            {issue["code"] for issue in readiness["issues"]},
+        )
+
+    def test_local_model_experiment_readiness_allows_controlled_real_smoke(self) -> None:
+        workspace_root = TEST_OUTPUT_ROOT / f"model-gate-workspaces-{uuid.uuid4()}"
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                workspace_root,
+                encryption_status_provider=_unavailable_encryption_status,
+            ),
+            local_model_config=LocalModelRuntimeConfig(
+                provider="ollama",
+                configured_model="llama3.1:8b",
+                real_model_enabled=True,
+                live_output_enabled=False,
+            ),
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
+        readiness_endpoint = endpoint(app, "get_local_model_experiment_readiness")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-model-gate",
+                created_by="investigator-001",
+                workspace_id="api-workspace-model-gate",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+        blocked = readiness_endpoint(
+            workspace_id="api-workspace-model-gate",
+            stop_review_approved=True,
+        )
+        ensure_model_artifacts(
+            "api-workspace-model-gate",
+            ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
+        )
+        ready = readiness_endpoint(
+            workspace_id="api-workspace-model-gate",
+            stop_review_approved=True,
+        )
+
+        self.assertEqual(blocked["state"], "blocked")
+        self.assertEqual(blocked["artifact_isolation_state"], "warning")
+        self.assertEqual(ready["state"], "ready")
+        self.assertTrue(ready["can_run_real_smoke"])
+        self.assertFalse(ready["can_enable_live_output"])
+        self.assertEqual(ready["workspace_security_state"], "ready")
+        self.assertEqual(ready["artifact_isolation_state"], "ready")
+
     def test_case_review_endpoint_returns_indicators_and_report(self) -> None:
         app = create_app()
         response = endpoint(app, "review_case_endpoint")("case-001", locale="en")
@@ -549,6 +612,47 @@ class ApiAppTest(unittest.TestCase):
             )
 
         self.assertEqual(caught.exception.status_code, 400)
+
+    def test_workspace_security_endpoint_reports_encrypted_storage_gate(self) -> None:
+        workspace_root = TEST_OUTPUT_ROOT / f"security-workspaces-{uuid.uuid4()}"
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                workspace_root,
+                encryption_status_provider=_available_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        get_workspace_security = endpoint(app, "get_workspace_security")
+
+        created = create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-security-api",
+                created_by="investigator-001",
+                workspace_id="api-workspace-security",
+                data_sensitivity=DataSensitivity.ANONYMIZED,
+                storage_mode=StorageMode.ENCRYPTED_REQUIRED,
+            )
+        )
+        security = get_workspace_security("api-workspace-security")
+
+        self.assertEqual(created["manifest"]["storage_mode"], "encrypted_required")
+        self.assertEqual(security["state"], "ready")
+        self.assertTrue(security["requires_encrypted_storage"])
+        self.assertTrue(security["allows_sensitive_material"])
+        self.assertTrue(security["encryption_available"])
+        self.assertEqual(security["issue_count"], 0)
+
+        drift_app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                workspace_root,
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        drift_security = endpoint(drift_app, "get_workspace_security")("api-workspace-security")
+
+        self.assertEqual(drift_security["state"], "blocked")
+        self.assertFalse(drift_security["allows_sensitive_material"])
+        self.assertEqual(drift_security["issues"][0]["code"], "encrypted_runtime_unavailable")
 
     def test_question_drafts_can_be_answered_with_workspace_context(self) -> None:
         app = create_app(
@@ -1125,6 +1229,15 @@ def _unavailable_encryption_status() -> EncryptionStatus:
         backend=EncryptionBackend.STANDARD_SQLITE,
         available=False,
         detail="SQLCipher runtime not detected for test.",
+    )
+
+
+def _available_encryption_status() -> EncryptionStatus:
+    return EncryptionStatus(
+        backend=EncryptionBackend.SQLCIPHER,
+        available=True,
+        version="4.0-test",
+        detail="SQLCipher runtime detected for test.",
     )
 
 

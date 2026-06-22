@@ -97,6 +97,7 @@ from interrogaition.ai.local_model_runtime import (
     resolve_grounded_model_client,
     run_local_model_smoke,
 )
+from interrogaition.ai.model_experiment_gate import assess_model_experiment_readiness
 from interrogaition.ai.model_client import ModelClient
 from interrogaition.domain.models import (
     Actor,
@@ -147,6 +148,7 @@ from interrogaition.security.model_artifacts import (
     list_model_artifact_manifest,
     write_model_artifact,
 )
+from interrogaition.security.workspace_security import assess_workspace_security
 from interrogaition.storage.json_case_loader import load_case_from_json
 from interrogaition.storage.material_registry import (
     MaterialRegistry,
@@ -451,6 +453,36 @@ def create_app(
             )
         )
 
+    @app.get("/ai/local-model/experiment-readiness")
+    def get_local_model_experiment_readiness(
+        workspace_id: str | None = None,
+        stop_review_approved: bool = False,
+    ) -> dict[str, Any]:
+        workspace_security_state: str | None = None
+        artifact_isolation_state: str | None = None
+        if workspace_id:
+            try:
+                workspace = workspace_manager.open_workspace(workspace_id)
+                workspace_security = assess_workspace_security(
+                    manifest=workspace.manifest,
+                    encryption_status=workspace_manager.encryption_status(),
+                )
+                artifact_isolation = inspect_model_artifact_isolation(workspace)
+            except WorkspaceError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            workspace_security_state = workspace_security.state
+            artifact_isolation_state = artifact_isolation.state
+
+        return _to_jsonable(
+            assess_model_experiment_readiness(
+                config=local_model_config,
+                stop_review_approved=stop_review_approved,
+                workspace_id=workspace_id,
+                workspace_security_state=workspace_security_state,
+                artifact_isolation_state=artifact_isolation_state,
+            )
+        )
+
     @app.post("/workspaces")
     def create_workspace(request: CreateWorkspaceRequest) -> dict[str, Any]:
         try:
@@ -491,6 +523,31 @@ def create_app(
                 role=role,
                 action=action,
                 manifest=workspace.manifest,
+            )
+        )
+
+    @app.get("/workspaces/{workspace_id}/security")
+    def get_workspace_security(
+        workspace_id: str,
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        return _to_jsonable(
+            assess_workspace_security(
+                manifest=workspace.manifest,
+                encryption_status=workspace_manager.encryption_status(),
             )
         )
 
