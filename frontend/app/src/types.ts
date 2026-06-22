@@ -291,6 +291,37 @@ export type ModelExperimentReadiness = {
   issues: ModelExperimentIssue[];
 };
 
+export type StopReviewDecisionType = "approved" | "rejected";
+
+export type StopReviewDecision = {
+  decision_id: string;
+  audit_event_id: string;
+  event_hash: string | null;
+  workspace_id: string;
+  case_id: string;
+  gate_id: string;
+  decision: StopReviewDecisionType;
+  created_at: string;
+  created_by: string;
+  rationale: string;
+  checklist: string[];
+};
+
+export type StopReviewDecisionResponse = {
+  decision: StopReviewDecision;
+  audit_event: AuditEvent;
+  chain_valid: boolean;
+};
+
+export type StopReviewListResponse = {
+  workspace_id: string;
+  case_id: string;
+  gate_id: string | null;
+  latest: StopReviewDecision | null;
+  decisions: StopReviewDecision[];
+  chain_valid: boolean;
+};
+
 export type ModelArtifactIsolationStatus = {
   workspace_id: string;
   state: EnvironmentHealthState;

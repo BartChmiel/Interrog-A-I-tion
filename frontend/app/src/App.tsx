@@ -54,10 +54,12 @@ import {
   loadWorkspaceAccess,
   loadWorkspaceAudit,
   loadWorkspaceSecurity,
+  loadWorkspaceStopReviews,
   loadWorkspaceMaterials,
   recordGroundedSuggestionDecision,
   recordMaterialQuestionLinkDecision,
   recordOperatorActionDecision,
+  recordWorkspaceStopReview,
   reviewSessionClaim,
   registerWorkspaceMaterial,
   runLocalModelSmoke,
@@ -123,6 +125,8 @@ import type {
   RuntimeConfig,
   SessionAuditResponse,
   StarterMaterial,
+  StopReviewDecisionType,
+  StopReviewListResponse,
   WorkspaceAccessDecision,
   WorkspaceAuditResponse,
   WorkspaceResponse,
@@ -244,6 +248,7 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceSecurity, setWorkspaceSecurity] = useState<WorkspaceSecurityReport | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
+  const [stopReviewList, setStopReviewList] = useState<StopReviewListResponse | null>(null);
   const [workspaceAudit, setWorkspaceAudit] = useState<WorkspaceAuditResponse | null>(null);
   const [sessionAudit, setSessionAudit] = useState<SessionAuditResponse | null>(null);
   const [workspaceMaterials, setWorkspaceMaterials] = useState<MaterialRecord[]>([]);
@@ -271,6 +276,7 @@ export function App() {
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, GroundedSuggestionDecision>>({});
   const [isGroundedSuggestionsLoading, setIsGroundedSuggestionsLoading] = useState(false);
+  const [isStopReviewSubmitting, setIsStopReviewSubmitting] = useState(false);
   const [groundedSuggestionsError, setGroundedSuggestionsError] = useState<string | null>(null);
   const [groundedCacheTick, setGroundedCacheTick] = useState(0);
   const groundedCacheRef = useRef<
@@ -626,6 +632,7 @@ export function App() {
         artifactIsolation,
         workspaceSecurityReport,
         experimentReadiness,
+        stopReviews,
         materialList,
         draftList,
         materialLinks,
@@ -638,6 +645,7 @@ export function App() {
         loadModelArtifactIsolation(config),
         loadWorkspaceSecurity(config),
         loadLocalModelExperimentReadiness(config),
+        loadStopReviewsOrNull(),
         loadWorkspaceMaterials(config),
         loadQuestionDraftsOrEmpty(),
         loadMaterialQuestionLinksOrEmpty(locale),
@@ -653,6 +661,7 @@ export function App() {
       setModelArtifactIsolation(artifactIsolation);
       setWorkspaceSecurity(workspaceSecurityReport);
       setModelExperimentReadiness(experimentReadiness);
+      setStopReviewList(stopReviews);
       setWorkspaceAudit(auditTrail);
       setWorkspace(ensuredWorkspace);
       setWorkspaceAccess(access);
@@ -674,6 +683,7 @@ export function App() {
       setWorkspace(null);
       setWorkspaceSecurity(null);
       setWorkspaceAccess(null);
+      setStopReviewList(null);
       setWorkspaceAudit(null);
       setSessionAudit(null);
       setWorkspaceMaterials([]);
@@ -745,6 +755,15 @@ export function App() {
       return await loadWorkspaceAudit(config);
     } catch (error) {
       console.warn("Could not refresh workspace audit trail.", error);
+      return null;
+    }
+  }
+
+  async function loadStopReviewsOrNull(): Promise<StopReviewListResponse | null> {
+    try {
+      return await loadWorkspaceStopReviews(config);
+    } catch (error) {
+      console.warn("Could not refresh STOP review decisions.", error);
       return null;
     }
   }
@@ -1128,6 +1147,46 @@ export function App() {
       setStatusKey("artifactIsolationFailed");
     } finally {
       setIsArtifactIsolationSubmitting(false);
+    }
+  }
+
+  async function submitStopReviewDecision(decision: StopReviewDecisionType) {
+    if (apiMode !== "online") {
+      setStatusKey("offline");
+      return;
+    }
+
+    setIsStopReviewSubmitting(true);
+    try {
+      await recordWorkspaceStopReview(config, {
+        decision,
+        rationale:
+          decision === "approved"
+            ? "Operator approved a controlled real-model smoke run from the Monitor panel."
+            : "Operator rejected or reopened the controlled real-model smoke gate from the Monitor panel.",
+        checklist:
+          decision === "approved"
+            ? [
+                "Workspace security report reviewed.",
+                "Model artifact isolation reviewed.",
+                "Smoke prompt remains synthetic and case-data free.",
+              ]
+            : [],
+      });
+      const [readiness, stopReviews, auditTrail] = await Promise.all([
+        loadLocalModelExperimentReadiness(config),
+        loadStopReviewsOrNull(),
+        loadWorkspaceAuditOrNull(),
+      ]);
+      setModelExperimentReadiness(readiness);
+      setStopReviewList(stopReviews);
+      setWorkspaceAudit(auditTrail);
+      setStatusKey(decision === "approved" ? "stopReviewApproved" : "stopReviewRejected");
+    } catch (error) {
+      console.error("Could not record STOP review decision.", error);
+      setStatusKey("stopReviewFailed");
+    } finally {
+      setIsStopReviewSubmitting(false);
     }
   }
 
@@ -1937,6 +1996,7 @@ export function App() {
                     groundedSuggestionCount={groundedSuggestions.length}
                     isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
                     isModelSmokeRunning={isModelSmokeRunning}
+                    isStopReviewSubmitting={isStopReviewSubmitting}
                     locale={locale}
                     localModelConfig={localModelConfig}
                     localModelSmoke={localModelSmoke}
@@ -1946,7 +2006,10 @@ export function App() {
                     materials={workspaceMaterials}
                     onArtifactIsolation={() => void initializeModelArtifactIsolation()}
                     onModelSmoke={(executeReal) => void smokeLocalModel(executeReal)}
+                    onStopReviewDecision={(decision) => void submitStopReviewDecision(decision)}
+                    stopReviewList={stopReviewList}
                     workspace={workspace}
+                    workspaceAudit={workspaceAudit}
                     workspaceSecurity={workspaceSecurity}
                   />
                 </CollapsibleSection>
@@ -2859,8 +2922,18 @@ function auditEventDetailPairs(event: AuditEvent): Array<[string, unknown]> {
     "target_question_id",
     "target_tab",
     "material_id",
+    "gate_id",
+    "readiness_state",
+    "issue_codes",
+    "ok",
+    "real_model_invoked",
+    "result_model",
+    "response_preview_hash",
     "decision",
     "decision_type",
+    "created_by",
+    "rationale",
+    "checklist",
     "action_title",
     "model_id",
     "prompt_version",
@@ -2892,6 +2965,11 @@ function auditActionLabel(action: string, locale: Locale): string {
       operator_action_opened: "Otwarto akcję operatora",
       operator_action_skipped: "Pominięto akcję operatora",
       operator_action_dismissed: "Zamknięto akcję operatora",
+      stop_review_approved: "Zatwierdzono STOP",
+      stop_review_rejected: "Odrzucono STOP",
+      local_model_smoke_blocked: "Zablokowano smoke modelu",
+      local_model_smoke_completed: "Wykonano smoke modelu",
+      local_model_smoke_failed: "Smoke modelu nieudany",
     },
     en: {
       session_started: "Session started",
@@ -2906,6 +2984,11 @@ function auditActionLabel(action: string, locale: Locale): string {
       operator_action_opened: "Operator action opened",
       operator_action_skipped: "Operator action skipped",
       operator_action_dismissed: "Operator action dismissed",
+      stop_review_approved: "STOP approved",
+      stop_review_rejected: "STOP rejected",
+      local_model_smoke_blocked: "Model smoke blocked",
+      local_model_smoke_completed: "Model smoke completed",
+      local_model_smoke_failed: "Model smoke failed",
     },
   };
   return labels[locale][action] ?? action.replaceAll("_", " ");
@@ -2955,17 +3038,27 @@ function auditDetailLabel(key: string, locale: Locale): string {
       artifact_warning: "artefakty",
       case_id: "sprawa",
       context_hash: "context",
+      created_by: "operator",
       decision: "decyzja",
       decision_type: "typ decyzji",
       finding_count: "ustalenia",
+      gate_id: "bramka",
+      issue_codes: "blokady",
       indicator_count: "wskaźniki",
+      checklist: "checklista",
       material_id: "materiał",
       model_id: "model",
+      ok: "wynik",
       output_hash: "output",
       participant_id: "osoba",
       prompt_hash: "prompt",
       prompt_version: "wersja promptu",
       question_id: "pytanie",
+      rationale: "uzasadnienie",
+      readiness_state: "readiness",
+      real_model_invoked: "realny model",
+      response_preview_hash: "preview",
+      result_model: "model",
       session_id: "sesja",
       target_question_id: "cel pytania",
       target_tab: "zakładka",
@@ -2975,17 +3068,27 @@ function auditDetailLabel(key: string, locale: Locale): string {
       artifact_warning: "artifacts",
       case_id: "case",
       context_hash: "context",
+      created_by: "operator",
       decision: "decision",
       decision_type: "decision type",
       finding_count: "findings",
+      gate_id: "gate",
+      issue_codes: "blocks",
       indicator_count: "indicators",
+      checklist: "checklist",
       material_id: "material",
       model_id: "model",
+      ok: "result",
       output_hash: "output",
       participant_id: "participant",
       prompt_hash: "prompt",
       prompt_version: "prompt version",
       question_id: "question",
+      rationale: "rationale",
+      readiness_state: "readiness",
+      real_model_invoked: "real model",
+      response_preview_hash: "preview",
+      result_model: "model",
       session_id: "session",
       target_question_id: "target question",
       target_tab: "tab",
@@ -4377,6 +4480,7 @@ function SecurityPanel({
   groundedSuggestionCount,
   isArtifactIsolationSubmitting,
   isModelSmokeRunning,
+  isStopReviewSubmitting,
   locale,
   localModelConfig,
   localModelSmoke,
@@ -4386,7 +4490,10 @@ function SecurityPanel({
   materials,
   onArtifactIsolation,
   onModelSmoke,
+  onStopReviewDecision,
+  stopReviewList,
   workspace,
+  workspaceAudit,
   workspaceSecurity,
 }: {
   accessDecision: WorkspaceAccessDecision | null;
@@ -4398,6 +4505,7 @@ function SecurityPanel({
   groundedSuggestionCount: number;
   isArtifactIsolationSubmitting: boolean;
   isModelSmokeRunning: boolean;
+  isStopReviewSubmitting: boolean;
   locale: Locale;
   localModelConfig: LocalModelConfig | null;
   localModelSmoke: LocalModelSmokeResult | null;
@@ -4407,7 +4515,10 @@ function SecurityPanel({
   materials: MaterialRecord[];
   onArtifactIsolation: () => void;
   onModelSmoke: (executeReal: boolean) => void;
+  onStopReviewDecision: (decision: StopReviewDecisionType) => void;
+  stopReviewList: StopReviewListResponse | null;
   workspace: WorkspaceResponse | null;
+  workspaceAudit: WorkspaceAuditResponse | null;
   workspaceSecurity: WorkspaceSecurityReport | null;
 }) {
   const manifest = workspace?.manifest;
@@ -4456,6 +4567,9 @@ function SecurityPanel({
       ? text(locale, "liveModelEnabled")
       : text(locale, "liveModelBlocked")
     : text(locale, "unknown");
+  const modelSmokeAuditEvents = [...(workspaceAudit?.events ?? [])]
+    .filter((event) => event.object_type === "model_smoke")
+    .reverse();
 
   const body = (
     <>
@@ -4525,6 +4639,17 @@ function SecurityPanel({
         localModelConfig={localModelConfig}
         localModelSmoke={localModelSmoke}
         visibleSuggestionCount={groundedSuggestionCount}
+      />
+      <StopReviewPanel
+        isSubmitting={isStopReviewSubmitting}
+        locale={locale}
+        modelExperimentReadiness={modelExperimentReadiness}
+        onDecision={onStopReviewDecision}
+        stopReviewList={stopReviewList}
+      />
+      <ModelSmokeAuditPanel
+        events={modelSmokeAuditEvents}
+        locale={locale}
       />
       <div className="model-runtime-panel" data-state={modelState}>
         <div className="model-runtime-header">
@@ -4602,6 +4727,162 @@ function SecurityPanel({
       />
       {body}
     </section>
+  );
+}
+
+function StopReviewPanel({
+  isSubmitting,
+  locale,
+  modelExperimentReadiness,
+  onDecision,
+  stopReviewList,
+}: {
+  isSubmitting: boolean;
+  locale: Locale;
+  modelExperimentReadiness: ModelExperimentReadiness | null;
+  onDecision: (decision: StopReviewDecisionType) => void;
+  stopReviewList: StopReviewListResponse | null;
+}) {
+  const latest = stopReviewList?.latest ?? null;
+  const state: EnvironmentHealthState =
+    latest?.decision === "approved"
+      ? "ready"
+      : latest?.decision === "rejected"
+        ? "blocked"
+        : "warning";
+  const stopIssue =
+    modelExperimentReadiness?.issues.find((issue) => issue.code === "stop_review_required")
+    ?? modelExperimentReadiness?.issues[0]
+    ?? null;
+  const decisionLabel = latest
+    ? stopReviewDecisionLabel(latest.decision, locale)
+    : text(locale, "stopReviewMissing");
+  const latestMeta = latest
+    ? `${latest.created_by} / ${formatDecisionTime(latest.created_at)}${
+        latest.event_hash ? ` / ${shortHash(latest.event_hash)}` : ""
+      }`
+    : text(locale, "stopReviewMissingDetail");
+
+  return (
+    <div className="stop-review-panel" data-state={state}>
+      <div className="model-runtime-header">
+        <span className="security-icon">
+          <ListChecks size={15} />
+        </span>
+        <div>
+          <span className="security-label">{text(locale, "stopReviewRecord")}</span>
+          <strong>{decisionLabel}</strong>
+          <span className="security-detail">{latestMeta}</span>
+        </div>
+      </div>
+      <p>{latest?.rationale ?? stopIssue?.detail ?? text(locale, "stopReviewMissingDetail")}</p>
+      {latest?.checklist.length ? (
+        <ul>
+          {latest.checklist.slice(0, 3).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : null}
+      {stopReviewList?.decisions.length ? (
+        <div className="stop-review-history">
+          <span>{text(locale, "stopReviewHistory")}</span>
+          {stopReviewList.decisions.slice(0, 3).map((decision) => (
+            <article data-decision={decision.decision} key={decision.decision_id}>
+              <History size={13} />
+              <strong>{stopReviewDecisionLabel(decision.decision, locale)}</strong>
+              <em>{formatDecisionTime(decision.created_at)}</em>
+              {decision.event_hash ? <small>{shortHash(decision.event_hash)}</small> : null}
+            </article>
+          ))}
+        </div>
+      ) : null}
+      <div className="stop-review-actions">
+        <button
+          disabled={isSubmitting || latest?.decision === "approved"}
+          type="button"
+          onClick={() => onDecision("approved")}
+        >
+          <Check size={14} />
+          {isSubmitting ? "..." : text(locale, "approveStopReview")}
+        </button>
+        <button
+          disabled={isSubmitting || latest?.decision === "rejected"}
+          type="button"
+          onClick={() => onDecision("rejected")}
+        >
+          <X size={14} />
+          {isSubmitting ? "..." : text(locale, "rejectStopReview")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ModelSmokeAuditPanel({
+  events,
+  locale,
+}: {
+  events: AuditEvent[];
+  locale: Locale;
+}) {
+  const latest = events[0] ?? null;
+  const latestDetail = latest?.details ?? {};
+  const state: EnvironmentHealthState = latest
+    ? latest.action === "local_model_smoke_completed" && latestDetail.ok === true
+      ? "ready"
+      : "blocked"
+    : "unknown";
+  const issueCodes = Array.isArray(latestDetail.issue_codes)
+    ? latestDetail.issue_codes.filter((value): value is string => typeof value === "string")
+    : [];
+  const latestMeta = latest
+    ? `${formatDecisionTime(latest.timestamp)}${latest.event_hash ? ` / ${shortHash(latest.event_hash)}` : ""}`
+    : text(locale, "modelSmokeAuditEmpty");
+  const latestModel = typeof latestDetail.result_model === "string" && latestDetail.result_model
+    ? latestDetail.result_model
+    : typeof latestDetail.configured_model === "string" && latestDetail.configured_model
+      ? latestDetail.configured_model
+      : text(locale, "unknown");
+  const invoked = latestDetail.real_model_invoked === true;
+
+  return (
+    <div className="model-smoke-audit-panel" data-state={state}>
+      <div className="model-runtime-header">
+        <span className="security-icon">
+          <Activity size={15} />
+        </span>
+        <div>
+          <span className="security-label">{text(locale, "modelSmokeAudit")}</span>
+          <strong>{latest ? auditActionLabel(latest.action, locale) : text(locale, "modelSmokeAuditEmpty")}</strong>
+          <span className="security-detail">{latestMeta}</span>
+        </div>
+      </div>
+      {latest ? (
+        <>
+          <p>
+            {latestModel} / {invoked ? text(locale, "realModelInvoked") : text(locale, "noRealModel")}
+          </p>
+          {issueCodes.length ? (
+            <p>
+              {text(locale, "modelSmokeAuditBlocks")}: {issueCodes.join(", ")}
+            </p>
+          ) : null}
+          <div className="model-smoke-audit-list">
+            <span>{text(locale, "modelSmokeAuditHistory")}</span>
+            {events.slice(0, 3).map((event) => (
+              <article data-action={event.action} key={event.id}>
+                <History size={13} />
+                <strong>{auditActionLabel(event.action, locale)}</strong>
+                <em>{formatDecisionTime(event.timestamp)}</em>
+                {event.event_hash ? <small>{shortHash(event.event_hash)}</small> : null}
+              </article>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p>{text(locale, "modelSmokeAuditEmpty")}</p>
+      )}
+    </div>
   );
 }
 
@@ -4769,6 +5050,14 @@ function environmentStateShortLabel(state: EnvironmentHealthState, locale: Local
     },
   };
   return labels[locale][state];
+}
+
+function stopReviewDecisionLabel(decision: StopReviewDecisionType, locale: Locale): string {
+  const labels: Record<StopReviewDecisionType, CopyKey> = {
+    approved: "stopReviewDecisionApproved",
+    rejected: "stopReviewDecisionRejected",
+  };
+  return text(locale, labels[decision]);
 }
 
 function storageModeLabel(

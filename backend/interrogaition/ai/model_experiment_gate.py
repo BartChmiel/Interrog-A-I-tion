@@ -78,7 +78,7 @@ def assess_model_experiment_readiness(
                 code="stop_review_required",
                 severity="error",
                 detail="A strategic STOP review approval is required before a real-model experiment.",
-                remediation="Record the approval decision before passing stop_review_approved=true.",
+                remediation="Record an audited STOP approval before running the real-model smoke experiment.",
             )
         )
     if workspace_id is None:

@@ -23,6 +23,8 @@ from interrogaition.ai.ollama_client import OllamaClient
 DEFAULT_DETERMINISTIC_MODEL = "deterministic-grounded-fake"
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_OLLAMA_MODEL = "llama3.1:8b"
+LOCAL_MODEL_SMOKE_SYSTEM_PROMPT = "Return a compact JSON object for a local model smoke check."
+LOCAL_MODEL_SMOKE_USER_PROMPT = '{"task":"interrogaition-local-model-smoke","sensitive_data":false}'
 
 
 @dataclass(frozen=True)
@@ -174,8 +176,8 @@ def run_local_model_smoke(
         )
 
     request = ModelRequest(
-        system_prompt="Return a compact JSON object for a local model smoke check.",
-        user_prompt='{"task":"interrogaition-local-model-smoke","sensitive_data":false}',
+        system_prompt=LOCAL_MODEL_SMOKE_SYSTEM_PROMPT,
+        user_prompt=LOCAL_MODEL_SMOKE_USER_PROMPT,
         temperature=config.temperature,
     )
 

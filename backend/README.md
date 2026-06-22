@@ -116,6 +116,8 @@ POST /workspaces
 GET /workspaces/{workspace_id}
 GET /workspaces/{workspace_id}/access
 GET /workspaces/{workspace_id}/security
+GET /workspaces/{workspace_id}/stop-reviews
+POST /workspaces/{workspace_id}/stop-reviews
 GET /workspaces/{workspace_id}/model-artifacts
 POST /workspaces/{workspace_id}/model-artifacts/isolation
 GET /workspaces/{workspace_id}/model-artifacts/manifest
@@ -141,6 +143,10 @@ $env:INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT='1'
 ```
 
 See `config/local-ai-developer.ps1.example` for a developer shell setup. This prevents real LLM output from entering live workflows by configuration drift alone.
+
+Controlled real-model smoke readiness is also gated by workspace state: the readiness endpoint derives STOP approval from the append-only workspace audit log, plus workspace security and model artifact isolation status. Record approval or rejection through `POST /workspaces/{workspace_id}/stop-reviews`; the newest STOP decision wins.
+
+`POST /ai/local-model/smoke?execute_real=true` enforces the same readiness gate server-side and requires `workspace_id`. If the workspace security report, model artifact isolation, runtime configuration, or audited STOP decision is not ready, the endpoint returns a blocked smoke result without invoking the real model. Real-smoke attempts with a workspace are written to the workspace audit chain as blocked, completed, or failed events, including readiness issue codes, runtime metadata, and hashes of the smoke prompt contract and response preview.
 
 ## Materials, Grounding, and Suggestions
 

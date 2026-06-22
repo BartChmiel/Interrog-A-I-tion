@@ -37,6 +37,9 @@ import type {
   SeedMaterialsResponse,
   SessionAuditResponse,
   SessionReviewResponse,
+  StopReviewDecisionResponse,
+  StopReviewDecisionType,
+  StopReviewListResponse,
   WorkspaceAuditResponse,
   WorkspaceAccessDecision,
   WorkspaceResponse,
@@ -123,6 +126,12 @@ export type CreateQuestionDraftPayload = {
   locale: string;
 };
 
+export type StopReviewDecisionPayload = {
+  decision: StopReviewDecisionType;
+  rationale: string;
+  checklist?: string[];
+};
+
 export async function loadCaseCatalog(config: RuntimeConfig, locale: string): Promise<CaseCatalogResponse> {
   return fetchJson(config, `/cases?locale=${locale}`);
 }
@@ -205,7 +214,12 @@ export async function runLocalModelSmoke(
   config: RuntimeConfig,
   executeReal = false,
 ): Promise<LocalModelSmokeResult> {
-  const query = executeReal ? "?execute_real=true" : "";
+  const query = executeReal
+    ? `?${new URLSearchParams({
+        execute_real: "true",
+        workspace_id: config.workspaceId,
+      }).toString()}`
+    : "";
   return fetchJson(config, `/ai/local-model/smoke${query}`, {
     method: "POST",
   });
@@ -213,11 +227,9 @@ export async function runLocalModelSmoke(
 
 export async function loadLocalModelExperimentReadiness(
   config: RuntimeConfig,
-  stopReviewApproved = false,
 ): Promise<ModelExperimentReadiness> {
   const query = new URLSearchParams({
     workspace_id: config.workspaceId,
-    stop_review_approved: String(stopReviewApproved),
   });
   return fetchJson(config, `/ai/local-model/experiment-readiness?${query.toString()}`);
 }
@@ -270,6 +282,27 @@ export async function loadWorkspaceAccess(
 
 export async function loadWorkspaceSecurity(config: RuntimeConfig): Promise<WorkspaceSecurityReport> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/security`);
+}
+
+export async function loadWorkspaceStopReviews(config: RuntimeConfig): Promise<StopReviewListResponse> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/stop-reviews`);
+}
+
+export async function recordWorkspaceStopReview(
+  config: RuntimeConfig,
+  payload: StopReviewDecisionPayload,
+): Promise<StopReviewDecisionResponse> {
+  return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/stop-reviews`, {
+    method: "POST",
+    body: JSON.stringify({
+      gate_id: "local_model_real_smoke",
+      decision: payload.decision,
+      created_by: "local-ui",
+      rationale: payload.rationale,
+      checklist: payload.checklist ?? [],
+      role: "admin",
+    }),
+  });
 }
 
 export async function loadWorkspaceAudit(config: RuntimeConfig): Promise<WorkspaceAuditResponse> {

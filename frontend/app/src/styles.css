@@ -2442,6 +2442,8 @@ h2 {
 .environment-health,
 .model-runtime-panel,
 .model-artifact-panel,
+.stop-review-panel,
+.model-smoke-audit-panel,
 .evidence-alignment,
 .material-preview,
 .material-link-audit details,
@@ -2723,6 +2725,8 @@ h2 {
 .environment-health[data-state="ready"],
 .model-runtime-panel[data-state="ready"],
 .model-artifact-panel[data-state="ready"],
+.stop-review-panel[data-state="ready"],
+.model-smoke-audit-panel[data-state="ready"],
 .material-card[data-state="ready"] {
   border-color: #b7dec9;
   background: linear-gradient(180deg, #fff 0, #f7fcfa 100%);
@@ -2732,6 +2736,8 @@ h2 {
 .environment-health[data-state="warning"],
 .model-runtime-panel[data-state="warning"],
 .model-artifact-panel[data-state="warning"],
+.stop-review-panel[data-state="warning"],
+.model-smoke-audit-panel[data-state="warning"],
 .material-card[data-state="warning"] {
   border-color: #ead49b;
   background: linear-gradient(180deg, #fff 0, #fffaf0 100%);
@@ -2740,6 +2746,8 @@ h2 {
 .security-item[data-state="blocked"],
 .environment-health[data-state="blocked"],
 .model-artifact-panel[data-state="blocked"],
+.stop-review-panel[data-state="blocked"],
+.model-smoke-audit-panel[data-state="blocked"],
 .material-card[data-state="blocked"] {
   border-color: #e6b3ad;
   background: linear-gradient(180deg, #fff 0, #fff7f6 100%);
@@ -2758,7 +2766,8 @@ h2 {
 .security-item[data-state="ready"] .security-icon,
 .environment-health[data-state="ready"] .security-icon,
 .model-runtime-panel[data-state="ready"] .security-icon,
-.model-artifact-panel[data-state="ready"] .security-icon {
+.model-artifact-panel[data-state="ready"] .security-icon,
+.model-smoke-audit-panel[data-state="ready"] .security-icon {
   background: var(--ok-soft);
   color: var(--ok);
 }
@@ -2766,14 +2775,16 @@ h2 {
 .security-item[data-state="warning"] .security-icon,
 .environment-health[data-state="warning"] .security-icon,
 .model-runtime-panel[data-state="warning"] .security-icon,
-.model-artifact-panel[data-state="warning"] .security-icon {
+.model-artifact-panel[data-state="warning"] .security-icon,
+.model-smoke-audit-panel[data-state="warning"] .security-icon {
   background: var(--warning-soft);
   color: var(--warning);
 }
 
 .security-item[data-state="blocked"] .security-icon,
 .environment-health[data-state="blocked"] .security-icon,
-.model-artifact-panel[data-state="blocked"] .security-icon {
+.model-artifact-panel[data-state="blocked"] .security-icon,
+.model-smoke-audit-panel[data-state="blocked"] .security-icon {
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -2796,8 +2807,12 @@ h2 {
 .security-detail,
 .model-runtime-panel p,
 .model-artifact-panel p,
+.stop-review-panel p,
+.model-smoke-audit-panel p,
 .model-runtime-panel ul,
 .model-artifact-panel ul,
+.stop-review-panel ul,
+.model-smoke-audit-panel ul,
 .environment-health-header span,
 .environment-health-summary,
 .environment-health-checks em,
@@ -2825,6 +2840,8 @@ h2 {
 
 .model-runtime-panel,
 .model-artifact-panel,
+.stop-review-panel,
+.model-smoke-audit-panel,
 .environment-health {
   display: grid;
   gap: 9px;
@@ -2840,7 +2857,9 @@ h2 {
 }
 
 .model-runtime-panel ul,
-.model-artifact-panel ul {
+.model-artifact-panel ul,
+.stop-review-panel ul,
+.model-smoke-audit-panel ul {
   margin: 0;
   padding-left: 16px;
   display: grid;
@@ -2849,13 +2868,17 @@ h2 {
 }
 
 .model-runtime-panel p,
-.model-artifact-panel p {
+.model-artifact-panel p,
+.stop-review-panel p,
+.model-smoke-audit-panel p {
   margin: 0;
   overflow-wrap: anywhere;
 }
 
 .model-runtime-panel button,
 .model-artifact-panel button,
+.stop-review-panel button,
+.model-smoke-audit-panel button,
 .grounded-suggestion-actions button,
 .material-card-footer button {
   border: 1px solid var(--line-strong);
@@ -2866,16 +2889,98 @@ h2 {
 
 .model-runtime-panel button,
 .model-artifact-panel button,
+.stop-review-panel button,
+.model-smoke-audit-panel button,
 .material-form button {
   width: 100%;
 }
 
 .model-runtime-panel button:hover,
 .model-artifact-panel button:hover,
+.stop-review-panel button:hover,
+.model-smoke-audit-panel button:hover,
 .grounded-suggestion-actions button:hover,
 .material-card-footer button:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.stop-review-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stop-review-history,
+.model-smoke-audit-list {
+  display: grid;
+  gap: 6px;
+}
+
+.stop-review-history > span,
+.model-smoke-audit-list > span {
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.stop-review-history article,
+.model-smoke-audit-list article {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 7px;
+}
+
+.stop-review-history article[data-decision="approved"] {
+  border-color: rgba(29, 128, 86, 0.22);
+}
+
+.model-smoke-audit-list article[data-action="local_model_smoke_completed"] {
+  border-color: rgba(29, 128, 86, 0.22);
+}
+
+.stop-review-history article[data-decision="rejected"] {
+  border-color: rgba(184, 73, 55, 0.22);
+}
+
+.model-smoke-audit-list article[data-action="local_model_smoke_blocked"],
+.model-smoke-audit-list article[data-action="local_model_smoke_failed"] {
+  border-color: rgba(184, 73, 55, 0.22);
+}
+
+.stop-review-history strong,
+.stop-review-history em,
+.stop-review-history small,
+.model-smoke-audit-list strong,
+.model-smoke-audit-list em,
+.model-smoke-audit-list small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stop-review-history strong,
+.model-smoke-audit-list strong {
+  color: var(--heading);
+  font-size: 12px;
+}
+
+.stop-review-history em,
+.stop-review-history small,
+.model-smoke-audit-list em,
+.model-smoke-audit-list small {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
 }
 
 .environment-health-header {

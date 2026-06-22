@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -92,12 +93,18 @@ from interrogaition.analysis.material_link_decisions import (
 )
 from interrogaition.ai.grounded_suggestion_service import GroundedSuggestionResult, generate_grounded_suggestions
 from interrogaition.ai.local_model_runtime import (
+    LOCAL_MODEL_SMOKE_SYSTEM_PROMPT,
+    LOCAL_MODEL_SMOKE_USER_PROMPT,
+    LocalModelSmokeResult,
     LocalModelRuntimeConfig,
     load_local_model_runtime_config,
     resolve_grounded_model_client,
     run_local_model_smoke,
 )
-from interrogaition.ai.model_experiment_gate import assess_model_experiment_readiness
+from interrogaition.ai.model_experiment_gate import (
+    ModelExperimentReadinessReport,
+    assess_model_experiment_readiness,
+)
 from interrogaition.ai.model_client import ModelClient
 from interrogaition.domain.models import (
     Actor,
@@ -167,6 +174,8 @@ SYNTHETIC_CASES_ROOT = PROJECT_ROOT / "data" / "synthetic"
 DEFAULT_DATABASE_PATH = BACKEND_ROOT / "local-data" / "interrogaition.sqlite3"
 DEFAULT_WORKSPACE_ROOT = BACKEND_ROOT / "local-data" / "workspaces"
 REQUIRED_CLAIM_FIELDS = ("id", "subject", "attribute", "value")
+MODEL_EXPERIMENT_STOP_GATE_ID = "local_model_real_smoke"
+STOP_REVIEW_DECISIONS = {"approved", "rejected"}
 
 
 @dataclass(frozen=True)
@@ -294,6 +303,16 @@ class OperatorActionDecisionRequest:
     context_hash: str = ""
     output_hash: str = ""
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
+
+
+@dataclass(frozen=True)
+class StopReviewDecisionRequest:
+    gate_id: str = MODEL_EXPERIMENT_STOP_GATE_ID
+    decision: str = "approved"
+    created_by: str = "local-ui"
+    rationale: str = ""
+    checklist: list[str] = field(default_factory=list)
+    role: WorkspaceRole = WorkspaceRole.ADMIN
 
 
 @dataclass(frozen=True)
@@ -445,43 +464,68 @@ def create_app(
         }
 
     @app.post("/ai/local-model/smoke")
-    def smoke_local_model(execute_real: bool = Query(default=False)) -> dict[str, Any]:
-        return _to_jsonable(
-            run_local_model_smoke(
-                local_model_config,
-                execute_real=execute_real,
+    def smoke_local_model(
+        execute_real: bool = False,
+        workspace_id: str | None = None,
+    ) -> dict[str, Any]:
+        effective_workspace_id = workspace_id.strip() if isinstance(workspace_id, str) and workspace_id.strip() else None
+        workspace: CaseWorkspace | None = None
+        if execute_real:
+            try:
+                if effective_workspace_id:
+                    workspace = workspace_manager.open_workspace(effective_workspace_id)
+                readiness = _assess_local_model_experiment_readiness(
+                    workspace_manager=workspace_manager,
+                    store=store,
+                    config=local_model_config,
+                    workspace_id=effective_workspace_id,
+                )
+            except WorkspaceError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            if not readiness.can_run_real_smoke:
+                result = _blocked_local_model_smoke(local_model_config, readiness)
+                if workspace is not None:
+                    _append_local_model_smoke_audit_event(
+                        store=store,
+                        workspace=workspace,
+                        action="local_model_smoke_blocked",
+                        readiness=readiness,
+                        result=result,
+                    )
+                return _to_jsonable(result)
+
+        result = run_local_model_smoke(
+            local_model_config,
+            execute_real=execute_real,
+            model_client=grounded_model_client_override if execute_real else None,
+        )
+        if execute_real and workspace is not None:
+            _append_local_model_smoke_audit_event(
+                store=store,
+                workspace=workspace,
+                action="local_model_smoke_completed" if result.ok else "local_model_smoke_failed",
+                readiness=readiness,
+                result=result,
             )
+        return _to_jsonable(
+            result
         )
 
     @app.get("/ai/local-model/experiment-readiness")
     def get_local_model_experiment_readiness(
         workspace_id: str | None = None,
-        stop_review_approved: bool = False,
     ) -> dict[str, Any]:
-        workspace_security_state: str | None = None
-        artifact_isolation_state: str | None = None
-        if workspace_id:
-            try:
-                workspace = workspace_manager.open_workspace(workspace_id)
-                workspace_security = assess_workspace_security(
-                    manifest=workspace.manifest,
-                    encryption_status=workspace_manager.encryption_status(),
+        try:
+            return _to_jsonable(
+                _assess_local_model_experiment_readiness(
+                    workspace_manager=workspace_manager,
+                    store=store,
+                    config=local_model_config,
+                    workspace_id=workspace_id,
                 )
-                artifact_isolation = inspect_model_artifact_isolation(workspace)
-            except WorkspaceError as exc:
-                raise HTTPException(status_code=404, detail=str(exc)) from exc
-            workspace_security_state = workspace_security.state
-            artifact_isolation_state = artifact_isolation.state
-
-        return _to_jsonable(
-            assess_model_experiment_readiness(
-                config=local_model_config,
-                stop_review_approved=stop_review_approved,
-                workspace_id=workspace_id,
-                workspace_security_state=workspace_security_state,
-                artifact_isolation_state=artifact_isolation_state,
             )
-        )
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @app.post("/workspaces")
     def create_workspace(request: CreateWorkspaceRequest) -> dict[str, Any]:
@@ -1351,6 +1395,80 @@ def create_app(
             "chain_valid": store.verify_audit_chain(),
         }
 
+    @app.post("/workspaces/{workspace_id}/stop-reviews")
+    def record_workspace_stop_review(
+        workspace_id: str,
+        request: StopReviewDecisionRequest,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=request.role,
+            action=WorkspaceAction.MANAGE_WORKSPACE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        _validate_stop_review_decision(request)
+        normalized_decision = request.decision.strip().lower()
+        audit_event = store.append_audit_event(
+            actor=Actor.HUMAN,
+            action=f"stop_review_{normalized_decision}",
+            object_type="stop_review",
+            object_id=request.gate_id,
+            details={
+                "workspace_id": workspace_id,
+                "case_id": workspace.manifest.case_id,
+                "gate_id": request.gate_id,
+                "decision": normalized_decision,
+                "created_by": request.created_by.strip(),
+                "rationale": request.rationale.strip(),
+                "checklist": [item.strip() for item in request.checklist if item.strip()],
+            },
+        )
+        return {
+            "decision": _stop_review_decision_from_event(audit_event),
+            "audit_event": _to_jsonable(audit_event),
+            "chain_valid": store.verify_audit_chain(),
+        }
+
+    @app.get("/workspaces/{workspace_id}/stop-reviews")
+    def list_workspace_stop_reviews(
+        workspace_id: str,
+        gate_id: str | None = Query(default=None),
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        events = _stop_review_events(
+            _workspace_audit_events(store.list_audit_events(), workspace_id),
+            gate_id=gate_id,
+        )
+        decisions = [_stop_review_decision_from_event(event) for event in reversed(events)]
+        return {
+            "workspace_id": workspace_id,
+            "case_id": workspace.manifest.case_id,
+            "gate_id": gate_id,
+            "latest": decisions[0] if decisions else None,
+            "decisions": decisions,
+            "chain_valid": store.verify_audit_chain(),
+        }
+
     @app.post("/workspaces/{workspace_id}/exports/integrity-preview")
     def preview_workspace_export_integrity(
         workspace_id: str,
@@ -1809,6 +1927,109 @@ def _case_catalog_item(case: Case) -> dict[str, Any]:
     }
 
 
+def _assess_local_model_experiment_readiness(
+    *,
+    workspace_manager: CaseWorkspaceManager,
+    store: SessionStore,
+    config: LocalModelRuntimeConfig,
+    workspace_id: str | None,
+) -> ModelExperimentReadinessReport:
+    effective_workspace_id = workspace_id.strip() if isinstance(workspace_id, str) and workspace_id.strip() else None
+    workspace_security_state: str | None = None
+    artifact_isolation_state: str | None = None
+    stop_review_approved = False
+    if effective_workspace_id:
+        workspace = workspace_manager.open_workspace(effective_workspace_id)
+        workspace_security = assess_workspace_security(
+            manifest=workspace.manifest,
+            encryption_status=workspace_manager.encryption_status(),
+        )
+        artifact_isolation = inspect_model_artifact_isolation(workspace)
+        workspace_security_state = workspace_security.state
+        artifact_isolation_state = artifact_isolation.state
+        stop_review_approved = _is_stop_review_approved(
+            _workspace_audit_events(store.list_audit_events(), effective_workspace_id),
+            gate_id=MODEL_EXPERIMENT_STOP_GATE_ID,
+        )
+
+    return assess_model_experiment_readiness(
+        config=config,
+        stop_review_approved=stop_review_approved,
+        workspace_id=effective_workspace_id,
+        workspace_security_state=workspace_security_state,
+        artifact_isolation_state=artifact_isolation_state,
+    )
+
+
+def _blocked_local_model_smoke(
+    config: LocalModelRuntimeConfig,
+    readiness: ModelExperimentReadinessReport,
+) -> LocalModelSmokeResult:
+    issue_codes = ", ".join(issue.code for issue in readiness.issues) or readiness.state
+    return LocalModelSmokeResult(
+        ok=False,
+        provider=config.provider,
+        model=config.configured_model,
+        real_model_invoked=False,
+        detail=f"Real model smoke blocked by readiness gate: {issue_codes}.",
+    )
+
+
+def _append_local_model_smoke_audit_event(
+    *,
+    store: SessionStore,
+    workspace: CaseWorkspace,
+    action: str,
+    readiness: ModelExperimentReadinessReport,
+    result: LocalModelSmokeResult,
+) -> AuditEvent:
+    return store.append_audit_event(
+        actor=Actor.SYSTEM,
+        action=action,
+        object_type="model_smoke",
+        object_id=MODEL_EXPERIMENT_STOP_GATE_ID,
+        details=_local_model_smoke_audit_details(
+            workspace=workspace,
+            readiness=readiness,
+            result=result,
+        ),
+    )
+
+
+def _local_model_smoke_audit_details(
+    *,
+    workspace: CaseWorkspace,
+    readiness: ModelExperimentReadinessReport,
+    result: LocalModelSmokeResult,
+) -> dict[str, Any]:
+    return {
+        "workspace_id": workspace.manifest.workspace_id,
+        "case_id": workspace.manifest.case_id,
+        "gate_id": MODEL_EXPERIMENT_STOP_GATE_ID,
+        "provider": readiness.provider,
+        "effective_provider": readiness.effective_provider,
+        "configured_model": readiness.configured_model,
+        "readiness_state": readiness.state,
+        "issue_codes": [issue.code for issue in readiness.issues],
+        "stop_review_approved": readiness.stop_review_approved,
+        "workspace_security_state": readiness.workspace_security_state,
+        "artifact_isolation_state": readiness.artifact_isolation_state,
+        "can_run_real_smoke": readiness.can_run_real_smoke,
+        "ok": result.ok,
+        "real_model_invoked": result.real_model_invoked,
+        "result_model": result.model,
+        "detail": result.detail,
+        "response_preview_hash": _sha256_text(result.response_preview) if result.response_preview else "",
+        "system_prompt_hash": _sha256_text(LOCAL_MODEL_SMOKE_SYSTEM_PROMPT),
+        "user_prompt_hash": _sha256_text(LOCAL_MODEL_SMOKE_USER_PROMPT),
+        "sensitive_data": False,
+    }
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def _session_audit_events(
     events: tuple[AuditEvent, ...],
     session_id: str,
@@ -1947,6 +2168,48 @@ def _operator_action_decision_from_event(event: AuditEvent) -> dict[str, Any]:
         "prompt_hash": details.get("prompt_hash", ""),
         "context_hash": details.get("context_hash", ""),
         "output_hash": details.get("output_hash", ""),
+    }
+
+
+def _stop_review_events(
+    events: tuple[AuditEvent, ...],
+    *,
+    gate_id: str | None,
+) -> tuple[AuditEvent, ...]:
+    return tuple(
+        event
+        for event in events
+        if event.object_type == "stop_review"
+        and event.action.startswith("stop_review_")
+        and (gate_id is None or event.details.get("gate_id") == gate_id)
+    )
+
+
+def _is_stop_review_approved(
+    events: tuple[AuditEvent, ...],
+    *,
+    gate_id: str,
+) -> bool:
+    matching_events = _stop_review_events(events, gate_id=gate_id)
+    if not matching_events:
+        return False
+    return matching_events[-1].details.get("decision") == "approved"
+
+
+def _stop_review_decision_from_event(event: AuditEvent) -> dict[str, Any]:
+    details = event.details
+    return {
+        "decision_id": event.id,
+        "audit_event_id": event.id,
+        "event_hash": event.event_hash,
+        "workspace_id": details.get("workspace_id"),
+        "case_id": details.get("case_id"),
+        "gate_id": details.get("gate_id", event.object_id),
+        "decision": details.get("decision"),
+        "created_at": event.timestamp.isoformat(),
+        "created_by": details.get("created_by"),
+        "rationale": details.get("rationale", ""),
+        "checklist": list(details.get("checklist", ())),
     }
 
 
@@ -2233,6 +2496,18 @@ def _validate_operator_action_decision(
     _validate_optional_sha256("prompt_hash", request.prompt_hash)
     _validate_optional_sha256("context_hash", request.context_hash)
     _validate_optional_sha256("output_hash", request.output_hash)
+
+
+def _validate_stop_review_decision(request: StopReviewDecisionRequest) -> None:
+    if request.gate_id != MODEL_EXPERIMENT_STOP_GATE_ID:
+        raise HTTPException(status_code=400, detail="Unsupported STOP review gate.")
+    normalized_decision = request.decision.strip().lower()
+    if normalized_decision not in STOP_REVIEW_DECISIONS:
+        raise HTTPException(status_code=400, detail="Unsupported STOP review decision.")
+    _require_non_empty("created_by", request.created_by)
+    _require_non_empty("rationale", request.rationale)
+    if normalized_decision == "approved" and not any(item.strip() for item in request.checklist):
+        raise HTTPException(status_code=400, detail="Approved STOP review requires checklist evidence.")
 
 
 def _validate_material_question_link_decision(

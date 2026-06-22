@@ -19,9 +19,11 @@ from interrogaition.api.app import (
     RegisterMaterialRequest,
     SeedWorkspaceMaterialsRequest,
     StartSessionRequest,
+    StopReviewDecisionRequest,
     create_app,
 )
 from interrogaition.ai.local_model_runtime import LocalModelRuntimeConfig
+from interrogaition.ai.model_client import FakeModelClient
 from interrogaition.domain.models import ClaimReviewStatus, SuggestionStatus
 from interrogaition.domain.session import ParticipantRole
 from interrogaition.security.access_policy import WorkspaceAction, WorkspaceRole
@@ -131,6 +133,8 @@ class ApiAppTest(unittest.TestCase):
         create_workspace = endpoint(app, "create_workspace")
         ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
         readiness_endpoint = endpoint(app, "get_local_model_experiment_readiness")
+        record_stop_review = endpoint(app, "record_workspace_stop_review")
+        list_stop_reviews = endpoint(app, "list_workspace_stop_reviews")
 
         create_workspace(
             CreateWorkspaceRequest(
@@ -143,24 +147,215 @@ class ApiAppTest(unittest.TestCase):
         )
         blocked = readiness_endpoint(
             workspace_id="api-workspace-model-gate",
-            stop_review_approved=True,
         )
         ensure_model_artifacts(
             "api-workspace-model-gate",
             ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
         )
+        blocked_after_artifacts = readiness_endpoint(
+            workspace_id="api-workspace-model-gate",
+        )
+        approval = record_stop_review(
+            "api-workspace-model-gate",
+            StopReviewDecisionRequest(
+                created_by="admin-001",
+                rationale="Approved controlled smoke with synthetic prompt only.",
+                checklist=[
+                    "Workspace security report reviewed.",
+                    "Model artifact isolation initialized.",
+                    "No case material in smoke prompt.",
+                ],
+                role=WorkspaceRole.ADMIN,
+            ),
+        )
         ready = readiness_endpoint(
             workspace_id="api-workspace-model-gate",
-            stop_review_approved=True,
+        )
+        stop_reviews = list_stop_reviews(
+            "api-workspace-model-gate",
+            gate_id=None,
+        )
+        rejection = record_stop_review(
+            "api-workspace-model-gate",
+            StopReviewDecisionRequest(
+                decision="rejected",
+                created_by="admin-001",
+                rationale="Reopened STOP after experiment shell changed.",
+                role=WorkspaceRole.ADMIN,
+            ),
+        )
+        blocked_after_rejection = readiness_endpoint(
+            workspace_id="api-workspace-model-gate",
         )
 
         self.assertEqual(blocked["state"], "blocked")
         self.assertEqual(blocked["artifact_isolation_state"], "warning")
+        self.assertIn(
+            "stop_review_required",
+            {issue["code"] for issue in blocked_after_artifacts["issues"]},
+        )
+        self.assertEqual(approval["decision"]["decision"], "approved")
+        self.assertEqual(approval["audit_event"]["action"], "stop_review_approved")
+        self.assertTrue(approval["chain_valid"])
         self.assertEqual(ready["state"], "ready")
         self.assertTrue(ready["can_run_real_smoke"])
         self.assertFalse(ready["can_enable_live_output"])
         self.assertEqual(ready["workspace_security_state"], "ready")
         self.assertEqual(ready["artifact_isolation_state"], "ready")
+        self.assertTrue(ready["stop_review_approved"])
+        self.assertEqual(stop_reviews["latest"]["decision"], "approved")
+        self.assertEqual(stop_reviews["latest"]["event_hash"], approval["decision"]["event_hash"])
+        self.assertTrue(stop_reviews["chain_valid"])
+        self.assertEqual(rejection["decision"]["decision"], "rejected")
+        self.assertFalse(blocked_after_rejection["stop_review_approved"])
+        self.assertIn(
+            "stop_review_required",
+            {issue["code"] for issue in blocked_after_rejection["issues"]},
+        )
+
+    def test_local_model_real_smoke_requires_workspace_stop_and_artifact_gate(self) -> None:
+        workspace_root = TEST_OUTPUT_ROOT / f"model-smoke-workspaces-{uuid.uuid4()}"
+        fake_model = FakeModelClient(
+            response_text='{"status":"ok","mode":"controlled-real-smoke"}',
+            model="ollama-test-double",
+            requests=[],
+        )
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                workspace_root,
+                encryption_status_provider=_unavailable_encryption_status,
+            ),
+            local_model_config=LocalModelRuntimeConfig(
+                provider="ollama",
+                configured_model="llama3.1:8b",
+                real_model_enabled=True,
+                live_output_enabled=False,
+            ),
+            model_client=fake_model,
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
+        record_stop_review = endpoint(app, "record_workspace_stop_review")
+        smoke = endpoint(app, "smoke_local_model")
+        get_workspace_audit = endpoint(app, "get_workspace_audit")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-model-smoke",
+                created_by="investigator-001",
+                workspace_id="api-workspace-model-smoke",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+        blocked_without_gate = smoke(execute_real=True, workspace_id="api-workspace-model-smoke")
+        ensure_model_artifacts(
+            "api-workspace-model-smoke",
+            ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
+        )
+        record_stop_review(
+            "api-workspace-model-smoke",
+            StopReviewDecisionRequest(
+                created_by="admin-001",
+                rationale="Approved controlled smoke with synthetic prompt only.",
+                checklist=[
+                    "Workspace security report reviewed.",
+                    "Model artifact isolation initialized.",
+                    "No case material in smoke prompt.",
+                ],
+                role=WorkspaceRole.ADMIN,
+            ),
+        )
+
+        self.assertFalse(blocked_without_gate["ok"])
+        self.assertFalse(blocked_without_gate["real_model_invoked"])
+        self.assertIn("stop_review_required", blocked_without_gate["detail"])
+        self.assertIn("artifact_isolation_not_ready", blocked_without_gate["detail"])
+        self.assertEqual(fake_model.requests, [])
+        allowed = smoke(execute_real=True, workspace_id="api-workspace-model-smoke")
+        self.assertTrue(allowed["ok"])
+        self.assertEqual(allowed["model"], "ollama-test-double")
+        self.assertFalse(allowed["real_model_invoked"])
+        self.assertIn("controlled-real-smoke", allowed["response_preview"])
+        self.assertEqual(len(fake_model.requests or []), 1)
+        workspace_audit = get_workspace_audit("api-workspace-model-smoke")
+        smoke_events = [
+            event for event in workspace_audit["events"] if event["object_type"] == "model_smoke"
+        ]
+
+        self.assertTrue(workspace_audit["chain_valid"])
+        self.assertEqual(
+            [event["action"] for event in smoke_events],
+            ["local_model_smoke_blocked", "local_model_smoke_completed"],
+        )
+        self.assertIn("stop_review_required", smoke_events[0]["details"]["issue_codes"])
+        self.assertIn("artifact_isolation_not_ready", smoke_events[0]["details"]["issue_codes"])
+        self.assertFalse(smoke_events[0]["details"]["ok"])
+        self.assertFalse(smoke_events[0]["details"]["real_model_invoked"])
+        self.assertTrue(smoke_events[1]["details"]["ok"])
+        self.assertFalse(smoke_events[1]["details"]["real_model_invoked"])
+        self.assertEqual(smoke_events[1]["details"]["result_model"], "ollama-test-double")
+        self.assertFalse(smoke_events[1]["details"]["sensitive_data"])
+        self.assertEqual(len(smoke_events[1]["details"]["response_preview_hash"]), 64)
+        self.assertEqual(len(smoke_events[1]["details"]["system_prompt_hash"]), 64)
+        self.assertEqual(len(smoke_events[1]["details"]["user_prompt_hash"]), 64)
+
+    def test_workspace_stop_review_validates_access_and_evidence(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"stop-review-workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        record_stop_review = endpoint(app, "record_workspace_stop_review")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-stop-review-validation",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        with self.assertRaises(HTTPException) as denied:
+            record_stop_review(
+                "api-workspace-stop-review-validation",
+                StopReviewDecisionRequest(
+                    created_by="investigator-001",
+                    rationale="Investigator attempted approval.",
+                    checklist=["Reviewed workspace security report."],
+                    role=WorkspaceRole.INVESTIGATOR,
+                ),
+            )
+
+        with self.assertRaises(HTTPException) as missing_checklist:
+            record_stop_review(
+                "api-workspace-stop-review-validation",
+                StopReviewDecisionRequest(
+                    created_by="admin-001",
+                    rationale="Approval without checklist should fail.",
+                    role=WorkspaceRole.ADMIN,
+                ),
+            )
+
+        with self.assertRaises(HTTPException) as unsupported_gate:
+            record_stop_review(
+                "api-workspace-stop-review-validation",
+                StopReviewDecisionRequest(
+                    gate_id="live_model_output",
+                    created_by="admin-001",
+                    rationale="Wrong gate.",
+                    checklist=["Reviewed workspace security report."],
+                    role=WorkspaceRole.ADMIN,
+                ),
+            )
+
+        self.assertEqual(denied.exception.status_code, 403)
+        self.assertEqual(missing_checklist.exception.status_code, 400)
+        self.assertEqual(unsupported_gate.exception.status_code, 400)
 
     def test_case_review_endpoint_returns_indicators_and_report(self) -> None:
         app = create_app()
