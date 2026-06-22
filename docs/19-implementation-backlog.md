@@ -218,7 +218,11 @@ Implemented:
 - case progress navigator with stage navigation (dossier -> interview -> materials -> AI -> review -> report),
 - scenario badges and supervisor-demo marker in the case catalog,
 - operational session context in the header and interview strip,
-- operations offline guidance when the local API is unavailable.
+- operations offline guidance when the local API is unavailable,
+- demo readiness report endpoint and Review panel covering workspace, session, audit, model artifacts, export bundle, and real-model STOP gate state,
+- pre-demo recommended actions and copyable demo readiness brief,
+- case quality report endpoint and Review panel aggregating session capture, claim review, provenance, evidence coverage, material grounding, grounded-AI trace, operator decisions, audit/export integrity, and workspace security,
+- quality score, quality-priority actions, and copyable case-quality brief for supervisor/thesis review.
 
 Next:
 

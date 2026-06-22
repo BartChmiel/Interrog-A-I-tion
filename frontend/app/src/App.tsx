@@ -53,6 +53,8 @@ import {
   loadSessionReview,
   loadWorkspaceAccess,
   loadWorkspaceAudit,
+  loadWorkspaceCaseQuality,
+  loadWorkspaceDemoReadiness,
   loadWorkspaceSecurity,
   loadWorkspaceStopReviews,
   loadWorkspaceMaterials,
@@ -87,9 +89,11 @@ import type {
   AuditEvent,
   CaseCatalogItem,
   CaseData,
+  CaseQualityReport,
   CaseTopic,
   ClaimReviewStatus,
   ClaimView,
+  DemoReadinessReport,
   EncryptionStatus,
   EnvironmentHealth,
   EnvironmentHealthState,
@@ -248,6 +252,8 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceSecurity, setWorkspaceSecurity] = useState<WorkspaceSecurityReport | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
+  const [demoReadiness, setDemoReadiness] = useState<DemoReadinessReport | null>(null);
+  const [caseQuality, setCaseQuality] = useState<CaseQualityReport | null>(null);
   const [stopReviewList, setStopReviewList] = useState<StopReviewListResponse | null>(null);
   const [workspaceAudit, setWorkspaceAudit] = useState<WorkspaceAuditResponse | null>(null);
   const [sessionAudit, setSessionAudit] = useState<SessionAuditResponse | null>(null);
@@ -631,6 +637,8 @@ export function App() {
         artifactManifest,
         artifactIsolation,
         workspaceSecurityReport,
+        nextDemoReadiness,
+        nextCaseQuality,
         experimentReadiness,
         stopReviews,
         materialList,
@@ -644,6 +652,8 @@ export function App() {
         loadModelArtifactManifest(config),
         loadModelArtifactIsolation(config),
         loadWorkspaceSecurity(config),
+        loadDemoReadinessOrNull(),
+        loadCaseQualityOrNull(locale),
         loadLocalModelExperimentReadiness(config),
         loadStopReviewsOrNull(),
         loadWorkspaceMaterials(config),
@@ -660,6 +670,8 @@ export function App() {
       setModelArtifactManifest(artifactManifest);
       setModelArtifactIsolation(artifactIsolation);
       setWorkspaceSecurity(workspaceSecurityReport);
+      setDemoReadiness(nextDemoReadiness);
+      setCaseQuality(nextCaseQuality);
       setModelExperimentReadiness(experimentReadiness);
       setStopReviewList(stopReviews);
       setWorkspaceAudit(auditTrail);
@@ -683,6 +695,8 @@ export function App() {
       setWorkspace(null);
       setWorkspaceSecurity(null);
       setWorkspaceAccess(null);
+      setDemoReadiness(null);
+      setCaseQuality(null);
       setStopReviewList(null);
       setWorkspaceAudit(null);
       setSessionAudit(null);
@@ -759,6 +773,24 @@ export function App() {
     }
   }
 
+  async function loadDemoReadinessOrNull(): Promise<DemoReadinessReport | null> {
+    try {
+      return await loadWorkspaceDemoReadiness(config);
+    } catch (error) {
+      console.warn("Could not refresh demo readiness report.", error);
+      return null;
+    }
+  }
+
+  async function loadCaseQualityOrNull(nextLocale: Locale = locale): Promise<CaseQualityReport | null> {
+    try {
+      return await loadWorkspaceCaseQuality(config, nextLocale);
+    } catch (error) {
+      console.warn("Could not refresh case quality report.", error);
+      return null;
+    }
+  }
+
   async function loadStopReviewsOrNull(): Promise<StopReviewListResponse | null> {
     try {
       return await loadWorkspaceStopReviews(config);
@@ -778,12 +810,16 @@ export function App() {
   }
 
   async function refreshAuditTrails() {
-    const [nextWorkspaceAudit, nextSessionAudit] = await Promise.all([
+    const [nextWorkspaceAudit, nextSessionAudit, nextDemoReadiness, nextCaseQuality] = await Promise.all([
       loadWorkspaceAuditOrNull(),
       loadSessionAuditOrNull(),
+      loadDemoReadinessOrNull(),
+      loadCaseQualityOrNull(),
     ]);
     setWorkspaceAudit(nextWorkspaceAudit);
     setSessionAudit(nextSessionAudit);
+    setDemoReadiness(nextDemoReadiness);
+    setCaseQuality(nextCaseQuality);
   }
 
   async function loadGroundedSuggestionsOrEmpty(
@@ -893,6 +929,7 @@ export function App() {
         draftList,
         materialLinks,
         nextEvidenceMap,
+        nextCaseQuality,
         nextGroundedSuggestions,
       ] = await Promise.all([
         loadCaseCatalog(config, nextLocale).catch(() => ({ cases: seedCaseCatalog[nextLocale] })),
@@ -902,6 +939,7 @@ export function App() {
         loadQuestionDraftsOrEmpty(),
         loadMaterialQuestionLinksOrEmpty(nextLocale),
         loadEvidenceMapOrNull(nextLocale),
+        loadCaseQualityOrNull(nextLocale),
         loadGroundedSuggestionsOrEmpty(nextLocale, activeQuestionId),
       ]);
       setCaseCatalog(catalog.cases);
@@ -918,6 +956,7 @@ export function App() {
       setQuestionDrafts(sortQuestionDrafts(draftList));
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
+      setCaseQuality(nextCaseQuality);
       applyGroundedSuggestions(nextGroundedSuggestions);
       setApiMode("online");
       setStatusKey("reviewUpdated");
@@ -2155,6 +2194,25 @@ export function App() {
                 <CollapsibleSection
                   accordionGroup="ops-review"
                   className="operations-section"
+                  defaultOpen={false}
+                  hint={text(locale, "expandWhenNeeded")}
+                  meta={caseQuality ? `${caseQuality.quality_score}%` : text(locale, "unknown")}
+                  title={text(locale, "caseQuality")}
+                >
+                  <CaseQualityPanel bare locale={locale} report={caseQuality} />
+                </CollapsibleSection>
+                <CollapsibleSection
+                  accordionGroup="ops-review"
+                  className="operations-section"
+                  hint={text(locale, "expandWhenNeeded")}
+                  meta={demoReadiness ? environmentStateLabel(demoReadiness.state, locale) : text(locale, "unknown")}
+                  title={text(locale, "demoReadiness")}
+                >
+                  <DemoReadinessPanel bare locale={locale} report={demoReadiness} />
+                </CollapsibleSection>
+                <CollapsibleSection
+                  accordionGroup="ops-review"
+                  className="operations-section"
                   hint={text(locale, "expandWhenNeeded")}
                   meta={text(locale, "noAutomatedVerdict")}
                   title={text(locale, "stopReadiness")}
@@ -2553,6 +2611,242 @@ function OperatorWorkflowPanel({
       ) : null}
     </section>
   );
+}
+
+function CaseQualityPanel({
+  bare = false,
+  locale,
+  report,
+}: {
+  bare?: boolean;
+  locale: Locale;
+  report: CaseQualityReport | null;
+}) {
+  const state = report?.state ?? "unknown";
+  async function copyBrief() {
+    if (!report) {
+      return;
+    }
+    await navigator.clipboard.writeText(buildCaseQualityBrief(report, locale));
+  }
+
+  const body = report ? (
+    <div className="case-quality-body">
+      <p>{text(locale, "caseQualityAdvisory")}</p>
+      <div className="case-quality-toolbar">
+        <div className="case-quality-score">
+          <strong>{report.quality_score}%</strong>
+          <span>{text(locale, "caseQualityScore")}</span>
+        </div>
+        <button type="button" onClick={() => void copyBrief()}>
+          <ClipboardCopy size={14} />
+          {text(locale, "caseQualityCopyBrief")}
+        </button>
+      </div>
+      <div className="case-quality-summary">
+        <span>{text(locale, "ready")}: {report.summary.ready ?? 0}</span>
+        <span>{text(locale, "warning")}: {report.summary.warning ?? 0}</span>
+        <span>{text(locale, "blocked")}: {report.summary.blocked ?? 0}</span>
+      </div>
+      {report.recommended_actions.length ? (
+        <div className="case-quality-actions">
+          <span>{text(locale, "caseQualityNextActions")}</span>
+          {report.recommended_actions.map((action) => (
+            <article data-state={action.state} key={action.id}>
+              <strong>{action.label}</strong>
+              <p>{action.action}</p>
+            </article>
+          ))}
+        </div>
+      ) : null}
+      <div className="security-list">
+        {report.dimensions.map((dimension) => (
+          <SecurityItem
+            detail={dimension.detail}
+            icon={caseQualityDimensionIcon(dimension.id)}
+            key={dimension.id}
+            state={dimension.state}
+            title={dimension.label}
+            value={environmentStateLabel(dimension.state, locale)}
+          />
+        ))}
+      </div>
+    </div>
+  ) : (
+    <div className="case-quality-body">
+      <p className="empty-state">{text(locale, "caseQualityUnavailable")}</p>
+    </div>
+  );
+
+  if (bare) {
+    return (
+      <div className="case-quality-panel is-bare" data-state={state}>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <section className="case-quality-panel" data-state={state}>
+      <PanelHeader title={text(locale, "caseQuality")} meta={environmentStateLabel(state, locale)} compact />
+      {body}
+    </section>
+  );
+}
+
+function caseQualityDimensionIcon(dimensionId: string): ReactNode {
+  const icons: Record<string, ReactNode> = {
+    ai_trace: <Sparkles size={15} />,
+    audit_export: <FileCheck2 size={15} />,
+    case_scope: <FolderOpen size={15} />,
+    claim_provenance: <Fingerprint size={15} />,
+    claim_review: <CheckCircle2 size={15} />,
+    evidence_coverage: <ListChecks size={15} />,
+    material_grounding: <FolderArchive size={15} />,
+    operator_decisions: <Activity size={15} />,
+    session_capture: <FileText size={15} />,
+    workspace_security: <ShieldCheck size={15} />,
+  };
+  return icons[dimensionId] ?? <ListChecks size={15} />;
+}
+
+function buildCaseQualityBrief(report: CaseQualityReport, locale: Locale): string {
+  const lines = [
+    text(locale, "caseQuality"),
+    `${text(locale, "caseLabel")}: ${report.case_id}`,
+    `${text(locale, "workspaceLabel")}: ${report.workspace_id}`,
+    `${text(locale, "session")}: ${report.session_id ?? text(locale, "unknown")}`,
+    `${text(locale, "status")}: ${environmentStateLabel(report.state, locale)}`,
+    `${text(locale, "caseQualityScore")}: ${report.quality_score}%`,
+    "",
+    `${text(locale, "ready")}: ${report.summary.ready ?? 0} / ${text(locale, "warning")}: ${
+      report.summary.warning ?? 0
+    } / ${text(locale, "blocked")}: ${report.summary.blocked ?? 0}`,
+    "",
+    text(locale, "caseQualityNextActions"),
+  ];
+  if (report.recommended_actions.length) {
+    report.recommended_actions.forEach((action) => {
+      lines.push(`- ${action.label}: ${action.action}`);
+    });
+  } else {
+    lines.push(`- ${text(locale, "caseQualityNoActions")}`);
+  }
+  return lines.join("\n");
+}
+
+function DemoReadinessPanel({
+  bare = false,
+  locale,
+  report,
+}: {
+  bare?: boolean;
+  locale: Locale;
+  report: DemoReadinessReport | null;
+}) {
+  const state = report?.state ?? "unknown";
+  async function copyBrief() {
+    if (!report) {
+      return;
+    }
+    await navigator.clipboard.writeText(buildDemoReadinessBrief(report, locale));
+  }
+
+  const body = report ? (
+    <div className="demo-readiness-body">
+      <p>{text(locale, "demoReadinessAdvisory")}</p>
+      <div className="demo-readiness-toolbar">
+        <button type="button" onClick={() => void copyBrief()}>
+          <ClipboardCopy size={14} />
+          {text(locale, "demoReadinessCopyBrief")}
+        </button>
+      </div>
+      <div className="demo-readiness-summary">
+        <span>{text(locale, "ready")}: {report.summary.ready ?? 0}</span>
+        <span>{text(locale, "warning")}: {report.summary.warning ?? 0}</span>
+        <span>{text(locale, "blocked")}: {report.summary.blocked ?? 0}</span>
+      </div>
+      {report.recommended_actions.length ? (
+        <div className="demo-readiness-actions">
+          <span>{text(locale, "demoReadinessNextActions")}</span>
+          {report.recommended_actions.map((action) => (
+            <article data-state={action.state} key={action.id}>
+              <strong>{action.label}</strong>
+              <p>{action.action}</p>
+            </article>
+          ))}
+        </div>
+      ) : null}
+      <div className="security-list">
+        {report.checks.map((check) => (
+          <SecurityItem
+            detail={check.detail}
+            icon={demoReadinessCheckIcon(check.id)}
+            key={check.id}
+            state={check.state}
+            title={check.label}
+            value={environmentStateLabel(check.state, locale)}
+          />
+        ))}
+      </div>
+    </div>
+  ) : (
+    <div className="demo-readiness-body">
+      <p className="empty-state">{text(locale, "demoReadinessUnavailable")}</p>
+    </div>
+  );
+
+  if (bare) {
+    return (
+      <div className="demo-readiness-panel is-bare" data-state={state}>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <section className="demo-readiness-panel" data-state={state}>
+      <PanelHeader title={text(locale, "demoReadiness")} meta={environmentStateLabel(state, locale)} compact />
+      {body}
+    </section>
+  );
+}
+
+function demoReadinessCheckIcon(checkId: string): ReactNode {
+  const icons: Record<string, ReactNode> = {
+    audit_chain: <Fingerprint size={15} />,
+    export_bundle: <FileDown size={15} />,
+    model_artifacts: <FolderArchive size={15} />,
+    model_experiment_stop: <Network size={15} />,
+    session_capture: <FileText size={15} />,
+    workspace: <Database size={15} />,
+    workspace_security: <ShieldCheck size={15} />,
+  };
+  return icons[checkId] ?? <ListChecks size={15} />;
+}
+
+function buildDemoReadinessBrief(report: DemoReadinessReport, locale: Locale): string {
+  const lines = [
+    text(locale, "demoReadiness"),
+    `${text(locale, "caseLabel")}: ${report.case_id}`,
+    `${text(locale, "workspaceLabel")}: ${report.workspace_id}`,
+    `${text(locale, "session")}: ${report.session_id ?? text(locale, "unknown")}`,
+    `${text(locale, "status")}: ${environmentStateLabel(report.state, locale)}`,
+    "",
+    `${text(locale, "ready")}: ${report.summary.ready ?? 0} / ${text(locale, "warning")}: ${
+      report.summary.warning ?? 0
+    } / ${text(locale, "blocked")}: ${report.summary.blocked ?? 0}`,
+    "",
+    text(locale, "demoReadinessNextActions"),
+  ];
+  if (report.recommended_actions.length) {
+    report.recommended_actions.forEach((action) => {
+      lines.push(`- ${action.label}: ${action.action}`);
+    });
+  } else {
+    lines.push(`- ${text(locale, "demoReadinessNoActions")}`);
+  }
+  return lines.join("\n");
 }
 
 function StopReadinessPanel({

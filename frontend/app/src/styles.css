@@ -2058,21 +2058,125 @@ h2 {
   font-size: 11px;
 }
 
-.stop-readiness-panel {
+.stop-readiness-panel,
+.case-quality-panel,
+.demo-readiness-panel {
   display: grid;
   gap: 0;
 }
 
-.stop-readiness-body {
+.stop-readiness-body,
+.case-quality-body,
+.demo-readiness-body {
   display: grid;
   gap: 10px;
   padding: 11px;
 }
 
-.stop-readiness-body > p {
+.stop-readiness-body > p,
+.case-quality-body > p,
+.demo-readiness-body > p {
   color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.case-quality-summary,
+.demo-readiness-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.case-quality-toolbar,
+.demo-readiness-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.case-quality-toolbar button,
+.demo-readiness-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.case-quality-score {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.case-quality-score strong {
+  color: var(--heading);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.case-quality-score span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.case-quality-actions,
+.demo-readiness-actions {
+  display: grid;
+  gap: 7px;
+}
+
+.case-quality-actions > span,
+.demo-readiness-actions > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.case-quality-actions article,
+.demo-readiness-actions article {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: var(--panel);
+}
+
+.case-quality-actions article[data-state="warning"],
+.demo-readiness-actions article[data-state="warning"] {
+  border-color: #ead49b;
+  background: #fffaf0;
+}
+
+.case-quality-actions article[data-state="blocked"],
+.demo-readiness-actions article[data-state="blocked"] {
+  border-color: #e6b3ad;
+  background: #fff7f6;
+}
+
+.case-quality-actions strong,
+.case-quality-actions p,
+.demo-readiness-actions strong,
+.demo-readiness-actions p {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.case-quality-actions strong,
+.demo-readiness-actions strong {
+  color: var(--heading);
+}
+
+.case-quality-actions p,
+.demo-readiness-actions p {
+  margin-top: 2px;
+  color: var(--muted-strong);
 }
 
 .stop-gate-grid {
@@ -2785,6 +2889,8 @@ h2 {
 .environment-health[data-state="ready"],
 .model-runtime-panel[data-state="ready"],
 .model-artifact-panel[data-state="ready"],
+.case-quality-panel[data-state="ready"],
+.demo-readiness-panel[data-state="ready"],
 .stop-review-panel[data-state="ready"],
 .model-smoke-audit-panel[data-state="ready"],
 .material-card[data-state="ready"] {
@@ -2796,6 +2902,8 @@ h2 {
 .environment-health[data-state="warning"],
 .model-runtime-panel[data-state="warning"],
 .model-artifact-panel[data-state="warning"],
+.case-quality-panel[data-state="warning"],
+.demo-readiness-panel[data-state="warning"],
 .stop-review-panel[data-state="warning"],
 .model-smoke-audit-panel[data-state="warning"],
 .material-card[data-state="warning"] {
@@ -2806,6 +2914,8 @@ h2 {
 .security-item[data-state="blocked"],
 .environment-health[data-state="blocked"],
 .model-artifact-panel[data-state="blocked"],
+.case-quality-panel[data-state="blocked"],
+.demo-readiness-panel[data-state="blocked"],
 .stop-review-panel[data-state="blocked"],
 .model-smoke-audit-panel[data-state="blocked"],
 .material-card[data-state="blocked"] {
@@ -2827,6 +2937,8 @@ h2 {
 .environment-health[data-state="ready"] .security-icon,
 .model-runtime-panel[data-state="ready"] .security-icon,
 .model-artifact-panel[data-state="ready"] .security-icon,
+.case-quality-panel[data-state="ready"] .security-icon,
+.demo-readiness-panel[data-state="ready"] .security-icon,
 .model-smoke-audit-panel[data-state="ready"] .security-icon {
   background: var(--ok-soft);
   color: var(--ok);
@@ -2836,6 +2948,8 @@ h2 {
 .environment-health[data-state="warning"] .security-icon,
 .model-runtime-panel[data-state="warning"] .security-icon,
 .model-artifact-panel[data-state="warning"] .security-icon,
+.case-quality-panel[data-state="warning"] .security-icon,
+.demo-readiness-panel[data-state="warning"] .security-icon,
 .model-smoke-audit-panel[data-state="warning"] .security-icon {
   background: var(--warning-soft);
   color: var(--warning);
@@ -2844,6 +2958,8 @@ h2 {
 .security-item[data-state="blocked"] .security-icon,
 .environment-health[data-state="blocked"] .security-icon,
 .model-artifact-panel[data-state="blocked"] .security-icon,
+.case-quality-panel[data-state="blocked"] .security-icon,
+.demo-readiness-panel[data-state="blocked"] .security-icon,
 .model-smoke-audit-panel[data-state="blocked"] .security-icon {
   background: var(--danger-soft);
   color: var(--danger);

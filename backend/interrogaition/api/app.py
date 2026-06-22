@@ -9,6 +9,7 @@ import json
 import sqlite3
 import uuid
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
 
@@ -593,6 +594,87 @@ def create_app(
             assess_workspace_security(
                 manifest=workspace.manifest,
                 encryption_status=workspace_manager.encryption_status(),
+            )
+        )
+
+    @app.get("/workspaces/{workspace_id}/demo-readiness")
+    def get_workspace_demo_readiness(
+        workspace_id: str,
+        case_id: str | None = Query(default=None),
+        session_id: str | None = Query(default=None),
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        effective_case_id = case_id or workspace.manifest.case_id
+        if effective_case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+
+        return _to_jsonable(
+            _build_demo_readiness_report(
+                workspace=workspace,
+                case_id=effective_case_id,
+                session_id=session_id,
+                workspace_manager=workspace_manager,
+                store=store,
+                local_model_config=local_model_config,
+            )
+        )
+
+    @app.get("/workspaces/{workspace_id}/case-quality")
+    def get_workspace_case_quality(
+        workspace_id: str,
+        case_id: str | None = Query(default=None),
+        session_id: str | None = Query(default=None),
+        locale: str = Query(default="en"),
+        role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
+    ) -> dict[str, Any]:
+        try:
+            workspace = workspace_manager.open_workspace(workspace_id)
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        decision = decide_workspace_access(
+            role=role,
+            action=WorkspaceAction.READ_CASE,
+            manifest=workspace.manifest,
+        )
+        if not decision.allowed:
+            raise HTTPException(status_code=403, detail=decision.reason)
+
+        effective_case_id = case_id or workspace.manifest.case_id
+        if effective_case_id != workspace.manifest.case_id:
+            raise HTTPException(status_code=400, detail="case_id does not match workspace.")
+        session = store.get_session(session_id) if session_id else None
+        if session is not None and session.case_id != effective_case_id:
+            raise HTTPException(status_code=400, detail="session case_id does not match workspace.")
+
+        try:
+            registry = MaterialRegistry(workspace)
+            material_texts = _read_workspace_material_texts(registry)
+        except MaterialRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        return _to_jsonable(
+            _build_case_quality_report(
+                workspace=workspace,
+                case_id=effective_case_id,
+                session_id=session_id,
+                locale=locale,
+                workspace_manager=workspace_manager,
+                store=store,
+                material_texts=material_texts,
             )
         )
 
@@ -1979,6 +2061,738 @@ def _assess_local_model_experiment_readiness(
         workspace_security_state=workspace_security_state,
         artifact_isolation_state=artifact_isolation_state,
     )
+
+
+def _build_demo_readiness_report(
+    *,
+    workspace: CaseWorkspace,
+    case_id: str,
+    session_id: str | None,
+    workspace_manager: CaseWorkspaceManager,
+    store: SessionStore,
+    local_model_config: LocalModelRuntimeConfig,
+) -> dict[str, Any]:
+    workspace_events = _workspace_audit_events(store.list_audit_events(), workspace.manifest.workspace_id)
+    session_events = _session_audit_events(store.list_audit_events(), session_id) if session_id else ()
+    workspace_security = assess_workspace_security(
+        manifest=workspace.manifest,
+        encryption_status=workspace_manager.encryption_status(),
+    )
+    artifact_isolation = inspect_model_artifact_isolation(workspace)
+    artifact_manifest = list_model_artifact_manifest(workspace)
+    model_readiness = _assess_local_model_experiment_readiness(
+        workspace_manager=workspace_manager,
+        store=store,
+        config=local_model_config,
+        workspace_id=workspace.manifest.workspace_id,
+    )
+    session = store.get_session(session_id) if session_id else None
+    export_events = tuple(event for event in workspace_events if event.action == "export_bundle_created")
+    checks = [
+        _demo_readiness_check(
+            "workspace",
+            "Case workspace",
+            "ready",
+            f"Workspace {workspace.manifest.workspace_id} is open for case {case_id}.",
+            {"data_sensitivity": workspace.manifest.data_sensitivity.value},
+            "",
+        ),
+        _demo_readiness_check(
+            "workspace_security",
+            "Workspace security",
+            workspace_security.state,
+            _first_issue_detail(workspace_security.issues) or "Workspace security posture is ready for synthetic demo data.",
+            {"issue_count": workspace_security.issue_count},
+            "Resolve workspace security findings before demo rehearsal.",
+        ),
+        _demo_readiness_check(
+            "audit_chain",
+            "Audit chain",
+            "ready" if store.verify_audit_chain() else "blocked",
+            f"{len(workspace_events)} workspace audit events and {len(session_events)} session audit events are available.",
+            {
+                "workspace_event_count": len(workspace_events),
+                "session_event_count": len(session_events),
+            },
+            "Refresh the workspace and session audit views, then investigate any chain mismatch before continuing.",
+        ),
+        _demo_readiness_check(
+            "session_capture",
+            "Session capture",
+            _session_capture_state(session_id=session_id, session=session),
+            _session_capture_detail(session_id=session_id, session=session),
+            {"answer_count": len(session.answers) if session is not None else 0},
+            "Start the demo session and record at least one answer before the final walkthrough.",
+        ),
+        _demo_readiness_check(
+            "model_artifacts",
+            "Model artifact trace",
+            _model_artifact_demo_state(artifact_isolation.state, artifact_manifest.record_count),
+            _model_artifact_demo_detail(artifact_isolation.state, artifact_manifest.record_count),
+            {
+                "isolation_state": artifact_isolation.state,
+                "record_count": artifact_manifest.record_count,
+                "chain_valid": artifact_manifest.chain_valid,
+            },
+            "Initialize model artifact isolation and generate grounded AI once so prompt/context/output records exist.",
+        ),
+        _demo_readiness_check(
+            "model_experiment_stop",
+            "Real-model STOP gate",
+            "ready" if model_readiness.can_run_real_smoke else "warning",
+            (
+                "Controlled real-model smoke is approved."
+                if model_readiness.can_run_real_smoke
+                else "Default demo remains deterministic; real-model smoke still needs its separate STOP gate."
+            ),
+            {
+                "provider": model_readiness.provider,
+                "effective_provider": model_readiness.effective_provider,
+                "issue_count": model_readiness.issue_count,
+            },
+            "Keep the first demo deterministic unless you deliberately run the separate real-model STOP approval.",
+        ),
+        _demo_readiness_check(
+            "export_bundle",
+            "Export bundle",
+            "ready" if export_events else "warning",
+            (
+                "A ZIP export bundle is recorded in the workspace audit chain."
+                if export_events
+                else "Download a ZIP export bundle from Review before the final demo rehearsal."
+            ),
+            _latest_export_bundle_evidence(export_events),
+            "Download the ZIP export bundle and verify it offline with the generated SHA-256 command.",
+        ),
+    ]
+    state = _demo_readiness_state(checks)
+    return {
+        "workspace_id": workspace.manifest.workspace_id,
+        "case_id": case_id,
+        "session_id": session_id,
+        "state": state,
+        "ready": state == "ready",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "checks": checks,
+        "recommended_actions": _demo_readiness_recommended_actions(checks),
+        "summary": _demo_readiness_summary(checks),
+    }
+
+
+def _demo_readiness_check(
+    check_id: str,
+    label: str,
+    state: str,
+    detail: str,
+    evidence: dict[str, Any] | None = None,
+    next_action: str = "",
+) -> dict[str, Any]:
+    return {
+        "id": check_id,
+        "label": label,
+        "state": state,
+        "detail": detail,
+        "evidence": evidence or {},
+        "next_action": next_action if state != "ready" else "",
+    }
+
+
+def _demo_readiness_state(checks: list[dict[str, Any]]) -> str:
+    states = {str(check["state"]) for check in checks}
+    if "blocked" in states:
+        return "blocked"
+    if "warning" in states:
+        return "warning"
+    if "unknown" in states:
+        return "unknown"
+    return "ready"
+
+
+def _demo_readiness_summary(checks: list[dict[str, Any]]) -> dict[str, int]:
+    states = ("ready", "warning", "blocked", "unknown")
+    return {state: sum(1 for check in checks if check["state"] == state) for state in states}
+
+
+def _demo_readiness_recommended_actions(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": check["id"],
+            "label": check["label"],
+            "state": check["state"],
+            "action": check["next_action"],
+        }
+        for check in checks
+        if check["state"] != "ready" and check.get("next_action")
+    ]
+
+
+def _first_issue_detail(issues: tuple[Any, ...]) -> str | None:
+    return str(issues[0].detail) if issues else None
+
+
+def _session_capture_state(*, session_id: str | None, session: InterviewSession | None) -> str:
+    if not session_id:
+        return "unknown"
+    if session is None:
+        return "warning"
+    return "ready" if session.answers else "warning"
+
+
+def _session_capture_detail(*, session_id: str | None, session: InterviewSession | None) -> str:
+    if not session_id:
+        return "No session id was supplied for this demo readiness report."
+    if session is None:
+        return f"Session {session_id} has not been started through the API yet."
+    if not session.answers:
+        return f"Session {session_id} exists but has no recorded answers yet."
+    return f"Session {session_id} has {len(session.answers)} recorded answers."
+
+
+def _model_artifact_demo_state(isolation_state: str, record_count: int) -> str:
+    if isolation_state == "blocked":
+        return "blocked"
+    if isolation_state != "ready" or record_count == 0:
+        return "warning"
+    return "ready"
+
+
+def _model_artifact_demo_detail(isolation_state: str, record_count: int) -> str:
+    if isolation_state != "ready":
+        return "Model artifact isolation should be initialized before demonstrating grounded AI traceability."
+    if record_count == 0:
+        return "Model artifact isolation is ready, but no prompt/context/output artifacts are recorded yet."
+    return f"Model artifact manifest contains {record_count} hash-chained records."
+
+
+def _latest_export_bundle_evidence(export_events: tuple[AuditEvent, ...]) -> dict[str, Any]:
+    if not export_events:
+        return {"bundle_count": 0}
+    latest = export_events[-1]
+    return {
+        "bundle_count": len(export_events),
+        "filename": latest.details.get("filename"),
+        "bundle_sha256": latest.details.get("bundle_sha256"),
+        "manifest_hash": latest.details.get("manifest_hash"),
+        "event_hash": latest.event_hash,
+    }
+
+
+def _build_case_quality_report(
+    *,
+    workspace: CaseWorkspace,
+    case_id: str,
+    session_id: str | None,
+    locale: str,
+    workspace_manager: CaseWorkspaceManager,
+    store: SessionStore,
+    material_texts: tuple[MaterialText, ...],
+) -> dict[str, Any]:
+    audit_events = store.list_audit_events()
+    workspace_events = _workspace_audit_events(audit_events, workspace.manifest.workspace_id)
+    session = store.get_session(session_id) if session_id else None
+    session_events = _session_audit_events(audit_events, session_id) if session_id else ()
+    chain_valid = store.verify_audit_chain()
+    material_decisions = derive_material_link_decisions(workspace_events)
+    question_drafts = _question_draft_questions(
+        workspace_events,
+        case_id=case_id,
+        session_id=session_id,
+    )
+    context = _build_evidence_context(
+        case_id=case_id,
+        locale=locale,
+        session_id=session_id,
+        store=store,
+        material_texts=material_texts,
+        material_link_decisions=material_decisions,
+        question_drafts=question_drafts,
+    )
+    workspace_security = assess_workspace_security(
+        manifest=workspace.manifest,
+        encryption_status=workspace_manager.encryption_status(),
+    )
+    artifact_manifest = list_model_artifact_manifest(workspace)
+    provenance = (
+        verify_session_claim_provenance(
+            session=session,
+            audit_events=session_events,
+            chain_valid=chain_valid,
+        )
+        if session is not None
+        else None
+    )
+    evidence_map = context["evidence_map"]
+    evidence_alignment = context["evidence_alignment"]
+    case_view = context["case"]
+    review = context["review"]
+    export_events = tuple(
+        event
+        for event in workspace_events
+        if event.action == "export_bundle_created" and event.details.get("case_id") == case_id
+    )
+    grounded_generation_events = _case_quality_grounded_generation_events(
+        workspace_events,
+        case_id=case_id,
+        session_id=session_id,
+    )
+    grounded_decision_events = _case_quality_grounded_decision_events(
+        workspace_events,
+        case_id=case_id,
+        session_id=session_id,
+    )
+    operator_events = _operator_action_decision_events(
+        workspace_events,
+        case_id=case_id,
+        session_id=session_id,
+    )
+    dimensions = [
+        _case_quality_case_scope_dimension(case_view, workspace, material_texts),
+        _case_quality_workspace_security_dimension(workspace_security),
+        _case_quality_session_dimension(session_id=session_id, session=session),
+        _case_quality_claim_review_dimension(session),
+        _case_quality_claim_provenance_dimension(provenance),
+        _case_quality_evidence_coverage_dimension(evidence_map),
+        _case_quality_material_grounding_dimension(evidence_map, evidence_alignment),
+        _case_quality_ai_trace_dimension(
+            artifact_manifest=artifact_manifest,
+            generation_events=grounded_generation_events,
+            decision_events=grounded_decision_events,
+        ),
+        _case_quality_operator_dimension(operator_events),
+        _case_quality_audit_export_dimension(
+            chain_valid=chain_valid,
+            workspace_events=workspace_events,
+            session_events=session_events,
+            export_events=export_events,
+        ),
+    ]
+    return {
+        "workspace_id": workspace.manifest.workspace_id,
+        "case_id": case_id,
+        "session_id": session_id,
+        "state": _case_quality_state(dimensions),
+        "ready": _case_quality_state(dimensions) == "ready",
+        "quality_score": _case_quality_score(dimensions),
+        "generated_at": datetime.now(UTC).isoformat(),
+        "dimensions": dimensions,
+        "recommended_actions": _case_quality_recommended_actions(dimensions),
+        "summary": _case_quality_summary(dimensions),
+        "metrics": {
+            "topic_count": evidence_map.summary.total_topics,
+            "missing_topic_count": evidence_map.summary.missing_topics,
+            "contested_topic_count": evidence_map.summary.contested_topics,
+            "answered_question_count": evidence_map.summary.answered_questions,
+            "answer_count": evidence_map.summary.total_answers,
+            "claim_count": evidence_map.summary.total_claims,
+            "finding_count": evidence_map.summary.total_findings,
+            "material_count": evidence_map.summary.total_materials,
+            "material_link_count": evidence_map.summary.total_material_question_links,
+            "material_link_reviewed_count": evidence_alignment.reviewed_links,
+            "grounded_suggestion_batch_count": len(grounded_generation_events),
+            "grounded_suggestion_decision_count": len(grounded_decision_events),
+            "operator_decision_count": len(operator_events),
+            "workspace_audit_event_count": len(workspace_events),
+            "session_audit_event_count": len(session_events),
+            "export_bundle_count": len(export_events),
+            "model_artifact_record_count": artifact_manifest.record_count,
+            "review_finding_count": len(review.findings),
+        },
+    }
+
+
+def _case_quality_dimension(
+    dimension_id: str,
+    label: str,
+    state: str,
+    detail: str,
+    metrics: dict[str, Any] | None = None,
+    next_action: str = "",
+) -> dict[str, Any]:
+    return {
+        "id": dimension_id,
+        "label": label,
+        "state": state,
+        "detail": detail,
+        "metrics": metrics or {},
+        "next_action": next_action if state != "ready" else "",
+    }
+
+
+def _case_quality_case_scope_dimension(
+    case: Case,
+    workspace: CaseWorkspace,
+    material_texts: tuple[MaterialText, ...],
+) -> dict[str, Any]:
+    return _case_quality_dimension(
+        "case_scope",
+        "Case scope",
+        "ready",
+        (
+            f"Case {case.id} has {len(case.questions)} planned questions, "
+            f"{len(case.topics)} topics and {len(material_texts)} registered materials."
+        ),
+        {
+            "question_count": len(case.questions),
+            "topic_count": len(case.topics),
+            "material_count": len(material_texts),
+            "data_sensitivity": workspace.manifest.data_sensitivity.value,
+        },
+    )
+
+
+def _case_quality_workspace_security_dimension(workspace_security: Any) -> dict[str, Any]:
+    return _case_quality_dimension(
+        "workspace_security",
+        "Workspace security",
+        workspace_security.state,
+        _first_issue_detail(workspace_security.issues)
+        or "Workspace security posture is acceptable for the current case mode.",
+        {"issue_count": workspace_security.issue_count},
+        "Resolve workspace security findings before using non-synthetic or externally shared outputs.",
+    )
+
+
+def _case_quality_session_dimension(
+    *,
+    session_id: str | None,
+    session: InterviewSession | None,
+) -> dict[str, Any]:
+    answer_count = len(session.answers) if session is not None else 0
+    if not session_id:
+        state = "unknown"
+        detail = "No session id was supplied, so live interview quality cannot be assessed."
+    elif session is None:
+        state = "warning"
+        detail = f"Session {session_id} has not been started through the API."
+    elif answer_count == 0:
+        state = "warning"
+        detail = f"Session {session_id} exists, but no answers have been captured."
+    else:
+        state = "ready"
+        detail = f"Session {session_id} has {answer_count} recorded answers."
+    return _case_quality_dimension(
+        "session_capture",
+        "Session capture",
+        state,
+        detail,
+        {"answer_count": answer_count},
+        "Start the session and record answers before treating the case as review-ready.",
+    )
+
+
+def _case_quality_claim_review_dimension(session: InterviewSession | None) -> dict[str, Any]:
+    counts = _claim_review_counts(session)
+    total = sum(counts.values())
+    pending = counts[ClaimReviewStatus.PENDING.value]
+    if session is None:
+        state = "unknown"
+        detail = "Claim review cannot be assessed without a session."
+    elif total == 0:
+        state = "warning"
+        detail = "No claims are available for operator review yet."
+    elif pending:
+        state = "warning"
+        detail = f"{pending} extracted claims still need operator review."
+    else:
+        state = "ready"
+        detail = f"All {total} claims have an operator review status."
+    return _case_quality_dimension(
+        "claim_review",
+        "Claim review discipline",
+        state,
+        detail,
+        counts,
+        "Accept, edit or reject pending claims before relying on downstream indicators.",
+    )
+
+
+def _case_quality_claim_provenance_dimension(provenance: Any | None) -> dict[str, Any]:
+    if provenance is None:
+        return _case_quality_dimension(
+            "claim_provenance",
+            "Claim provenance",
+            "unknown",
+            "Claim provenance cannot be assessed without a session.",
+            {},
+            "Run a session with extracted claims so provenance can be verified.",
+        )
+    metrics = {
+        "claim_count": provenance.claim_count,
+        "extracted_claim_count": provenance.extracted_claim_count,
+        "verified_claim_count": provenance.verified_claim_count,
+        "issue_count": provenance.issue_count,
+        "chain_valid": provenance.chain_valid,
+    }
+    if not provenance.chain_valid or provenance.issue_count:
+        return _case_quality_dimension(
+            "claim_provenance",
+            "Claim provenance",
+            "blocked",
+            "Claim extraction provenance has audit-chain or trace issues.",
+            metrics,
+            "Inspect the session claim provenance report before continuing.",
+        )
+    if provenance.extracted_claim_count == 0:
+        return _case_quality_dimension(
+            "claim_provenance",
+            "Claim provenance",
+            "warning",
+            "No extracted claims are available for provenance verification.",
+            metrics,
+            "Capture or extract claims so traceability can be demonstrated.",
+        )
+    return _case_quality_dimension(
+        "claim_provenance",
+        "Claim provenance",
+        "ready",
+        f"{provenance.verified_claim_count} extracted claims are verified against audit snapshots.",
+        metrics,
+    )
+
+
+def _case_quality_evidence_coverage_dimension(evidence_map: Any) -> dict[str, Any]:
+    summary = evidence_map.summary
+    high_missing = tuple(
+        node for node in evidence_map.topic_nodes if node.status.value == "missing" and node.priority == "high"
+    )
+    metrics = {
+        "total_topics": summary.total_topics,
+        "missing_topics": summary.missing_topics,
+        "missing_high_priority_topics": len(high_missing),
+        "contested_topics": summary.contested_topics,
+        "answered_questions": summary.answered_questions,
+        "total_questions": summary.total_questions,
+        "total_answers": summary.total_answers,
+    }
+    if summary.total_answers == 0:
+        state = "warning"
+        detail = "No answers are captured, so topic coverage is not review-ready."
+    elif high_missing:
+        state = "warning"
+        detail = f"{len(high_missing)} high-priority topics are still missing."
+    elif summary.missing_topics or summary.contested_topics:
+        state = "warning"
+        detail = (
+            f"{summary.missing_topics} topics are missing and "
+            f"{summary.contested_topics} topics are contested."
+        )
+    else:
+        state = "ready"
+        detail = "All case topics have coverage without contested evidence-map topics."
+    return _case_quality_dimension(
+        "evidence_coverage",
+        "Evidence coverage",
+        state,
+        detail,
+        metrics,
+        "Use the evidence map to resolve missing, material-only or contested topics.",
+    )
+
+
+def _case_quality_material_grounding_dimension(evidence_map: Any, evidence_alignment: Any) -> dict[str, Any]:
+    summary = evidence_map.summary
+    metrics = {
+        "total_materials": summary.total_materials,
+        "proposed_links": evidence_alignment.total_proposed_links,
+        "reviewed_links": evidence_alignment.reviewed_links,
+        "accepted_links": evidence_alignment.accepted_links,
+        "rejected_links": evidence_alignment.rejected_links,
+        "pending_links": evidence_alignment.pending_links,
+        "alignment_band": evidence_alignment.band.value,
+        "alignment_score": evidence_alignment.score,
+    }
+    if summary.total_materials == 0:
+        state = "warning"
+        detail = "No materials are registered for this case workspace."
+    elif evidence_alignment.total_proposed_links == 0:
+        state = "warning"
+        detail = "Registered materials do not yet produce question-grounding links."
+    elif evidence_alignment.pending_links:
+        state = "warning"
+        detail = f"{evidence_alignment.pending_links} material-question links still need review."
+    elif evidence_alignment.accepted_links == 0:
+        state = "warning"
+        detail = "Material links were reviewed, but none are accepted as support."
+    else:
+        state = "ready"
+        detail = f"{evidence_alignment.accepted_links} material-question links are accepted."
+    return _case_quality_dimension(
+        "material_grounding",
+        "Material grounding",
+        state,
+        detail,
+        metrics,
+        "Review proposed material-question links and accept the sources that genuinely support the case.",
+    )
+
+
+def _case_quality_ai_trace_dimension(
+    *,
+    artifact_manifest: Any,
+    generation_events: tuple[AuditEvent, ...],
+    decision_events: tuple[AuditEvent, ...],
+) -> dict[str, Any]:
+    warning_count = sum(1 for event in generation_events if event.details.get("artifact_warning"))
+    metrics = {
+        "generation_count": len(generation_events),
+        "decision_count": len(decision_events),
+        "artifact_record_count": artifact_manifest.record_count,
+        "artifact_chain_valid": artifact_manifest.chain_valid,
+        "artifact_warning_count": warning_count,
+    }
+    if not artifact_manifest.chain_valid:
+        state = "blocked"
+        detail = "Model artifact manifest chain is invalid."
+    elif not generation_events:
+        state = "warning"
+        detail = "No grounded AI suggestion batch is recorded for this case."
+    elif warning_count:
+        state = "warning"
+        detail = "Grounded AI was generated without complete artifact capture."
+    elif artifact_manifest.record_count == 0:
+        state = "warning"
+        detail = "Grounded AI is recorded, but no prompt/context/output artifacts are present."
+    elif len(decision_events) < len(generation_events):
+        state = "warning"
+        detail = "Grounded AI suggestions need explicit accepted/edited/rejected operator decisions."
+    else:
+        state = "ready"
+        detail = "Grounded AI generation, artifacts and operator decisions are auditable."
+    return _case_quality_dimension(
+        "ai_trace",
+        "Grounded AI trace",
+        state,
+        detail,
+        metrics,
+        "Generate grounded suggestions with artifact isolation enabled, then record operator decisions.",
+    )
+
+
+def _case_quality_operator_dimension(operator_events: tuple[AuditEvent, ...]) -> dict[str, Any]:
+    if operator_events:
+        state = "ready"
+        detail = f"{len(operator_events)} operator work-queue decisions are recorded."
+    else:
+        state = "warning"
+        detail = "No operator work-queue decisions are recorded for this case/session."
+    return _case_quality_dimension(
+        "operator_decisions",
+        "Operator decision trail",
+        state,
+        detail,
+        {"decision_count": len(operator_events)},
+        "Open, skip, dismiss or convert recommended operator actions so the workflow trail is explicit.",
+    )
+
+
+def _case_quality_audit_export_dimension(
+    *,
+    chain_valid: bool,
+    workspace_events: tuple[AuditEvent, ...],
+    session_events: tuple[AuditEvent, ...],
+    export_events: tuple[AuditEvent, ...],
+) -> dict[str, Any]:
+    metrics = {
+        "chain_valid": chain_valid,
+        "workspace_event_count": len(workspace_events),
+        "session_event_count": len(session_events),
+        "export_bundle_count": len(export_events),
+    }
+    if not chain_valid:
+        state = "blocked"
+        detail = "Audit chain verification failed."
+    elif not export_events:
+        state = "warning"
+        detail = "No export bundle is recorded for this case workspace."
+    else:
+        state = "ready"
+        detail = "Audit chain is valid and at least one export bundle is recorded."
+    return _case_quality_dimension(
+        "audit_export",
+        "Audit and export integrity",
+        state,
+        detail,
+        metrics,
+        "Create and verify a ZIP export bundle once the case is review-ready.",
+    )
+
+
+def _claim_review_counts(session: InterviewSession | None) -> dict[str, int]:
+    counts = {status.value: 0 for status in ClaimReviewStatus}
+    if session is None:
+        return counts
+    for answer in session.answers:
+        for claim in answer.claims:
+            counts[claim.review_status.value] = counts.get(claim.review_status.value, 0) + 1
+    return counts
+
+
+def _case_quality_grounded_generation_events(
+    events: tuple[AuditEvent, ...],
+    *,
+    case_id: str,
+    session_id: str | None,
+) -> tuple[AuditEvent, ...]:
+    return tuple(
+        event
+        for event in events
+        if event.action == "grounded_suggestions_generated"
+        and event.details.get("case_id") == case_id
+        and (session_id is None or event.details.get("session_id") in {None, session_id})
+    )
+
+
+def _case_quality_grounded_decision_events(
+    events: tuple[AuditEvent, ...],
+    *,
+    case_id: str,
+    session_id: str | None,
+) -> tuple[AuditEvent, ...]:
+    return tuple(
+        event
+        for event in events
+        if event.object_type == "ai_suggestion"
+        and event.action.startswith("grounded_suggestion_")
+        and event.details.get("case_id") == case_id
+        and (session_id is None or event.details.get("session_id") in {None, session_id})
+    )
+
+
+def _case_quality_state(dimensions: list[dict[str, Any]]) -> str:
+    states = {str(dimension["state"]) for dimension in dimensions}
+    if "blocked" in states:
+        return "blocked"
+    if "warning" in states:
+        return "warning"
+    if "unknown" in states:
+        return "unknown"
+    return "ready"
+
+
+def _case_quality_summary(dimensions: list[dict[str, Any]]) -> dict[str, int]:
+    states = ("ready", "warning", "blocked", "unknown")
+    return {state: sum(1 for dimension in dimensions if dimension["state"] == state) for state in states}
+
+
+def _case_quality_score(dimensions: list[dict[str, Any]]) -> int:
+    if not dimensions:
+        return 0
+    values = {"ready": 1.0, "warning": 0.5, "unknown": 0.0, "blocked": 0.0}
+    score = sum(values.get(str(dimension["state"]), 0.0) for dimension in dimensions)
+    return round((score / len(dimensions)) * 100)
+
+
+def _case_quality_recommended_actions(dimensions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": dimension["id"],
+            "label": dimension["label"],
+            "state": dimension["state"],
+            "action": dimension["next_action"],
+        }
+        for dimension in dimensions
+        if dimension["state"] != "ready" and dimension.get("next_action")
+    ]
 
 
 def _blocked_local_model_smoke(

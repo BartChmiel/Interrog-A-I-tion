@@ -117,6 +117,8 @@ POST /workspaces
 GET /workspaces/{workspace_id}
 GET /workspaces/{workspace_id}/access
 GET /workspaces/{workspace_id}/security
+GET /workspaces/{workspace_id}/demo-readiness?case_id=case-001&session_id=demo-session
+GET /workspaces/{workspace_id}/case-quality?case_id=case-001&session_id=demo-session&locale=en
 GET /workspaces/{workspace_id}/stop-reviews
 POST /workspaces/{workspace_id}/stop-reviews
 GET /workspaces/{workspace_id}/model-artifacts
@@ -124,6 +126,16 @@ POST /workspaces/{workspace_id}/model-artifacts/isolation
 GET /workspaces/{workspace_id}/model-artifacts/manifest
 POST /workspaces/{workspace_id}/model-artifacts/items
 ```
+
+The demo-readiness endpoint aggregates workspace security, session capture, audit-chain
+validity, model artifact traceability, export bundle evidence, and the separate real-model
+STOP gate into one pre-demo report with recommended follow-up actions.
+
+The case-quality endpoint is broader than demo readiness. It aggregates session capture,
+operator claim review, claim provenance, evidence-map coverage, material grounding review,
+grounded-AI artifact/decision trace, operator work-queue decisions, workspace security,
+audit-chain validity, and export bundle evidence into one case-level quality gate with
+a quality score and recommended corrective actions.
 
 ## Local Model Runtime
 

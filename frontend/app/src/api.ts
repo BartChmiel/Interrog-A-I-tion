@@ -1,9 +1,11 @@
 import type {
   CaseCatalogResponse,
+  CaseQualityReport,
   CaseReviewResponse,
   CaseStarterMaterialsResponse,
   ClaimReviewDecisionResponse,
   ClaimReviewStatus,
+  DemoReadinessReport,
   EncryptionStatus,
   EnvironmentHealth,
   GroundedSuggestionDecision,
@@ -282,6 +284,28 @@ export async function loadWorkspaceAccess(
 
 export async function loadWorkspaceSecurity(config: RuntimeConfig): Promise<WorkspaceSecurityReport> {
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/security`);
+}
+
+export async function loadWorkspaceDemoReadiness(config: RuntimeConfig): Promise<DemoReadinessReport> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({
+    case_id: config.caseId,
+    session_id: config.sessionId,
+  });
+  return fetchJson(config, `/workspaces/${workspaceId}/demo-readiness?${query.toString()}`);
+}
+
+export async function loadWorkspaceCaseQuality(
+  config: RuntimeConfig,
+  locale: string,
+): Promise<CaseQualityReport> {
+  const workspaceId = encodeURIComponent(config.workspaceId);
+  const query = new URLSearchParams({
+    case_id: config.caseId,
+    session_id: config.sessionId,
+    locale,
+  });
+  return fetchJson(config, `/workspaces/${workspaceId}/case-quality?${query.toString()}`);
 }
 
 export async function loadWorkspaceStopReviews(config: RuntimeConfig): Promise<StopReviewListResponse> {

@@ -877,6 +877,326 @@ class ApiAppTest(unittest.TestCase):
         self.assertFalse(drift_security["allows_sensitive_material"])
         self.assertEqual(drift_security["issues"][0]["code"], "encrypted_runtime_unavailable")
 
+    def test_workspace_demo_readiness_report_tracks_demo_gates(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"demo-readiness-workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        get_demo_readiness = endpoint(app, "get_workspace_demo_readiness")
+        start_session = endpoint(app, "start_session")
+        add_answer_endpoint = endpoint(app, "add_session_answer")
+        ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
+        write_model_artifact = endpoint(app, "write_workspace_model_artifact")
+        create_export_bundle = endpoint(app, "create_workspace_export_bundle")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-demo-readiness",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        initial = get_demo_readiness(
+            "api-workspace-demo-readiness",
+            case_id="case-001",
+            session_id="api-session-demo-readiness",
+        )
+        initial_checks = {check["id"]: check for check in initial["checks"]}
+
+        self.assertEqual(initial["state"], "warning")
+        self.assertEqual(initial_checks["workspace"]["state"], "ready")
+        self.assertEqual(initial_checks["workspace_security"]["state"], "ready")
+        self.assertEqual(initial_checks["session_capture"]["state"], "warning")
+        self.assertEqual(initial_checks["model_artifacts"]["state"], "warning")
+        self.assertEqual(initial_checks["export_bundle"]["state"], "warning")
+        self.assertEqual(initial_checks["model_experiment_stop"]["state"], "warning")
+        self.assertIn(
+            "export_bundle",
+            {action["id"] for action in initial["recommended_actions"]},
+        )
+
+        start_session(
+            StartSessionRequest(
+                session_id="api-session-demo-readiness",
+                case_id="case-001",
+                participant_id="person-001",
+                initial_role=ParticipantRole.WITNESS,
+            )
+        )
+        add_answer_endpoint(
+            "api-session-demo-readiness",
+            AddAnswerRequest(
+                id="answer-demo-readiness-001",
+                question_id="q-001",
+                text="I last saw the bicycle near the library entrance.",
+                event_id="event-demo-readiness-001",
+                topic_ids=["topic-location"],
+                workspace_id="api-workspace-demo-readiness",
+            ),
+        )
+        ensure_model_artifacts(
+            "api-workspace-demo-readiness",
+            ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
+        )
+        write_model_artifact(
+            "api-workspace-demo-readiness",
+            ModelArtifactWriteRequest(
+                artifact_type="context",
+                content='{"allowed_source_ids":["api-demo-readiness"]}',
+                content_type="application/json",
+                created_by="investigator-001",
+                source="demo-readiness-test",
+                role=WorkspaceRole.INVESTIGATOR,
+            ),
+        )
+        bundle = create_export_bundle(
+            "api-workspace-demo-readiness",
+            ExportBundleRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                markdown="# Demo report\n\nSynthetic demo readiness report.\n",
+                json_export='{"schema_version":1}',
+            ),
+        )
+        ready_for_deterministic_demo = get_demo_readiness(
+            "api-workspace-demo-readiness",
+            case_id="case-001",
+            session_id="api-session-demo-readiness",
+        )
+        checks = {check["id"]: check for check in ready_for_deterministic_demo["checks"]}
+
+        self.assertEqual(ready_for_deterministic_demo["state"], "warning")
+        self.assertFalse(ready_for_deterministic_demo["ready"])
+        self.assertEqual(checks["session_capture"]["state"], "ready")
+        self.assertEqual(checks["model_artifacts"]["state"], "ready")
+        self.assertEqual(checks["export_bundle"]["state"], "ready")
+        self.assertEqual(
+            checks["export_bundle"]["evidence"]["bundle_sha256"],
+            bundle["audit_event"]["details"]["bundle_sha256"],
+        )
+        self.assertEqual(checks["model_experiment_stop"]["state"], "warning")
+        self.assertEqual(ready_for_deterministic_demo["summary"]["warning"], 1)
+        self.assertEqual(
+            [action["id"] for action in ready_for_deterministic_demo["recommended_actions"]],
+            ["model_experiment_stop"],
+        )
+
+    def test_workspace_case_quality_report_aggregates_review_provenance_and_grounding(self) -> None:
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                TEST_OUTPUT_ROOT / f"case-quality-workspaces-{uuid.uuid4()}",
+                encryption_status_provider=_unavailable_encryption_status,
+            )
+        )
+        create_workspace = endpoint(app, "create_workspace")
+        get_case_quality = endpoint(app, "get_workspace_case_quality")
+        start_session = endpoint(app, "start_session")
+        add_answer_endpoint = endpoint(app, "add_session_answer")
+        review_claim = endpoint(app, "review_session_claim")
+        register_material = endpoint(app, "register_workspace_material")
+        link_materials = endpoint(app, "link_workspace_materials_to_questions")
+        record_link_decision = endpoint(app, "record_material_question_link_decision")
+        ensure_model_artifacts = endpoint(app, "ensure_workspace_model_artifact_isolation")
+        generate_grounded_suggestions = endpoint(app, "generate_workspace_grounded_suggestions")
+        record_suggestion_decision = endpoint(app, "record_workspace_grounded_suggestion_decision")
+        record_operator_decision = endpoint(app, "record_workspace_operator_action_decision")
+        create_export_bundle = endpoint(app, "create_workspace_export_bundle")
+
+        create_workspace(
+            CreateWorkspaceRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                workspace_id="api-workspace-case-quality",
+                data_sensitivity=DataSensitivity.SYNTHETIC,
+                storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            )
+        )
+
+        initial = get_case_quality(
+            "api-workspace-case-quality",
+            case_id="case-001",
+            session_id="api-session-case-quality",
+            locale="en",
+        )
+        initial_dimensions = {dimension["id"]: dimension for dimension in initial["dimensions"]}
+
+        self.assertEqual(initial["state"], "warning")
+        self.assertEqual(initial_dimensions["case_scope"]["state"], "ready")
+        self.assertEqual(initial_dimensions["session_capture"]["state"], "warning")
+        self.assertEqual(initial_dimensions["claim_provenance"]["state"], "unknown")
+        self.assertIn(
+            "session_capture",
+            {action["id"] for action in initial["recommended_actions"]},
+        )
+
+        start_session(
+            StartSessionRequest(
+                session_id="api-session-case-quality",
+                case_id="case-001",
+                participant_id="person-001",
+                initial_role=ParticipantRole.WITNESS,
+            )
+        )
+        updated = add_answer_endpoint(
+            "api-session-case-quality",
+            AddAnswerRequest(
+                id="answer-case-quality-001",
+                question_id="q-001",
+                text="At 19:45 I saw the person near the bicycle stand.",
+                event_id="event-case-quality-answer-001",
+                topic_ids=["topic-location"],
+                workspace_id="api-workspace-case-quality",
+            ),
+        )
+        for claim in updated["answers"][0]["claims"]:
+            review_claim(
+                "api-session-case-quality",
+                "answer-case-quality-001",
+                claim["id"],
+                ClaimReviewDecisionRequest(
+                    decision=ClaimReviewStatus.ACCEPTED,
+                    subject=claim["subject"],
+                    attribute=claim["attribute"],
+                    value=claim["value"],
+                    source_text=claim["source_text"],
+                    operator_note="Reviewed for case quality gate.",
+                ),
+            )
+        register_material(
+            "api-workspace-case-quality",
+            RegisterMaterialRequest(
+                id="api-quality-material-001",
+                title="Library bicycle stand note",
+                content="Witness says the bicycle was near the library bicycle stand.",
+                created_by="investigator-001",
+                source_type=MaterialSourceType.CASE_PROTOCOL,
+                tags=["protocol", "synthetic"],
+            ),
+        )
+        material_links = link_materials("api-workspace-case-quality", case_id="case-001", locale="en")
+        for link in material_links["links"]:
+            record_link_decision(
+                "api-workspace-case-quality",
+                link["material_id"],
+                link["question_id"],
+                MaterialQuestionLinkDecisionRequest(
+                    decision="accepted",
+                    case_id="case-001",
+                    question_id=link["question_id"],
+                    topic_ids=link["topic_ids"],
+                    matched_terms=link["matched_terms"],
+                    confidence=link["confidence"],
+                    rationale=link["rationale"],
+                ),
+            )
+        ensure_model_artifacts(
+            "api-workspace-case-quality",
+            ModelArtifactIsolationRequest(created_by="admin-001", role=WorkspaceRole.ADMIN),
+        )
+        grounded_suggestions = generate_grounded_suggestions(
+            "api-workspace-case-quality",
+            case_id="case-001",
+            session_id="api-session-case-quality",
+            question_id="q-001",
+            locale="en",
+        )
+        first_suggestion = grounded_suggestions["suggestions"][0]
+        record_suggestion_decision(
+            "api-workspace-case-quality",
+            first_suggestion["id"],
+            GroundedSuggestionDecisionRequest(
+                decision=SuggestionStatus.ACCEPTED,
+                original_text=first_suggestion["text"],
+                final_text=first_suggestion["text"],
+                suggestion_type=first_suggestion["suggestion_type"],
+                reason=first_suggestion["reason"],
+                linked_topics=first_suggestion["linked_topics"],
+                linked_evidence=first_suggestion["linked_evidence"],
+                risk_flags=first_suggestion["risk_flags"],
+                confidence=first_suggestion["confidence"],
+                model=grounded_suggestions["model"],
+                prompt_version=grounded_suggestions["prompt_version"],
+                prompt_hash=grounded_suggestions["prompt_hash"],
+                context_hash=grounded_suggestions["context_hash"],
+                output_hash=grounded_suggestions["output_hash"],
+                case_id="case-001",
+                session_id="api-session-case-quality",
+                question_id="q-001",
+            ),
+        )
+        record_operator_decision(
+            "api-workspace-case-quality",
+            OperatorActionDecisionRequest(
+                action_id="ask-q-002-quality",
+                action_kind="ask",
+                action_title="Ask the next question",
+                action_detail="q-002: What happened next?",
+                action_priority="high",
+                decision_type="opened",
+                created_by="investigator-001",
+                case_id="case-001",
+                session_id="api-session-case-quality",
+                participant_id="person-001",
+                target_question_id="q-002",
+                source_object_ids=["q-002", "topic-location"],
+                before_state={"active_question_id": "q-001"},
+                after_state={"active_question_id": "q-002"},
+                prompt_hash=grounded_suggestions["prompt_hash"],
+                context_hash=grounded_suggestions["context_hash"],
+                output_hash=grounded_suggestions["output_hash"],
+            ),
+        )
+        bundle = create_export_bundle(
+            "api-workspace-case-quality",
+            ExportBundleRequest(
+                case_id="case-001",
+                created_by="investigator-001",
+                markdown="# Case quality export\n\nSynthetic quality gate report.\n",
+                json_export='{"schema_version":1}',
+            ),
+        )
+
+        quality = get_case_quality(
+            "api-workspace-case-quality",
+            case_id="case-001",
+            session_id="api-session-case-quality",
+            locale="en",
+        )
+        dimensions = {dimension["id"]: dimension for dimension in quality["dimensions"]}
+
+        self.assertEqual(quality["workspace_id"], "api-workspace-case-quality")
+        self.assertEqual(quality["case_id"], "case-001")
+        self.assertEqual(quality["session_id"], "api-session-case-quality")
+        self.assertGreaterEqual(quality["quality_score"], 80)
+        self.assertEqual(dimensions["workspace_security"]["state"], "ready")
+        self.assertEqual(dimensions["session_capture"]["state"], "ready")
+        self.assertEqual(dimensions["claim_review"]["state"], "ready")
+        self.assertEqual(dimensions["claim_review"]["metrics"]["pending"], 0)
+        self.assertEqual(dimensions["claim_provenance"]["state"], "ready")
+        self.assertEqual(dimensions["claim_provenance"]["metrics"]["issue_count"], 0)
+        self.assertEqual(dimensions["material_grounding"]["state"], "ready")
+        self.assertEqual(
+            dimensions["material_grounding"]["metrics"]["accepted_links"],
+            len(material_links["links"]),
+        )
+        self.assertEqual(dimensions["ai_trace"]["state"], "ready")
+        self.assertEqual(dimensions["operator_decisions"]["state"], "ready")
+        self.assertEqual(dimensions["audit_export"]["state"], "ready")
+        self.assertEqual(quality["metrics"]["export_bundle_count"], 1)
+        self.assertEqual(quality["metrics"]["grounded_suggestion_decision_count"], 1)
+        self.assertEqual(
+            dimensions["audit_export"]["metrics"]["export_bundle_count"],
+            1,
+        )
+        self.assertEqual(bundle["audit_event"]["action"], "export_bundle_created")
+        self.assertEqual(bundle["audit_event"]["details"]["case_id"], "case-001")
+
     def test_question_drafts_can_be_answered_with_workspace_context(self) -> None:
         app = create_app(
             workspace_manager=CaseWorkspaceManager(

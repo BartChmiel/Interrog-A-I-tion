@@ -223,6 +223,64 @@ export type EnvironmentHealth = {
   summary: Record<string, number>;
 };
 
+export type DemoReadinessCheck = {
+  id: string;
+  label: string;
+  state: EnvironmentHealthState;
+  detail: string;
+  evidence: Record<string, unknown>;
+  next_action: string;
+};
+
+export type DemoReadinessAction = {
+  id: string;
+  label: string;
+  state: EnvironmentHealthState;
+  action: string;
+};
+
+export type DemoReadinessReport = {
+  workspace_id: string;
+  case_id: string;
+  session_id: string | null;
+  state: EnvironmentHealthState;
+  ready: boolean;
+  generated_at: string;
+  checks: DemoReadinessCheck[];
+  recommended_actions: DemoReadinessAction[];
+  summary: Record<EnvironmentHealthState, number>;
+};
+
+export type CaseQualityDimension = {
+  id: string;
+  label: string;
+  state: EnvironmentHealthState;
+  detail: string;
+  metrics: Record<string, unknown>;
+  next_action: string;
+};
+
+export type CaseQualityAction = {
+  id: string;
+  label: string;
+  state: EnvironmentHealthState;
+  action: string;
+};
+
+export type CaseQualityReport = {
+  workspace_id: string;
+  case_id: string;
+  session_id: string | null;
+  state: EnvironmentHealthState;
+  ready: boolean;
+  quality_score: number;
+  generated_at: string;
+  dimensions: CaseQualityDimension[];
+  recommended_actions: CaseQualityAction[];
+  summary: Record<EnvironmentHealthState, number>;
+  metrics: Record<string, number | string | boolean | null>;
+};
+
 export type LocalModelConfig = {
   provider: string;
   effective_provider: string;
