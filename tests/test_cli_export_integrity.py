@@ -1,3 +1,4 @@
+import hashlib
 import sys
 import unittest
 import uuid
@@ -7,7 +8,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from interrogaition.cli import main
-from interrogaition.export.integrity_manifest import read_export_manifest, verify_export_manifest
+from interrogaition.export.integrity_manifest import (
+    create_export_bundle_zip,
+    read_export_manifest,
+    verify_export_manifest,
+)
 from interrogaition.security.case_workspace import CaseWorkspaceManager
 from interrogaition.security.model_artifacts import (
     ensure_model_artifact_isolation,
@@ -120,6 +125,76 @@ class CliExportIntegrityTest(unittest.TestCase):
                 exit_code = main()
 
         self.assertEqual(exit_code, 0)
+
+    def test_verify_export_command_returns_success_for_downloaded_bundle(self) -> None:
+        export_root = TEST_OUTPUT_ROOT / f"verify-bundle-{uuid.uuid4()}"
+        report_path = export_root / "report.md"
+        manifest_path = export_root / "manifest.json"
+        bundle_path = export_root / "interrogaition-case-001-export.zip"
+        _write_cli_export(report_path, manifest_path)
+        manifest = read_export_manifest(manifest_path)
+        bundle_path.write_bytes(
+            create_export_bundle_zip(
+                markdown_path="report.md",
+                markdown_content=report_path.read_bytes().decode("utf-8"),
+                manifest=manifest,
+            )
+        )
+
+        stdout = StringIO()
+        bundle_sha256 = hashlib.sha256(bundle_path.read_bytes()).hexdigest()
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "interrogaition",
+                "verify-export",
+                str(bundle_path),
+                "--bundle",
+                "--expected-sha256",
+                bundle_sha256,
+            ],
+        ):
+            with redirect_stdout(stdout):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertIn("Export bundle integrity verified.", stdout.getvalue())
+
+    def test_verify_export_command_returns_failure_for_bundle_sha256_mismatch(self) -> None:
+        export_root = TEST_OUTPUT_ROOT / f"verify-bundle-sha-{uuid.uuid4()}"
+        report_path = export_root / "report.md"
+        manifest_path = export_root / "manifest.json"
+        bundle_path = export_root / "interrogaition-case-001-export.zip"
+        _write_cli_export(report_path, manifest_path)
+        manifest = read_export_manifest(manifest_path)
+        bundle_path.write_bytes(
+            create_export_bundle_zip(
+                markdown_path="report.md",
+                markdown_content=report_path.read_bytes().decode("utf-8"),
+                manifest=manifest,
+            )
+        )
+
+        stdout = StringIO()
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "interrogaition",
+                "verify-export",
+                str(bundle_path),
+                "--bundle",
+                "--expected-sha256",
+                "0" * 64,
+            ],
+        ):
+            with redirect_stdout(stdout):
+                exit_code = main()
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("sha256 mismatch", stdout.getvalue())
 
     def test_verify_export_command_returns_failure_for_changed_file(self) -> None:
         export_root = TEST_OUTPUT_ROOT / f"verify-changed-{uuid.uuid4()}"

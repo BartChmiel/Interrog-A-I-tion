@@ -1,3 +1,5 @@
+import base64
+import hashlib
 import unittest
 import uuid
 from pathlib import Path
@@ -794,6 +796,32 @@ class ApiAppTest(unittest.TestCase):
         self.assertTrue(bundle["filename"].endswith("-export.zip"))
         self.assertTrue(bundle["content_base64"])
         self.assertTrue(bundle["verification"]["verified"])
+        bundle_bytes = base64.b64decode(bundle["content_base64"].encode("ascii"))
+        self.assertTrue(bundle["chain_valid"])
+        self.assertEqual(bundle["audit_event"]["action"], "export_bundle_created")
+        self.assertEqual(bundle["audit_event"]["object_type"], "export_bundle")
+        self.assertEqual(bundle["audit_event"]["object_id"], bundle["manifest"]["export_id"])
+        self.assertEqual(bundle["audit_event"]["details"]["workspace_id"], "api-workspace-001")
+        self.assertEqual(bundle["audit_event"]["details"]["case_id"], "case-001")
+        self.assertEqual(bundle["audit_event"]["details"]["filename"], bundle["filename"])
+        self.assertEqual(
+            bundle["audit_event"]["details"]["manifest_hash"],
+            bundle["manifest"]["manifest_hash"],
+        )
+        self.assertEqual(
+            bundle["audit_event"]["details"]["bundle_sha256"],
+            hashlib.sha256(bundle_bytes).hexdigest(),
+        )
+        self.assertEqual(bundle["audit_event"]["details"]["bundle_size_bytes"], len(bundle_bytes))
+        self.assertTrue(bundle["audit_event"]["details"]["json_included"])
+        self.assertTrue(bundle["audit_event"]["details"]["model_artifacts_included"])
+        self.assertEqual(bundle["audit_event"]["details"]["model_artifact_record_count"], 4)
+        self.assertTrue(bundle["audit_event"]["details"]["verification_verified"])
+        workspace_audit_after_export = get_workspace_audit("api-workspace-001")
+        export_event = workspace_audit_after_export["events"][-1]
+        self.assertEqual(export_event["action"], "export_bundle_created")
+        self.assertEqual(export_event["event_hash"], bundle["audit_event"]["event_hash"])
+        self.assertTrue(workspace_audit_after_export["chain_valid"])
 
         with self.assertRaises(HTTPException) as caught:
             create_workspace(

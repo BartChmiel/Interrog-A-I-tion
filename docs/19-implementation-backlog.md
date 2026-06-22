@@ -200,12 +200,14 @@ Tasks:
 - add session context and provenance summary wrapper,
 - add download and copy controls with a non-official disclaimer,
 - keep export behind the local API workflow,
-- add recorded answers and grounded AI trace sections to the export wrapper.
+- add recorded answers and grounded AI trace sections to the export wrapper,
+- attach export bundle hash, manifest hash, inclusion flags, and verification state to workspace audit,
+- verify downloaded ZIP bundles offline with `verify-export --bundle`,
+- show downloaded ZIP hash, audit verification state, and CLI verification command with expected SHA-256 in the report export panel.
 
 Next:
 
-- verify downloaded zip bundles offline with the CLI integrity tool,
-- attach export bundle hash to workspace audit after STOP review.
+- run a browser/API round-trip with a downloaded ZIP during final demo rehearsal.
 
 ## Milestone 9: Case Workflow Deepening
 

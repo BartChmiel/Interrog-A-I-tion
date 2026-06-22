@@ -12,6 +12,7 @@ from interrogaition.export.integrity_manifest import (
     create_export_manifest_from_contents,
     create_model_artifact_manifest_reference,
     read_export_manifest,
+    verify_export_bundle_zip,
     verify_export_manifest,
     verify_export_manifest_contents,
     write_export_manifest,
@@ -72,6 +73,59 @@ class ExportIntegrityManifestTest(unittest.TestCase):
             names = set(archive.namelist())
 
         self.assertEqual(names, {"session-report.md", "manifest.json", "session-report.json"})
+
+    def test_verifies_zip_bundle_from_file(self) -> None:
+        root = _export_root("bundle-verify")
+        bundle_path = root / "interrogaition-case-001-export.zip"
+        manifest = create_export_manifest_from_contents(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(("session-report.md", "# Report\n"),),
+        )
+        bundle_path.write_bytes(
+            create_export_bundle_zip(
+                markdown_path="session-report.md",
+                markdown_content="# Report\n",
+                manifest=manifest,
+            )
+        )
+
+        verification = verify_export_bundle_zip(bundle_path)
+
+        self.assertTrue(verification.verified)
+        self.assertTrue(verification.manifest_hash_valid)
+
+    def test_zip_bundle_verification_detects_changed_report(self) -> None:
+        root = _export_root("bundle-changed")
+        bundle_path = root / "interrogaition-case-001-export.zip"
+        manifest = create_export_manifest_from_contents(
+            case_id="case-001",
+            created_by="investigator-001",
+            files=(("session-report.md", "# Report\n"),),
+        )
+        bundle_path.write_bytes(
+            create_export_bundle_zip(
+                markdown_path="session-report.md",
+                markdown_content="# Changed\n",
+                manifest=manifest,
+            )
+        )
+
+        verification = verify_export_bundle_zip(bundle_path)
+
+        self.assertFalse(verification.verified)
+        self.assertEqual(verification.changed_files, ("session-report.md",))
+
+    def test_zip_bundle_verification_reports_missing_manifest(self) -> None:
+        root = _export_root("bundle-missing-manifest")
+        bundle_path = root / "interrogaition-case-001-export.zip"
+        with zipfile.ZipFile(bundle_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("session-report.md", "# Report\n")
+
+        verification = verify_export_bundle_zip(bundle_path)
+
+        self.assertFalse(verification.verified)
+        self.assertIn("manifest.json", verification.unexpected_errors[0])
 
     def test_rejects_unsafe_virtual_export_paths(self) -> None:
         with self.assertRaises(ExportIntegrityError):

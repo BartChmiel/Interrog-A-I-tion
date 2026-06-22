@@ -8,7 +8,24 @@ import {
   buildSessionReportJson,
   type SessionReportExportInput,
 } from "./session-report";
-import type { ApiMode, ExportIntegrityManifest, ExportIntegrityVerification, Locale, RuntimeConfig } from "./types";
+import type {
+  ApiMode,
+  ExportBundleResponse,
+  ExportIntegrityManifest,
+  ExportIntegrityVerification,
+  Locale,
+  RuntimeConfig,
+} from "./types";
+
+type BundleReceipt = {
+  filename: string;
+  bundleSha256: string | null;
+  bundleSizeBytes: number | null;
+  manifestHash: string | null;
+  verified: boolean;
+  chainValid: boolean;
+  verifyCommand: string;
+};
 
 function shortHash(value: string): string {
   return value.length > 16 ? `${value.slice(0, 16)}…` : value;
@@ -35,6 +52,7 @@ export function SessionReportPanel({
   const [isIntegrityLoading, setIsIntegrityLoading] = useState(false);
   const [isBundleDownloading, setIsBundleDownloading] = useState(false);
   const [bundleError, setBundleError] = useState<string | null>(null);
+  const [bundleReceipt, setBundleReceipt] = useState<BundleReceipt | null>(null);
 
   const markdownWithoutIntegrity = useMemo(() => {
     if (!preview || !exportInput) {
@@ -122,6 +140,10 @@ export function SessionReportPanel({
     onExported?.();
   }
 
+  async function copyBundleVerifyCommand(command: string) {
+    await navigator.clipboard.writeText(command);
+  }
+
   function downloadMarkdown() {
     if (!markdownExport) {
       return;
@@ -145,12 +167,14 @@ export function SessionReportPanel({
 
     setIsBundleDownloading(true);
     setBundleError(null);
+    setBundleReceipt(null);
 
     try {
       const response = await loadExportBundle(config, markdownWithoutIntegrity, jsonExport);
       downloadBase64File(response.content_base64, response.filename, response.content_type);
       setIntegrityManifest(response.manifest);
       setIntegrityVerification(response.verification);
+      setBundleReceipt(createBundleReceipt(response));
       onExported?.();
     } catch (error) {
       setBundleError(error instanceof Error ? error.message : text(locale, "exportBundleFailed"));
@@ -187,6 +211,53 @@ export function SessionReportPanel({
             </button>
           </div>
           {bundleError ? <p className="grounding-pack-error">{bundleError}</p> : null}
+          {bundleReceipt ? (
+            <div className="session-report-bundle-receipt">
+              <div className="session-report-bundle-receipt-header">
+                <FileArchive size={14} />
+                <strong>{text(locale, "exportBundleReady")}</strong>
+                <span
+                  className="integrity-verification-badge"
+                  data-verified={bundleReceipt.verified && bundleReceipt.chainValid ? "true" : "false"}
+                >
+                  {bundleReceipt.verified && bundleReceipt.chainValid ? (
+                    <CheckCircle2 size={14} />
+                  ) : (
+                    <XCircle size={14} />
+                  )}
+                  {bundleReceipt.verified && bundleReceipt.chainValid
+                    ? text(locale, "integrityVerified")
+                    : text(locale, "integrityFailed")}
+                </span>
+              </div>
+              <div className="session-report-bundle-grid">
+                <span>{bundleReceipt.filename}</span>
+                {bundleReceipt.bundleSha256 ? (
+                  <span>
+                    {text(locale, "exportBundleHash")}: {shortHash(bundleReceipt.bundleSha256)}
+                  </span>
+                ) : null}
+                {bundleReceipt.bundleSizeBytes !== null ? (
+                  <span>
+                    {text(locale, "exportBundleSize")}: {formatBytes(bundleReceipt.bundleSizeBytes)}
+                  </span>
+                ) : null}
+                {bundleReceipt.manifestHash ? (
+                  <span>
+                    {text(locale, "manifestHash")}: {shortHash(bundleReceipt.manifestHash)}
+                  </span>
+                ) : null}
+                <span>{bundleReceipt.chainValid ? text(locale, "chainValid") : text(locale, "chainInvalid")}</span>
+              </div>
+              <div className="session-report-bundle-command">
+                <code>{bundleReceipt.verifyCommand}</code>
+                <button type="button" onClick={() => void copyBundleVerifyCommand(bundleReceipt.verifyCommand)}>
+                  <ClipboardCopy size={14} />
+                  {text(locale, "exportBundleCopyCommand")}
+                </button>
+              </div>
+            </div>
+          ) : null}
           <div className="session-report-integrity">
             <strong>{text(locale, "exportIntegrityPreview")}</strong>
             {isIntegrityLoading ? (
@@ -246,6 +317,43 @@ export function SessionReportPanel({
 function buildFilename(config: RuntimeConfig, extension: string): string {
   const stamp = new Date().toISOString().slice(0, 10);
   return `interrogaition-${config.caseId}-${config.sessionId}-${stamp}.${extension}`;
+}
+
+function createBundleReceipt(response: ExportBundleResponse): BundleReceipt {
+  const details = response.audit_event.details;
+  const bundleSha256 = readString(details.bundle_sha256);
+  return {
+    filename: response.filename,
+    bundleSha256,
+    bundleSizeBytes: readNumber(details.bundle_size_bytes),
+    manifestHash: response.manifest.manifest_hash ?? readString(details.manifest_hash),
+    verified: response.verification.verified,
+    chainValid: response.chain_valid,
+    verifyCommand: buildBundleVerifyCommand(response.filename, bundleSha256),
+  };
+}
+
+function buildBundleVerifyCommand(filename: string, bundleSha256: string | null): string {
+  const baseCommand = `python -m interrogaition.cli verify-export .\\${filename} --bundle`;
+  return bundleSha256 ? `${baseCommand} --expected-sha256 ${bundleSha256}` : baseCommand;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function readNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatBytes(value: number): string {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function downloadTextFile(content: string, filename: string, mimeType: string) {

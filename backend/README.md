@@ -33,6 +33,7 @@ Report export with an integrity manifest:
 ```powershell
 python -m interrogaition.cli review ..\data\synthetic\case-001\case.json --output ..\test-output\report.md --manifest ..\test-output\manifest.json --created-by investigator-001
 python -m interrogaition.cli verify-export ..\test-output\manifest.json --root ..\test-output
+python -m interrogaition.cli verify-export ..\test-output\interrogaition-case-001-export.zip --bundle --expected-sha256 <zip-sha256>
 ```
 
 Report export with model artifact provenance, when a workspace is available:
@@ -90,7 +91,7 @@ Live sessions are persisted in a local SQLite database when the API app is run n
 backend/local-data/interrogaition.sqlite3
 ```
 
-Session start, answer creation, review refresh, material-link decisions, and grounded-suggestion decisions are written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage.
+Session start, answer creation, review refresh, material-link decisions, grounded-suggestion decisions, real-model smoke attempts, and export bundle creation are written to an append-only audit table with a SHA-256 hash chain. This is an integrity prototype, not encrypted storage.
 
 Markdown exports can be accompanied by an integrity manifest. Schema v2 can include workspace model-artifact provenance: artifact manifest hash, record hashes, artifact file hashes, chain validity, and latest artifact record hash.
 
@@ -184,3 +185,10 @@ preserving the action metadata, linked source ids, target question/tab, and befo
 state for later provenance review.
 The decision-list endpoint returns the newest matching decision first for compact UI trails;
 the full workspace audit endpoint remains the chain-ordered integrity view.
+
+ZIP export bundle creation is also recorded in the workspace audit chain with the export id,
+manifest hash, ZIP SHA-256, bundle size, JSON/model-artifact inclusion flags, and verification
+state returned by the integrity checker.
+Downloaded ZIP bundles can be verified offline with `verify-export --bundle --expected-sha256 <zip-sha256>`,
+which checks the ZIP file hash, reads `manifest.json` from the archive, and verifies the
+manifest-declared files against the ZIP contents.

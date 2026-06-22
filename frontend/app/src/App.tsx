@@ -2148,6 +2148,7 @@ export function App() {
                     onExported={() => {
                       setSessionReportExported(true);
                       setStatusKey("sessionReportCopied");
+                      void refreshAuditTrails();
                     }}
                   />
                 </CollapsibleSection>
@@ -2922,6 +2923,14 @@ function auditEventDetailPairs(event: AuditEvent): Array<[string, unknown]> {
     "target_question_id",
     "target_tab",
     "material_id",
+    "export_id",
+    "filename",
+    "manifest_hash",
+    "bundle_sha256",
+    "bundle_size_bytes",
+    "verification_verified",
+    "json_included",
+    "model_artifacts_included",
     "gate_id",
     "readiness_state",
     "issue_codes",
@@ -2970,6 +2979,7 @@ function auditActionLabel(action: string, locale: Locale): string {
       local_model_smoke_blocked: "Zablokowano smoke modelu",
       local_model_smoke_completed: "Wykonano smoke modelu",
       local_model_smoke_failed: "Smoke modelu nieudany",
+      export_bundle_created: "Utworzono paczkę eksportu",
     },
     en: {
       session_started: "Session started",
@@ -2989,6 +2999,7 @@ function auditActionLabel(action: string, locale: Locale): string {
       local_model_smoke_blocked: "Model smoke blocked",
       local_model_smoke_completed: "Model smoke completed",
       local_model_smoke_failed: "Model smoke failed",
+      export_bundle_created: "Export bundle created",
     },
   };
   return labels[locale][action] ?? action.replaceAll("_", " ");
@@ -3036,17 +3047,24 @@ function auditDetailLabel(key: string, locale: Locale): string {
     pl: {
       action_title: "akcja",
       artifact_warning: "artefakty",
+      bundle_sha256: "bundle",
+      bundle_size_bytes: "rozmiar",
       case_id: "sprawa",
       context_hash: "context",
       created_by: "operator",
       decision: "decyzja",
       decision_type: "typ decyzji",
+      export_id: "export",
+      filename: "plik",
       finding_count: "ustalenia",
       gate_id: "bramka",
       issue_codes: "blokady",
       indicator_count: "wskaźniki",
+      json_included: "JSON",
+      manifest_hash: "manifest",
       checklist: "checklista",
       material_id: "materiał",
+      model_artifacts_included: "artefakty modelu",
       model_id: "model",
       ok: "wynik",
       output_hash: "output",
@@ -3062,21 +3080,29 @@ function auditDetailLabel(key: string, locale: Locale): string {
       session_id: "sesja",
       target_question_id: "cel pytania",
       target_tab: "zakładka",
+      verification_verified: "weryfikacja",
     },
     en: {
       action_title: "action",
       artifact_warning: "artifacts",
+      bundle_sha256: "bundle",
+      bundle_size_bytes: "size",
       case_id: "case",
       context_hash: "context",
       created_by: "operator",
       decision: "decision",
       decision_type: "decision type",
+      export_id: "export",
+      filename: "file",
       finding_count: "findings",
       gate_id: "gate",
       issue_codes: "blocks",
       indicator_count: "indicators",
+      json_included: "JSON",
+      manifest_hash: "manifest",
       checklist: "checklist",
       material_id: "material",
+      model_artifacts_included: "model artifacts",
       model_id: "model",
       ok: "result",
       output_hash: "output",
@@ -3092,6 +3118,7 @@ function auditDetailLabel(key: string, locale: Locale): string {
       session_id: "session",
       target_question_id: "target question",
       target_tab: "tab",
+      verification_verified: "verification",
     },
   };
   return labels[locale][key] ?? key.replaceAll("_", " ");

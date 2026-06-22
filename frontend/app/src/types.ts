@@ -697,6 +697,8 @@ export type ExportBundleResponse = {
   content_base64: string;
   manifest: ExportIntegrityManifest;
   verification: ExportIntegrityVerification;
+  audit_event: AuditEvent;
+  chain_valid: boolean;
 };
 
 export type GroundedSuggestion = {

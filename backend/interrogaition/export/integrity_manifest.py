@@ -191,6 +191,67 @@ def create_export_bundle_base64(
     ).decode("ascii")
 
 
+def verify_export_bundle_zip(
+    bundle_path: Path,
+    *,
+    workspace_root_path: Path | None = None,
+) -> ExportVerification:
+    """Verify a downloaded ZIP export bundle without manual extraction."""
+
+    try:
+        with zipfile.ZipFile(bundle_path) as archive:
+            try:
+                manifest = read_export_manifest_json(archive.read("manifest.json").decode("utf-8"))
+            except KeyError:
+                return ExportVerification(
+                    verified=False,
+                    manifest_hash_valid=False,
+                    unexpected_errors=("manifest.json: missing from bundle.",),
+                )
+
+            files: list[tuple[str, bytes]] = []
+            for record in manifest.files:
+                try:
+                    files.append((record.path, archive.read(record.path)))
+                except KeyError:
+                    continue
+
+        verification = verify_export_manifest_contents(manifest, files=files)
+        if manifest.model_artifacts is None or workspace_root_path is None:
+            return verification
+
+        model_verification = _verify_model_artifact_references(
+            manifest,
+            workspace_root_path=workspace_root_path,
+        )
+        return ExportVerification(
+            verified=(
+                verification.manifest_hash_valid
+                and not verification.missing_files
+                and not verification.changed_files
+                and model_verification.model_artifact_manifest_hash_valid
+                and model_verification.model_artifact_chain_valid
+                and not model_verification.missing_model_artifact_files
+                and not model_verification.changed_model_artifact_files
+                and not model_verification.unexpected_errors
+            ),
+            manifest_hash_valid=verification.manifest_hash_valid,
+            missing_files=verification.missing_files,
+            changed_files=verification.changed_files,
+            model_artifact_manifest_hash_valid=model_verification.model_artifact_manifest_hash_valid,
+            model_artifact_chain_valid=model_verification.model_artifact_chain_valid,
+            missing_model_artifact_files=model_verification.missing_model_artifact_files,
+            changed_model_artifact_files=model_verification.changed_model_artifact_files,
+            unexpected_errors=model_verification.unexpected_errors,
+        )
+    except (ExportIntegrityError, UnicodeDecodeError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        return ExportVerification(
+            verified=False,
+            manifest_hash_valid=False,
+            unexpected_errors=(f"bundle: {exc}",),
+        )
+
+
 def create_export_manifest(
     *,
     case_id: str,
@@ -242,7 +303,13 @@ def write_export_manifest(path: Path, manifest: ExportManifest) -> None:
 
 
 def read_export_manifest(path: Path) -> ExportManifest:
-    raw = json.loads(path.read_text(encoding="utf-8"))
+    return read_export_manifest_json(path.read_text(encoding="utf-8"))
+
+
+def read_export_manifest_json(content: str) -> ExportManifest:
+    raw = json.loads(content)
+    if not isinstance(raw, dict):
+        raise ExportIntegrityError("Export manifest JSON must be an object.")
     if raw.get("schema_version") not in SUPPORTED_EXPORT_MANIFEST_SCHEMA_VERSIONS:
         raise ExportIntegrityError("Unsupported export manifest schema version.")
 
@@ -274,12 +341,8 @@ def verify_export_manifest(
     root = root_path.resolve()
     missing_files: list[str] = []
     changed_files: list[str] = []
-    missing_model_artifact_files: list[str] = []
-    changed_model_artifact_files: list[str] = []
     unexpected_errors: list[str] = []
     manifest_hash_valid = manifest.manifest_hash == calculate_manifest_hash(manifest)
-    model_artifact_manifest_hash_valid = True
-    model_artifact_chain_valid = True
 
     for record in manifest.files:
         try:
@@ -293,62 +356,97 @@ def verify_export_manifest(
         except Exception as exc:
             unexpected_errors.append(f"{record.path}: {exc}")
 
-    if manifest.model_artifacts is not None:
-        model_artifact_chain_valid = manifest.model_artifacts.chain_valid
-        if workspace_root_path is None:
-            unexpected_errors.append("model_artifacts: workspace_root_path is required for verification.")
-        else:
-            workspace_root = workspace_root_path.resolve()
-            try:
-                manifest_path = _safe_relative_path(
-                    workspace_root,
-                    manifest.model_artifacts.manifest_path,
-                    "Model artifact manifest path escaped the workspace root.",
-                )
-                expected_manifest_hash = manifest.model_artifacts.manifest_sha256
-                if expected_manifest_hash is None:
-                    if manifest_path.exists():
-                        changed_model_artifact_files.append(manifest.model_artifacts.manifest_path)
-                        model_artifact_manifest_hash_valid = False
-                elif not manifest_path.exists():
-                    missing_model_artifact_files.append(manifest.model_artifacts.manifest_path)
-                    model_artifact_manifest_hash_valid = False
-                elif sha256_file(manifest_path) != expected_manifest_hash:
-                    changed_model_artifact_files.append(manifest.model_artifacts.manifest_path)
-                    model_artifact_manifest_hash_valid = False
-            except Exception as exc:
-                model_artifact_manifest_hash_valid = False
-                unexpected_errors.append(f"{manifest.model_artifacts.manifest_path}: {exc}")
-
-            for record in manifest.model_artifacts.records:
-                try:
-                    path = _safe_relative_path(
-                        workspace_root,
-                        record.relative_path,
-                        "Model artifact path escaped the workspace root.",
-                    )
-                    if not path.exists():
-                        missing_model_artifact_files.append(record.relative_path)
-                        continue
-                    if path.stat().st_size != record.size_bytes or sha256_file(path) != record.sha256:
-                        changed_model_artifact_files.append(record.relative_path)
-                except Exception as exc:
-                    unexpected_errors.append(f"{record.relative_path}: {exc}")
+    model_verification = _verify_model_artifact_references(
+        manifest,
+        workspace_root_path=workspace_root_path,
+    )
+    unexpected_errors.extend(model_verification.unexpected_errors)
 
     return ExportVerification(
         verified=(
             manifest_hash_valid
-            and model_artifact_manifest_hash_valid
-            and model_artifact_chain_valid
+            and model_verification.model_artifact_manifest_hash_valid
+            and model_verification.model_artifact_chain_valid
             and not missing_files
             and not changed_files
-            and not missing_model_artifact_files
-            and not changed_model_artifact_files
+            and not model_verification.missing_model_artifact_files
+            and not model_verification.changed_model_artifact_files
             and not unexpected_errors
         ),
         manifest_hash_valid=manifest_hash_valid,
         missing_files=tuple(missing_files),
         changed_files=tuple(changed_files),
+        model_artifact_manifest_hash_valid=model_verification.model_artifact_manifest_hash_valid,
+        model_artifact_chain_valid=model_verification.model_artifact_chain_valid,
+        missing_model_artifact_files=model_verification.missing_model_artifact_files,
+        changed_model_artifact_files=model_verification.changed_model_artifact_files,
+        unexpected_errors=tuple(unexpected_errors),
+    )
+
+
+def _verify_model_artifact_references(
+    manifest: ExportManifest,
+    *,
+    workspace_root_path: Path | None,
+) -> ExportVerification:
+    if manifest.model_artifacts is None:
+        return ExportVerification(verified=True, manifest_hash_valid=True)
+
+    missing_model_artifact_files: list[str] = []
+    changed_model_artifact_files: list[str] = []
+    unexpected_errors: list[str] = []
+    model_artifact_manifest_hash_valid = True
+    model_artifact_chain_valid = manifest.model_artifacts.chain_valid
+
+    if workspace_root_path is None:
+        unexpected_errors.append("model_artifacts: workspace_root_path is required for verification.")
+    else:
+        workspace_root = workspace_root_path.resolve()
+        try:
+            manifest_path = _safe_relative_path(
+                workspace_root,
+                manifest.model_artifacts.manifest_path,
+                "Model artifact manifest path escaped the workspace root.",
+            )
+            expected_manifest_hash = manifest.model_artifacts.manifest_sha256
+            if expected_manifest_hash is None:
+                if manifest_path.exists():
+                    changed_model_artifact_files.append(manifest.model_artifacts.manifest_path)
+                    model_artifact_manifest_hash_valid = False
+            elif not manifest_path.exists():
+                missing_model_artifact_files.append(manifest.model_artifacts.manifest_path)
+                model_artifact_manifest_hash_valid = False
+            elif sha256_file(manifest_path) != expected_manifest_hash:
+                changed_model_artifact_files.append(manifest.model_artifacts.manifest_path)
+                model_artifact_manifest_hash_valid = False
+        except Exception as exc:
+            model_artifact_manifest_hash_valid = False
+            unexpected_errors.append(f"{manifest.model_artifacts.manifest_path}: {exc}")
+
+        for record in manifest.model_artifacts.records:
+            try:
+                path = _safe_relative_path(
+                    workspace_root,
+                    record.relative_path,
+                    "Model artifact path escaped the workspace root.",
+                )
+                if not path.exists():
+                    missing_model_artifact_files.append(record.relative_path)
+                    continue
+                if path.stat().st_size != record.size_bytes or sha256_file(path) != record.sha256:
+                    changed_model_artifact_files.append(record.relative_path)
+            except Exception as exc:
+                unexpected_errors.append(f"{record.relative_path}: {exc}")
+
+    return ExportVerification(
+        verified=(
+            model_artifact_manifest_hash_valid
+            and model_artifact_chain_valid
+            and not missing_model_artifact_files
+            and not changed_model_artifact_files
+            and not unexpected_errors
+        ),
+        manifest_hash_valid=True,
         model_artifact_manifest_hash_valid=model_artifact_manifest_hash_valid,
         model_artifact_chain_valid=model_artifact_chain_valid,
         missing_model_artifact_files=tuple(missing_model_artifact_files),

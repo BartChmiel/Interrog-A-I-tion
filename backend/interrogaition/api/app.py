@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import sqlite3
@@ -1551,15 +1552,34 @@ def create_app(
                 manifest=manifest,
                 json_content=request.json_export,
             )
+            bundle_bytes = base64.b64decode(bundle_base64.encode("ascii"))
         except ExportIntegrityError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        filename = f"interrogaition-{request.case_id}-export.zip"
+        audit_event = store.append_audit_event(
+            actor=Actor.HUMAN,
+            action="export_bundle_created",
+            object_type="export_bundle",
+            object_id=manifest.export_id,
+            details=_export_bundle_audit_details(
+                workspace=workspace,
+                request=request,
+                filename=filename,
+                manifest=manifest,
+                verification=verification,
+                bundle_bytes=bundle_bytes,
+            ),
+        )
+
         return {
-            "filename": f"interrogaition-{request.case_id}-export.zip",
+            "filename": filename,
             "content_type": "application/zip",
             "content_base64": bundle_base64,
             "manifest": export_manifest_to_dict(manifest),
             "verification": _to_jsonable(verification),
+            "audit_event": _to_jsonable(audit_event),
+            "chain_valid": store.verify_audit_chain(),
         }
 
     @app.get("/workspaces/{workspace_id}/audit")
@@ -2028,6 +2048,41 @@ def _local_model_smoke_audit_details(
 
 def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _export_bundle_audit_details(
+    *,
+    workspace: CaseWorkspace,
+    request: ExportBundleRequest,
+    filename: str,
+    manifest: Any,
+    verification: Any,
+    bundle_bytes: bytes,
+) -> dict[str, Any]:
+    model_artifacts = manifest.model_artifacts
+    return {
+        "workspace_id": workspace.manifest.workspace_id,
+        "case_id": workspace.manifest.case_id,
+        "export_id": manifest.export_id,
+        "created_by": request.created_by,
+        "filename": filename,
+        "markdown_path": request.markdown_path,
+        "file_paths": [record.path for record in manifest.files],
+        "manifest_hash": manifest.manifest_hash,
+        "bundle_sha256": _sha256_bytes(bundle_bytes),
+        "bundle_size_bytes": len(bundle_bytes),
+        "json_included": request.json_export is not None,
+        "include_model_artifacts_requested": request.include_model_artifacts,
+        "model_artifacts_included": model_artifacts is not None,
+        "model_artifact_record_count": model_artifacts.record_count if model_artifacts is not None else 0,
+        "model_artifact_chain_valid": verification.model_artifact_chain_valid,
+        "manifest_hash_valid": verification.manifest_hash_valid,
+        "verification_verified": verification.verified,
+    }
 
 
 def _session_audit_events(

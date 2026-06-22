@@ -224,6 +224,66 @@ h2 {
   gap: 6px;
 }
 
+.session-report-bundle-receipt {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  border-radius: 8px;
+  background: rgba(20, 83, 45, 0.12);
+  padding: 10px 12px;
+}
+
+.session-report-bundle-receipt-header,
+.session-report-bundle-grid {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #d8e7d7;
+  font-size: 12px;
+}
+
+.session-report-bundle-receipt-header strong {
+  color: #ecfdf5;
+}
+
+.session-report-bundle-grid {
+  color: #a8bda9;
+}
+
+.session-report-bundle-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.session-report-bundle-command code {
+  display: block;
+  overflow-wrap: anywhere;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.42);
+  padding: 7px 8px;
+  color: #dbe4f0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.session-report-bundle-command button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .session-report-bundle-command {
+    grid-template-columns: 1fr;
+  }
+}
+
 .model-smoke-actions {
   display: flex;
   flex-wrap: wrap;
