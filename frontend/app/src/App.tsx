@@ -103,6 +103,7 @@ import type {
   EvidenceTopicStatus,
   GroundedSuggestionDecision,
   GroundedSuggestion,
+  GroundedSuggestionQualityReport,
   GroundedSuggestionsResponse,
   GroundedSuggestionWarning,
   Indicator,
@@ -278,6 +279,7 @@ export function App() {
     contextArtifact: ModelArtifactSummary | null;
     outputArtifact: ModelArtifactSummary | null;
     artifactWarning: string | null;
+    qualityReport: GroundedSuggestionQualityReport | null;
   } | null>(null);
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, GroundedSuggestionDecision>>({});
@@ -301,6 +303,7 @@ export function App() {
           contextArtifact: ModelArtifactSummary | null;
           outputArtifact: ModelArtifactSummary | null;
           artifactWarning: string | null;
+          qualityReport: GroundedSuggestionQualityReport | null;
         } | null;
         decisions: Record<string, GroundedSuggestionDecision>;
         drafts: Record<string, string>;
@@ -889,6 +892,7 @@ export function App() {
             contextArtifact: response.context_artifact ?? null,
             outputArtifact: response.output_artifact ?? null,
             artifactWarning: response.artifact_warning ?? null,
+            qualityReport: response.quality_report ?? null,
           }
         : null,
     );
@@ -1469,7 +1473,7 @@ export function App() {
   function startFreshDemo() {
     const nextUrl = new URL(window.location.href);
     const stamp = Date.now();
-    nextUrl.searchParams.set("session", `${config.caseId}-demo-${stamp}`);
+    nextUrl.searchParams.set("session", `${config.caseId}-session-${stamp}`);
     nextUrl.searchParams.set("workspace", `${config.caseId}-workspace-${stamp}`);
     window.location.assign(nextUrl.toString());
   }

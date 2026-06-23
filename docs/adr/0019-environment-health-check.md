@@ -33,7 +33,7 @@ Frontend:
 
 ## Consequences
 
-- Demo readiness is visible in one place.
+- Workflow readiness is visible in one place.
 - Missing synthetic fixtures or local-data problems become obvious early.
 - SQLCipher absence remains a warning for synthetic prototype work, not a blocker.
 - Real-model live output remains separately blocked by the local model runtime gate.

@@ -1298,6 +1298,10 @@ def create_app(
             "output_hash": result.output_hash,
             "suggestion_count": len(result.batch.suggestions),
             "warning_count": len(result.warnings),
+            "quality_state": result.quality_report.state,
+            "quality_score": result.quality_report.score,
+            "quality_issue_count": result.quality_report.issue_count,
+            "quality_error_count": result.quality_report.error_count,
         }
         if prompt_artifact is not None:
             audit_details["prompt_artifact_id"] = prompt_artifact["artifact_id"]
@@ -1329,6 +1333,7 @@ def create_app(
             "context_hash": result.context_hash,
             "output_hash": result.output_hash,
             "warnings": _to_jsonable(result.warnings),
+            "quality_report": _to_jsonable(result.quality_report),
             "prompt_artifact": prompt_artifact,
             "context_artifact": context_artifact,
             "output_artifact": output_artifact,
@@ -2101,9 +2106,9 @@ def _build_demo_readiness_report(
             "workspace_security",
             "Workspace security",
             workspace_security.state,
-            _first_issue_detail(workspace_security.issues) or "Workspace security posture is ready for synthetic demo data.",
+            _first_issue_detail(workspace_security.issues) or "Workspace security posture is ready for synthetic workflow data.",
             {"issue_count": workspace_security.issue_count},
-            "Resolve workspace security findings before demo rehearsal.",
+            "Resolve workspace security findings before continuing the workflow.",
         ),
         _demo_readiness_check(
             "audit_chain",
@@ -2122,7 +2127,7 @@ def _build_demo_readiness_report(
             _session_capture_state(session_id=session_id, session=session),
             _session_capture_detail(session_id=session_id, session=session),
             {"answer_count": len(session.answers) if session is not None else 0},
-            "Start the demo session and record at least one answer before the final walkthrough.",
+            "Start the session and record at least one answer before the final review.",
         ),
         _demo_readiness_check(
             "model_artifacts",
@@ -2143,14 +2148,14 @@ def _build_demo_readiness_report(
             (
                 "Controlled real-model smoke is approved."
                 if model_readiness.can_run_real_smoke
-                else "Default demo remains deterministic; real-model smoke still needs its separate STOP gate."
+                else "Default workflow remains deterministic; real-model smoke still needs its separate STOP gate."
             ),
             {
                 "provider": model_readiness.provider,
                 "effective_provider": model_readiness.effective_provider,
                 "issue_count": model_readiness.issue_count,
             },
-            "Keep the first demo deterministic unless you deliberately run the separate real-model STOP approval.",
+            "Keep the default workflow deterministic unless you deliberately run the separate real-model STOP approval.",
         ),
         _demo_readiness_check(
             "export_bundle",
@@ -2159,7 +2164,7 @@ def _build_demo_readiness_report(
             (
                 "A ZIP export bundle is recorded in the workspace audit chain."
                 if export_events
-                else "Download a ZIP export bundle from Review before the final demo rehearsal."
+                else "Download a ZIP export bundle from Review before the final review."
             ),
             _latest_export_bundle_evidence(export_events),
             "Download the ZIP export bundle and verify it offline with the generated SHA-256 command.",
@@ -2240,7 +2245,7 @@ def _session_capture_state(*, session_id: str | None, session: InterviewSession 
 
 def _session_capture_detail(*, session_id: str | None, session: InterviewSession | None) -> str:
     if not session_id:
-        return "No session id was supplied for this demo readiness report."
+        return "No session id was supplied for this readiness report."
     if session is None:
         return f"Session {session_id} has not been started through the API yet."
     if not session.answers:
@@ -2258,7 +2263,7 @@ def _model_artifact_demo_state(isolation_state: str, record_count: int) -> str:
 
 def _model_artifact_demo_detail(isolation_state: str, record_count: int) -> str:
     if isolation_state != "ready":
-        return "Model artifact isolation should be initialized before demonstrating grounded AI traceability."
+        return "Model artifact isolation should be initialized before reviewing grounded AI traceability."
     if record_count == 0:
         return "Model artifact isolation is ready, but no prompt/context/output artifacts are recorded yet."
     return f"Model artifact manifest contains {record_count} hash-chained records."
@@ -2633,19 +2638,34 @@ def _case_quality_ai_trace_dimension(
     decision_events: tuple[AuditEvent, ...],
 ) -> dict[str, Any]:
     warning_count = sum(1 for event in generation_events if event.details.get("artifact_warning"))
+    latest_generation = generation_events[-1] if generation_events else None
+    latest_quality_state = (
+        str(latest_generation.details.get("quality_state"))
+        if latest_generation is not None and latest_generation.details.get("quality_state") is not None
+        else ""
+    )
     metrics = {
         "generation_count": len(generation_events),
         "decision_count": len(decision_events),
         "artifact_record_count": artifact_manifest.record_count,
         "artifact_chain_valid": artifact_manifest.chain_valid,
         "artifact_warning_count": warning_count,
+        "latest_quality_state": latest_quality_state,
+        "latest_quality_score": latest_generation.details.get("quality_score") if latest_generation else None,
+        "latest_quality_issue_count": latest_generation.details.get("quality_issue_count") if latest_generation else 0,
     }
     if not artifact_manifest.chain_valid:
         state = "blocked"
         detail = "Model artifact manifest chain is invalid."
+    elif latest_quality_state == "blocked":
+        state = "blocked"
+        detail = "Latest grounded AI quality report is blocked."
     elif not generation_events:
         state = "warning"
         detail = "No grounded AI suggestion batch is recorded for this case."
+    elif latest_quality_state == "warning":
+        state = "warning"
+        detail = "Latest grounded AI quality report has warnings that need review."
     elif warning_count:
         state = "warning"
         detail = "Grounded AI was generated without complete artifact capture."

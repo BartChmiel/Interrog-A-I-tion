@@ -9,8 +9,8 @@ enforcement on the real smoke endpoint, and audit-chain records for blocked/comp
 real-smoke attempts; the next step is broader operator-facing UX for reviewing these
 STOP and smoke records before any real model workflow expansion.
 
-The live-session core, supervisor-demo UX, and deterministic AI path are already in place. Do not
-rush Ollama into the default demo workflow.
+The live-session core, guided workflow UX, and deterministic AI path are already in place. Do not
+rush Ollama into the default workflow.
 
 ## Milestone 1: Live Session Core
 
@@ -60,7 +60,7 @@ Success criteria:
 
 ## Milestone 3: Local Model Abstraction
 
-Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, an audit-derived STOP-gated real-model experiment readiness report, a deterministic grounding context pack, and developer-gated live grounded suggestions via Ollama when `INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1`. The default demo path remains deterministic.
+Status: implemented for interface, fake client, prompt rendering, guarded response parsing, an Ollama adapter behind the interface, local model runtime configuration, deterministic model smoke checks, an audit-derived STOP-gated real-model experiment readiness report, a deterministic grounding context pack, and developer-gated live grounded suggestions via Ollama when `INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT=1`. The default workflow path remains deterministic.
 
 Tasks:
 
@@ -108,8 +108,8 @@ Success criteria:
 
 Status: implemented. `frontend/app` is the main UI target. The React app preserves the live-session
 review loop, local API reconnect path, PL/EN UI switching, a three-zone workspace layout
-(case prep / live interview / operations), progressive disclosure, case dossier, guided demo path,
-demo-pack controls, and an in-app tutorial walkthrough. `frontend/prototype` remains archival.
+(case prep / live interview / operations), progressive disclosure, case dossier, guided workflow path,
+workflow-pack controls, and an in-app tutorial walkthrough. `frontend/prototype` remains archival.
 
 Tasks:
 
@@ -167,32 +167,32 @@ Success criteria:
 - grounded suggestions remain source-traceable and human-controlled,
 - architecture leaves a clear path toward institutional deployment.
 
-## Milestone 7: First Supervisor Demo UX
+## Milestone 7: Guided Workflow UX
 
-Status: implemented for the first shareable course-supervisor demo.
+Status: implemented for the first guided workflow.
 
 Tasks:
 
-- first supervisor demo document,
-- guided demo path and case dossier orientation,
-- demo-pack controls: fresh demo, copy summary, demo checklist,
+- guided workflow document,
+- guided workflow path and case dossier orientation,
+- workflow-pack controls: new session, copy brief, workflow checklist,
 - investigative review board in the Review tab,
 - three-zone workspace with collapsed-by-default panels,
 - in-app tutorial mode with spotlight walkthrough (PL/EN),
-- clearer question and answer presentation in the live interview zone.
+- clearer question and answer layout in the live interview zone.
 
 Success criteria:
 
-- a supervisor can run the demo from synthetic data only,
+- the guided workflow can run from synthetic data only,
 - the default path uses deterministic local AI, not a required real model,
-- the UI stays readable during a live walkthrough,
+- the UI stays readable during live review,
 - no guilt, truthfulness, or lie-detection claims are introduced.
 
-See `docs/24-first-supervisor-demo.md` for run instructions and boundaries.
+See `docs/24-guided-workflow.md` for run instructions and boundaries.
 
 ## Milestone 8: Session Report Export
 
-Status: implemented as a research/demo Markdown and JSON export from the Review tab with session context, provenance summary, recorded answers, grounded AI trace, audited AI decisions, and export integrity manifest references.
+Status: implemented as a research Markdown and JSON export from the Review tab with session context, provenance summary, recorded answers, grounded AI trace, audited AI decisions, and export integrity manifest references.
 
 Tasks:
 
@@ -207,7 +207,7 @@ Tasks:
 
 Next:
 
-- run a browser/API round-trip with a downloaded ZIP during final demo rehearsal.
+- run a browser/API round-trip with a downloaded ZIP during final review.
 
 ## Milestone 9: Case Workflow Deepening
 
@@ -216,13 +216,13 @@ Status: in progress.
 Implemented:
 
 - case progress navigator with stage navigation (dossier -> interview -> materials -> AI -> review -> report),
-- scenario badges and supervisor-demo marker in the case catalog,
+- scenario badges and default-case marker in the case catalog,
 - operational session context in the header and interview strip,
 - operations offline guidance when the local API is unavailable,
-- demo readiness report endpoint and Review panel covering workspace, session, audit, model artifacts, export bundle, and real-model STOP gate state,
-- pre-demo recommended actions and copyable demo readiness brief,
+- workflow readiness report endpoint and Review panel covering workspace, session, audit, model artifacts, export bundle, and real-model STOP gate state,
+- readiness recommended actions and copyable workflow brief,
 - case quality report endpoint and Review panel aggregating session capture, claim review, provenance, evidence coverage, material grounding, grounded-AI trace, operator decisions, audit/export integrity, and workspace security,
-- quality score, quality-priority actions, and copyable case-quality brief for supervisor/thesis review.
+- quality score, quality-priority actions, and copyable case-quality brief for thesis review.
 
 Next:
 
@@ -231,7 +231,7 @@ Next:
 
 Partially delivered in synthetic data:
 
-- richer per-case README summaries and suggested demo paths,
+- richer per-case README summaries and suggested workflow paths,
 - additional starter materials for case-001 and case-002,
 - open recording topics with material leads and README follow-up guidance,
 - Polish diacritics and i18n polish for case-001 answers and questions.
@@ -249,7 +249,9 @@ Implemented:
 - grounding pack preview panel in the AI tab (`GET /grounding-pack`),
 - per-question grounded suggestion cache so decisions survive question switches,
 - AI runtime status card in Security,
-- audited grounded-suggestion decisions in session report export.
+- audited grounded-suggestion decisions in session report export,
+- grounded suggestion quality evaluator covering citation scope, topic links, operator-review flags, confidence hygiene, and forbidden interpretive claims,
+- AI quality report returned by grounded suggestion generation, persisted into the generation audit record, surfaced in the Grounded AI panel, and reused by the case quality gate.
 
 Implemented additionally:
 

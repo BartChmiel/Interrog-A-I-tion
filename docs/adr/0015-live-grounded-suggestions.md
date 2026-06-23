@@ -35,7 +35,7 @@ The first implementation:
 - exposes the workflow through:
 
 ```text
-POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=demo-session&question_id=q-001
+POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=review-session&question_id=q-001
 POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
 GET /workspaces/{workspace_id}/audit
 ```

@@ -23,7 +23,7 @@ The first version:
 - exposes the map through:
 
 ```text
-GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=demo-session
+GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=review-session
 ```
 
 The React prototype displays a compact "Case map" panel in the right insight rail.

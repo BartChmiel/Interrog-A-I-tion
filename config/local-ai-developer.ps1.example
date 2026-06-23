@@ -1,5 +1,5 @@
 # Developer-only local AI setup for InterrogA(I)tion.
-# Default supervisor demo stays deterministic when these variables are not set.
+# Default guided workflow stays deterministic when these variables are not set.
 
 $env:INTERROGAITION_MODEL_PROVIDER = "ollama"
 $env:INTERROGAITION_OLLAMA_MODEL = "llama3.1:8b"

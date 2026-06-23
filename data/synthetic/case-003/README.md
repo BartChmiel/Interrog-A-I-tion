@@ -1,6 +1,6 @@
 # Synthetic Case 003
 
-Recommended first supervisor-demo scenario: care-facility medication discrepancy.
+Recommended default guided-workflow scenario: care-facility medication discrepancy.
 
 ## Purpose
 
@@ -31,8 +31,8 @@ reconciliation, and the evening medication roster.
 
 ## Suggested Demo Path
 
-Use the in-app tutorial (`&tutorial=1`) or the left-side demo path. This case is the default
-supervisor walkthrough documented in `docs/24-first-supervisor-demo.md`.
+Use the in-app tutorial (`&tutorial=1`) or the left-side workflow path. This case is the default
+guided workflow documented in `docs/24-guided-workflow.md`.
 
 ## Run Analysis
 

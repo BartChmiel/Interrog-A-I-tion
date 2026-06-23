@@ -708,6 +708,9 @@ class ApiAppTest(unittest.TestCase):
             ["context", "prompt", "context", "output"],
         )
         self.assertEqual(grounded_suggestions["warnings"], [])
+        self.assertEqual(grounded_suggestions["quality_report"]["state"], "ready")
+        self.assertEqual(grounded_suggestions["quality_report"]["score"], 100)
+        self.assertEqual(grounded_suggestions["quality_report"]["issue_count"], 0)
         self.assertTrue(grounded_suggestions["suggestions"])
         self.assertEqual(decision["decision"], "accepted")
         self.assertTrue(decision["chain_valid"])
@@ -753,6 +756,9 @@ class ApiAppTest(unittest.TestCase):
             grounded_suggestions["output_artifact"]["sha256"],
         )
         self.assertFalse(generated_event["details"]["output_artifact_deduplicated"])
+        self.assertEqual(generated_event["details"]["quality_state"], "ready")
+        self.assertEqual(generated_event["details"]["quality_score"], 100)
+        self.assertEqual(generated_event["details"]["quality_issue_count"], 0)
         self.assertEqual(
             [event["action"] for event in workspace_audit["events"]],
             [
@@ -1186,6 +1192,8 @@ class ApiAppTest(unittest.TestCase):
             len(material_links["links"]),
         )
         self.assertEqual(dimensions["ai_trace"]["state"], "ready")
+        self.assertEqual(dimensions["ai_trace"]["metrics"]["latest_quality_state"], "ready")
+        self.assertEqual(dimensions["ai_trace"]["metrics"]["latest_quality_score"], 100)
         self.assertEqual(dimensions["operator_decisions"]["state"], "ready")
         self.assertEqual(dimensions["audit_export"]["state"], "ready")
         self.assertEqual(quality["metrics"]["export_bundle_count"], 1)

@@ -25,7 +25,7 @@ The first version:
 - exposes the pack through:
 
 ```text
-GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-session&question_id=q-001
+GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=review-session&question_id=q-001
 ```
 
 ## Consequences

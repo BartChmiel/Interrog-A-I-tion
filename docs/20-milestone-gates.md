@@ -371,23 +371,23 @@ The project owner should evaluate:
   with a decision state,
 - whether the Review tab should remain the home for provenance and STOP readiness or whether a
   separate Governance/Admin view is needed,
-- whether chain-validity and prompt hashes are understandable enough for thesis demonstration,
+- whether chain-validity and prompt hashes are understandable enough for thesis review,
 - whether any current UI wording looks too official for a synthetic prototype.
 
 ## Current STOP
 
-Milestone 7: First supervisor demo UX has reached its first review point.
+Milestone 7: Guided workflow UX has reached its first review point.
 
 The project owner should evaluate:
 
-- whether the three-zone workspace is readable enough for a non-technical supervisor walkthrough,
+- whether the three-zone workspace is readable enough for a non-technical reviewer,
 - whether collapsed-by-default panels help or hide too much of the workflow,
 - whether the in-app tutorial (`&tutorial=1`, `?`, or top-bar launch) is sufficient as a
-  self-guided demo path,
-- whether demo-pack controls (`Fresh demo`, `Copy summary`, checklist) are enough for a prepared
+  self-guided workflow path,
+- whether workflow-pack controls (`New session`, `Copy brief`, checklist) are enough for a prepared
   review without adding export/report scope yet,
 - whether current UI wording still looks clearly non-official for a synthetic prototype,
-- whether the default deterministic runtime should remain mandatory for the first supervisor send.
+- whether the default deterministic runtime should remain mandatory for the guided workflow.
 
 ## Next Expected STOP
 

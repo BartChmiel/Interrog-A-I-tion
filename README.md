@@ -35,11 +35,11 @@ Core capabilities:
 
 Interpretation remains with the authorized human user.
 
-## First Supervisor Demo
+## Guided Workflow
 
-The current shareable demo uses synthetic data only. Run instructions, workspace layout notes,
+The current guided workflow uses synthetic data only. Run instructions, workspace layout notes,
 tutorial launch (`&tutorial=1`), and ethical boundaries are documented in
-[First Supervisor Demo](docs/24-first-supervisor-demo.md).
+[Guided Workflow](docs/24-guided-workflow.md).
 
 ## Language Policy
 
@@ -86,7 +86,7 @@ UI labels, report copy, and future installer/startup language selection should u
 - [Derived Assumptions and Work Packages](docs/21-derived-assumptions-and-work-packages.md)
 - [Architecture Diagram](docs/22-architecture-diagram.md)
 - [Brand](docs/23-brand.md)
-- [First Supervisor Demo](docs/24-first-supervisor-demo.md)
+- [Guided Workflow](docs/24-guided-workflow.md)
 
 ## Development Stages
 

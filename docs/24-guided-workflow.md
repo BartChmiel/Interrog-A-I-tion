@@ -1,13 +1,13 @@
-# First Supervisor Demo
+# Guided Workflow
 
-This document summarizes the first shareable demo of InterrogA(I)tion for the forensic
-computing course/project review.
+This document summarizes the first guided workflow of InterrogA(I)tion for synthetic
+case review and local research validation.
 
 ## Purpose
 
 InterrogA(I)tion is a local-first research prototype for AI-assisted investigative
-interviewing. The current demo is intended to show the direction of the project, not a
-production-ready tool.
+interviewing. The current workflow validates the direction of the project with synthetic
+data; it is not a production-ready tool.
 
 The system supports an authorized human operator in:
 
@@ -21,9 +21,9 @@ The system supports an authorized human operator in:
 
 The system does not decide whether a person is lying, guilty, credible, or legally reliable.
 
-## Current Demo Scope
+## Current Workflow Scope
 
-The first demo includes:
+The first guided workflow includes:
 
 - React/Vite frontend with Polish and English UI copy,
 - local FastAPI backend,
@@ -46,14 +46,14 @@ The first demo includes:
 
 The interview workspace is split into three zones:
 
-- **Case prep** (left) - demo path, dossier, and case context.
+- **Case prep** (left) - workflow path, dossier, and case context.
 - **Live interview** (center) - active question, answer composer, and answer history.
 - **Operations** (right) - materials, grounded AI, operator queue, and review.
 
 Side rails can collapse to keep focus on the live interview. Secondary panels stay
-collapsed until opened, so the default view stays readable during a walkthrough.
+collapsed until opened, so the default view stays readable during review.
 
-## How To Run The Demo
+## How To Run The Workflow
 
 From the repository root, start the backend:
 
@@ -73,14 +73,14 @@ npm run dev
 Open:
 
 ```text
-http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-003&session=demo-session&participant=person-001&workspace=demo-workspace
+http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-003&session=review-session&participant=person-001&workspace=review-workspace
 ```
 
-For a self-guided supervisor walkthrough, add `&tutorial=1` to auto-start the
-in-app tutorial, or press `?` / use **Tutorial mode** (EN) or **Tryb tutorialowy** (PL) in the
+For a self-guided workflow, add `&tutorial=1` to auto-start the
+in-app tutorial, or press `?` / use **Guide** (EN) or **Przewodnik** (PL) in the
 top bar anytime.
 
-The demo uses synthetic material only.
+The workflow uses synthetic material only.
 
 ## Pre-Send Quality Gate
 
@@ -101,16 +101,16 @@ cd frontend/app
 npm run build
 ```
 
-- The demo opens on `case-003` with a fresh session/workspace.
+- The workflow opens on `case-003` with a fresh session/workspace.
 - The first screen clearly shows that this is a synthetic research prototype.
 - The Review tab shows STOP readiness, provenance, and the non-official report boundary.
 - No real case material, personal data, secrets, local databases, or generated exports are committed.
 
-## Five-Minute Review Script
+## Five-Minute Review Flow
 
-For a short supervisor walkthrough:
+For a short guided review:
 
-1. Show the README and this demo document to establish scope and boundaries.
+1. Show the README and this workflow document to establish scope and boundaries.
 2. Open `case-003` with `&tutorial=1`.
 3. Show the case dossier and priority gaps.
 4. Record one short synthetic answer in the live interview area.
@@ -131,18 +131,18 @@ Useful questions for the first academic review:
 - Are the ethical boundaries and non-goals clear enough?
 - Should the next semester focus more on encrypted storage, evaluation scenarios, UI workflow,
   or controlled local-model experiments?
-- Which artifacts would be most useful for assessment: live demo, exported report, architecture
+- Which artifacts would be most useful for assessment: live workflow, exported report, architecture
   diagram, evaluation protocol, or threat model?
 
-## Demo Pack Controls
+## Workflow Pack Controls
 
-The left sidebar **Demo path** panel includes supervisor-demo helpers:
+The left sidebar **Workflow path** panel includes workflow helpers:
 
-- **Fresh demo** - reloads the page with a new session and workspace for the
+- **New session** - reloads the page with a new session and workspace for the
   current case, so each walkthrough starts from a clean local state.
-- **Copy summary** - copies a compact text snapshot (case, coverage, materials,
+- **Copy brief** - copies a compact text snapshot (case, coverage, materials,
   audit counts, advisory boundary) for notes or email follow-up.
-- **Demo checklist** - tracks which walkthrough steps have been touched in the
+- **Workflow checklist** - tracks which workflow steps have been touched in the
   current session.
 
 ## Suggested Walkthrough
@@ -152,11 +152,11 @@ For the first review, the recommended path is:
 1. Open `case-003` with `&tutorial=1` for a guided walkthrough, or start the tutorial from the
    top bar after load. The scenario covers medication discrepancy with timing, documentation,
    access, and monitoring questions.
-2. Use **Fresh demo** if you need a clean workspace, then use the left-side demo
-   path to move through the main workflow.
+2. Use **New session** if you need a clean workspace, then use the left-side workflow
+   path to move through the main flow.
 3. Review the case dossier: planned scope, priority gaps, answer count, and starter materials.
-4. Open the local AI/runtime area from the demo path. The default runtime is deterministic and
-   safe for demonstration; it shows the local model gate without relying on a real model.
+4. Open the local AI/runtime area from the workflow path. The default runtime is deterministic and
+   safe for local review; it shows the local model gate without relying on a real model.
 5. Open Materials and inspect starter materials, hashes, verification, and material-question links.
 6. Open Grounded AI and inspect suggested follow-up questions with reasons, source ids, and
    human use/edit/reject controls.
@@ -169,9 +169,9 @@ leads without making any truthfulness or guilt decision.
 
 ## Local AI Notes
 
-The first demo should use the deterministic local runtime by default. This is intentional: it
+The default workflow should use the deterministic local runtime by default. This is intentional: it
 demonstrates the local-first AI workflow, grounding, audit, prompt/context/output artifact
-capture, and STOP gates without making the demo dependent on a specific installed model.
+capture, and STOP gates without making the workflow dependent on a specific installed model.
 
 Ollama support exists as a gated runtime path for future local-model experiments. A real model
 should only be enabled deliberately with environment variables and should not be presented as
@@ -185,7 +185,7 @@ $env:INTERROGAITION_ENABLE_REAL_MODEL='1'
 $env:INTERROGAITION_OLLAMA_MODEL='llama3.1:8b'
 ```
 
-This remains a research/developer path, not the default first-supervisor demo.
+This remains a research/developer path, not the default guided workflow.
 
 Developer setup example:
 

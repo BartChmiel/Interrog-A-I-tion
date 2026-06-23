@@ -213,14 +213,14 @@ Design rule:
 
 Goal: keep the prototype aligned with future police/prosecution adoption.
 
-Implemented for the first supervisor demo:
+Implemented for the first guided workflow:
 
 - case catalog and dossier orientation,
-- guided demo path and demo-pack controls,
+- guided workflow path and workflow-pack controls,
 - three-zone workspace with progressive disclosure,
 - in-app tutorial walkthrough (PL/EN),
 - investigative review board and STOP readiness panel,
-- documented run path in `docs/24-first-supervisor-demo.md`.
+- documented run path in `docs/24-guided-workflow.md`.
 
 Future product needs:
 

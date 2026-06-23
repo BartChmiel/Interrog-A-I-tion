@@ -1,10 +1,11 @@
 import { useMemo } from "react";
-import { AlertTriangle, Check, Loader2, Pencil, RefreshCw, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Pencil, RefreshCw, ShieldCheck, Sparkles, X } from "lucide-react";
 import { text, type CopyKey } from "./i18n";
 import type {
   ApiMode,
   GroundedSuggestion,
   GroundedSuggestionDecision,
+  GroundedSuggestionQualityReport,
   GroundedSuggestionWarning,
   Locale,
   LocalModelConfig,
@@ -17,6 +18,7 @@ export type GroundedSuggestionMeta = {
   contextArtifact: ModelArtifactSummary | null;
   outputArtifact: ModelArtifactSummary | null;
   artifactWarning: string | null;
+  qualityReport: GroundedSuggestionQualityReport | null;
 } | null;
 
 function shortHash(value: string): string {
@@ -169,6 +171,7 @@ export function GroundedSuggestionsPanel({
           ) : null}
         </div>
       ) : null}
+      {meta?.qualityReport ? <GroundedAiQualityPanel locale={locale} report={meta.qualityReport} /> : null}
       {isLoading && !suggestions.length ? (
         <p className="empty-state grounded-ai-loading">
           <Loader2 className="spin" size={16} />
@@ -207,6 +210,45 @@ export function GroundedSuggestionsPanel({
         <span>{meta?.model ?? providerLabel}</span>
       </div>
       {body}
+    </section>
+  );
+}
+
+function GroundedAiQualityPanel({
+  locale,
+  report,
+}: {
+  locale: Locale;
+  report: GroundedSuggestionQualityReport;
+}) {
+  const visibleIssues = report.issues.slice(0, 4);
+  return (
+    <section className="grounded-ai-quality" data-state={report.state}>
+      <div className="grounded-ai-quality-header">
+        <span>
+          <ShieldCheck size={14} />
+          {text(locale, "aiQualityGate")}
+        </span>
+        <strong>{report.score}%</strong>
+      </div>
+      <div className="grounded-ai-quality-summary">
+        <span>{text(locale, "ready")}: {report.summary.ready ?? 0}</span>
+        <span>{text(locale, "warning")}: {report.warning_count}</span>
+        <span>{text(locale, "blocked")}: {report.error_count}</span>
+      </div>
+      {visibleIssues.length ? (
+        <div className="grounded-ai-quality-issues">
+          <span>{text(locale, "aiQualityIssues")}</span>
+          {visibleIssues.map((issue, index) => (
+            <article data-severity={issue.severity} key={`${issue.suggestion_id}-${issue.code}-${index}`}>
+              <strong>{issue.code}</strong>
+              <p>{issue.detail}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p>{text(locale, "aiQualityNoIssues")}</p>
+      )}
     </section>
   );
 }

@@ -3656,6 +3656,96 @@ h2 {
   gap: 6px;
 }
 
+.grounded-ai-quality {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  background: #fff;
+}
+
+.grounded-ai-quality[data-state="ready"] {
+  border-color: #b7dec9;
+  background: #f7fcfa;
+}
+
+.grounded-ai-quality[data-state="warning"] {
+  border-color: #ead49b;
+  background: #fffaf0;
+}
+
+.grounded-ai-quality[data-state="blocked"] {
+  border-color: #e6b3ad;
+  background: #fff7f6;
+}
+
+.grounded-ai-quality-header,
+.grounded-ai-quality-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.grounded-ai-quality-header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--heading);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.grounded-ai-quality-header strong {
+  color: var(--heading);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.grounded-ai-quality-summary,
+.grounded-ai-quality p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.grounded-ai-quality p {
+  margin: 0;
+}
+
+.grounded-ai-quality-issues {
+  display: grid;
+  gap: 6px;
+}
+
+.grounded-ai-quality-issues > span {
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.grounded-ai-quality-issues article {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: #fff;
+}
+
+.grounded-ai-quality-issues article[data-severity="error"] {
+  border-color: #e6b3ad;
+  background: #fff7f6;
+}
+
+.grounded-ai-quality-issues strong {
+  color: var(--heading);
+  font-size: 12px;
+}
+
 .grounded-ai-meta span,
 .grounded-source-list em {
   min-width: 0;

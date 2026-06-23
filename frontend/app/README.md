@@ -28,7 +28,7 @@ python -m interrogaition.api.app
 The app uses `http://127.0.0.1:8000` by default. You can override it with:
 
 ```text
-http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-001&session=demo-session&participant=person-001&workspace=case-001-workspace
+http://127.0.0.1:5173/?api=http://127.0.0.1:8000&case=case-001&session=review-session&participant=person-001&workspace=case-001-workspace
 ```
 
 During Vite development, loopback API calls to `127.0.0.1:8000` or `localhost:8000` are routed through the same-origin `/api` proxy. This keeps the embedded browser and strict local browser policies on the happy path without changing the production API URL behavior.

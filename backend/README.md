@@ -117,8 +117,8 @@ POST /workspaces
 GET /workspaces/{workspace_id}
 GET /workspaces/{workspace_id}/access
 GET /workspaces/{workspace_id}/security
-GET /workspaces/{workspace_id}/demo-readiness?case_id=case-001&session_id=demo-session
-GET /workspaces/{workspace_id}/case-quality?case_id=case-001&session_id=demo-session&locale=en
+GET /workspaces/{workspace_id}/demo-readiness?case_id=case-001&session_id=review-session
+GET /workspaces/{workspace_id}/case-quality?case_id=case-001&session_id=review-session&locale=en
 GET /workspaces/{workspace_id}/stop-reviews
 POST /workspaces/{workspace_id}/stop-reviews
 GET /workspaces/{workspace_id}/model-artifacts
@@ -127,11 +127,11 @@ GET /workspaces/{workspace_id}/model-artifacts/manifest
 POST /workspaces/{workspace_id}/model-artifacts/items
 ```
 
-The demo-readiness endpoint aggregates workspace security, session capture, audit-chain
+The readiness endpoint aggregates workspace security, session capture, audit-chain
 validity, model artifact traceability, export bundle evidence, and the separate real-model
-STOP gate into one pre-demo report with recommended follow-up actions.
+STOP gate into one workflow report with recommended follow-up actions.
 
-The case-quality endpoint is broader than demo readiness. It aggregates session capture,
+The case-quality endpoint is broader than workflow readiness. It aggregates session capture,
 operator claim review, claim provenance, evidence-map coverage, material grounding review,
 grounded-AI artifact/decision trace, operator work-queue decisions, workspace security,
 audit-chain validity, and export bundle evidence into one case-level quality gate with
@@ -174,18 +174,18 @@ GET /workspaces/{workspace_id}/materials/{material_id}/preview
 GET /workspaces/{workspace_id}/materials/links?case_id=case-001
 POST /workspaces/{workspace_id}/materials/{material_id}/questions/{question_id}/decision
 GET /workspaces/{workspace_id}/materials/{material_id}/verification
-GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=demo-session
-GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=demo-session&question_id=q-001
-POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=demo-session&question_id=q-001
+GET /workspaces/{workspace_id}/evidence-map?case_id=case-001&session_id=review-session
+GET /workspaces/{workspace_id}/grounding-pack?case_id=case-001&session_id=review-session&question_id=q-001
+POST /workspaces/{workspace_id}/grounded-suggestions?case_id=case-001&session_id=review-session&question_id=q-001
 POST /workspaces/{workspace_id}/grounded-suggestions/{suggestion_id}/decision
 POST /workspaces/{workspace_id}/operator-actions/decisions
-GET /workspaces/{workspace_id}/operator-actions/decisions?case_id=case-001&session_id=demo-session
+GET /workspaces/{workspace_id}/operator-actions/decisions?case_id=case-001&session_id=review-session
 GET /workspaces/{workspace_id}/audit
 POST /workspaces/{workspace_id}/exports/integrity-preview
 POST /workspaces/{workspace_id}/exports/bundle
 ```
 
-Grounded suggestions use the current grounding context pack, validate citations against `allowed_source_ids`, return citation warnings, and audit model id, prompt version, prompt hash, context hash, and output hash.
+Grounded suggestions use the current grounding context pack, validate citations against `allowed_source_ids`, return citation warnings, and audit model id, prompt version, prompt hash, context hash, and output hash. Each generation also returns an AI quality report that scores citation scope, grounded topic links, operator-review flags, confidence hygiene, and forbidden interpretive claims. The generation audit record stores the quality state, score, issue count, and error count.
 
 If model artifact isolation is initialized, grounded suggestions also write workspace-local `prompt`, `context`, and `output` artifacts. Artifact records are deduplicated by `artifact_type + SHA-256`, hash-chained in `models/artifact-manifest.json`, and can be referenced by export integrity manifests.
 

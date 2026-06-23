@@ -40,6 +40,8 @@ class GroundedSuggestionServiceTest(unittest.TestCase):
         self.assertIn("potential_inconsistency", suggestion_types)
         self.assertIn("summary", suggestion_types)
         self.assertFalse(result.warnings)
+        self.assertEqual(result.quality_report.state, "ready")
+        self.assertEqual(result.quality_report.score, 100)
         self.assertEqual(len(result.context_hash), 64)
         self.assertEqual(len(result.output_hash), 64)
         self.assertIn("grounded_followup_questions", result.prompt_version)
@@ -73,6 +75,8 @@ class GroundedSuggestionServiceTest(unittest.TestCase):
 
         self.assertEqual(len(result.warnings), 1)
         self.assertEqual(result.warnings[0].warning_type, "unknown_source_id")
+        self.assertEqual(result.quality_report.state, "warning")
+        self.assertIn("unknown_source_id", {issue.code for issue in result.quality_report.issues})
 
 
 def _grounding_pack():
