@@ -808,6 +808,26 @@ export type GroundedSuggestionQualityReport = {
   summary: Record<EnvironmentHealthState, number>;
 };
 
+export type GroundedSuggestionTriageRecord = {
+  suggestion_id: string;
+  priority: "high" | "medium" | "low";
+  priority_score: number;
+  risk_level: "blocked" | "high" | "medium" | "low";
+  recommended_action: string;
+  rationale: string;
+  topic_statuses: string[];
+  topic_labels: string[];
+  evidence_state: "blocked" | "missing" | "supported";
+  quality_state: EnvironmentHealthState;
+};
+
+export type GroundedSuggestionTriageReport = {
+  state: EnvironmentHealthState;
+  top_suggestion_id: string | null;
+  records: GroundedSuggestionTriageRecord[];
+  summary: Record<string, number>;
+};
+
 export type GroundedSuggestionDecision = "accepted" | "edited" | "rejected";
 
 export type GroundedSuggestionDecisionResponse = {
@@ -831,6 +851,7 @@ export type GroundedSuggestionsResponse = {
   output_hash: string;
   warnings: GroundedSuggestionWarning[];
   quality_report: GroundedSuggestionQualityReport;
+  triage_report: GroundedSuggestionTriageReport;
   prompt_artifact?: ModelArtifactSummary | null;
   context_artifact?: ModelArtifactSummary | null;
   output_artifact?: ModelArtifactSummary | null;

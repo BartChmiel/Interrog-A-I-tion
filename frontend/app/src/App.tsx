@@ -105,6 +105,7 @@ import type {
   GroundedSuggestionDecision,
   GroundedSuggestion,
   GroundedSuggestionQualityReport,
+  GroundedSuggestionTriageReport,
   GroundedSuggestionsResponse,
   GroundedSuggestionWarning,
   Indicator,
@@ -290,6 +291,7 @@ export function App() {
     outputArtifact: ModelArtifactSummary | null;
     artifactWarning: string | null;
     qualityReport: GroundedSuggestionQualityReport | null;
+    triageReport: GroundedSuggestionTriageReport | null;
   } | null>(null);
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
   const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, GroundedSuggestionDecision>>({});
@@ -314,6 +316,7 @@ export function App() {
           outputArtifact: ModelArtifactSummary | null;
           artifactWarning: string | null;
           qualityReport: GroundedSuggestionQualityReport | null;
+          triageReport: GroundedSuggestionTriageReport | null;
         } | null;
         decisions: Record<string, GroundedSuggestionDecision>;
         drafts: Record<string, string>;
@@ -934,6 +937,7 @@ export function App() {
             outputArtifact: response.output_artifact ?? null,
             artifactWarning: response.artifact_warning ?? null,
             qualityReport: response.quality_report ?? null,
+            triageReport: response.triage_report ?? null,
           }
         : null,
     );

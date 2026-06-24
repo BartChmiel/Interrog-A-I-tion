@@ -42,6 +42,10 @@ class GroundedSuggestionServiceTest(unittest.TestCase):
         self.assertFalse(result.warnings)
         self.assertEqual(result.quality_report.state, "ready")
         self.assertEqual(result.quality_report.score, 100)
+        self.assertEqual(result.triage_report.state, "ready")
+        self.assertIsNotNone(result.triage_report.top_suggestion_id)
+        self.assertGreaterEqual(result.triage_report.summary["high"], 1)
+        self.assertTrue(all(record.evidence_state == "supported" for record in result.triage_report.records))
         self.assertEqual(len(result.context_hash), 64)
         self.assertEqual(len(result.output_hash), 64)
         self.assertIn("grounded_followup_questions", result.prompt_version)
@@ -77,6 +81,8 @@ class GroundedSuggestionServiceTest(unittest.TestCase):
         self.assertEqual(result.warnings[0].warning_type, "unknown_source_id")
         self.assertEqual(result.quality_report.state, "warning")
         self.assertIn("unknown_source_id", {issue.code for issue in result.quality_report.issues})
+        self.assertEqual(result.triage_report.records[0].recommended_action, "edit_before_use")
+        self.assertEqual(result.triage_report.records[0].risk_level, "medium")
 
 
 def _grounding_pack():

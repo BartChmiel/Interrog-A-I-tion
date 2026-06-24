@@ -17,6 +17,10 @@ from interrogaition.ai.suggestion_quality import (
     SuggestionQualityReport,
     evaluate_grounded_suggestion_quality,
 )
+from interrogaition.ai.suggestion_triage import (
+    SuggestionTriageReport,
+    build_suggestion_triage_report,
+)
 from interrogaition.analysis.grounding_context import GroundingContextPack
 
 
@@ -35,6 +39,7 @@ class GroundedSuggestionResult:
     batch: ParsedSuggestionBatch
     warnings: tuple[GroundedSuggestionWarning, ...]
     quality_report: SuggestionQualityReport
+    triage_report: SuggestionTriageReport
     prompt_version: str
     prompt_hash: str
     prompt_text: str
@@ -75,6 +80,12 @@ def generate_grounded_suggestions(
         batch=batch,
         grounding_pack=grounding_pack,
     )
+    triage_report = build_suggestion_triage_report(
+        batch=batch,
+        grounding_pack=grounding_pack,
+        quality_report=quality_report,
+        locale=locale,
+    )
     if warnings and citation_policy == "reject":
         details = "; ".join(warning.detail for warning in warnings)
         raise ValueError(f"Grounded suggestions contain invalid citations: {details}")
@@ -83,6 +94,7 @@ def generate_grounded_suggestions(
         batch=batch,
         warnings=warnings,
         quality_report=quality_report,
+        triage_report=triage_report,
         prompt_version=PROMPT_VERSION,
         prompt_hash=hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
         prompt_text=prompt_text,

@@ -1305,6 +1305,10 @@ def create_app(
             "quality_score": result.quality_report.score,
             "quality_issue_count": result.quality_report.issue_count,
             "quality_error_count": result.quality_report.error_count,
+            "triage_state": result.triage_report.state,
+            "triage_top_suggestion_id": result.triage_report.top_suggestion_id,
+            "triage_high_priority_count": result.triage_report.summary.get("high", 0),
+            "triage_needs_review_count": result.triage_report.summary.get("needs_review", 0),
         }
         if prompt_artifact is not None:
             audit_details["prompt_artifact_id"] = prompt_artifact["artifact_id"]
@@ -1337,6 +1341,7 @@ def create_app(
             "output_hash": result.output_hash,
             "warnings": _to_jsonable(result.warnings),
             "quality_report": _to_jsonable(result.quality_report),
+            "triage_report": _to_jsonable(result.triage_report),
             "prompt_artifact": prompt_artifact,
             "context_artifact": context_artifact,
             "output_artifact": output_artifact,

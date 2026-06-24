@@ -22,6 +22,8 @@ import type {
   GroundedSuggestion,
   GroundedSuggestionDecision,
   GroundedSuggestionQualityReport,
+  GroundedSuggestionTriageRecord,
+  GroundedSuggestionTriageReport,
   GroundedSuggestionWarning,
   Locale,
   LocalModelConfig,
@@ -35,6 +37,7 @@ export type GroundedSuggestionMeta = {
   outputArtifact: ModelArtifactSummary | null;
   artifactWarning: string | null;
   qualityReport: GroundedSuggestionQualityReport | null;
+  triageReport: GroundedSuggestionTriageReport | null;
 } | null;
 
 function shortHash(value: string): string {
@@ -60,6 +63,77 @@ function formatSuggestionTime(value: string): string {
     minute: "2-digit",
     month: "2-digit",
   });
+}
+
+function triagePriorityLabel(priority: GroundedSuggestionTriageRecord["priority"], locale: Locale): string {
+  const labels: Record<Locale, Record<GroundedSuggestionTriageRecord["priority"], string>> = {
+    pl: {
+      high: "wysoki",
+      low: "niski",
+      medium: "średni",
+    },
+    en: {
+      high: "high",
+      low: "low",
+      medium: "medium",
+    },
+  };
+  return labels[locale][priority];
+}
+
+function triageActionLabel(action: string, locale: Locale): string {
+  const labels: Record<Locale, Record<string, string>> = {
+    pl: {
+      ask_now: "zadaj teraz",
+      edit_before_use: "popraw przed użyciem",
+      queue_for_later: "odłóż na później",
+      reject_or_regenerate: "odrzuć albo wygeneruj ponownie",
+      review_sources: "sprawdź źródła",
+    },
+    en: {
+      ask_now: "ask now",
+      edit_before_use: "edit before use",
+      queue_for_later: "queue for later",
+      reject_or_regenerate: "reject or regenerate",
+      review_sources: "review sources",
+    },
+  };
+  return labels[locale][action] ?? action.replace(/_/g, " ");
+}
+
+function suggestionTypeLabel(type: string, locale: Locale): string {
+  const labels: Record<Locale, Record<string, string>> = {
+    pl: {
+      follow_up_question: "pytanie doprecyzowujące",
+      gap: "luka",
+      interview_plan: "plan rozmowy",
+      neutrality_rewrite: "neutralna redakcja",
+      potential_inconsistency: "możliwa niespójność",
+      summary: "podsumowanie",
+    },
+    en: {
+      follow_up_question: "follow-up question",
+      gap: "gap",
+      interview_plan: "interview plan",
+      neutrality_rewrite: "neutrality rewrite",
+      potential_inconsistency: "potential inconsistency",
+      summary: "summary",
+    },
+  };
+  return labels[locale][type] ?? type.replace(/_/g, " ");
+}
+
+function triageTone(record: GroundedSuggestionTriageRecord): "default" | "ok" | "warning" | "danger" {
+  if (record.risk_level === "blocked") {
+    return "danger";
+  }
+  if (record.risk_level === "high" || record.recommended_action !== "ask_now") {
+    return "warning";
+  }
+  if (record.priority === "high") {
+    return "ok";
+  }
+  return "default";
 }
 
 export function groundedSuggestionDecisionLabel(
@@ -235,6 +309,7 @@ export function GroundedSuggestionsPanel({
           </div>
         </ContextWindow>
       ) : null}
+      {meta?.triageReport ? <GroundedAiTriagePanel locale={locale} report={meta.triageReport} /> : null}
       {meta?.qualityReport ? <GroundedAiQualityPanel locale={locale} report={meta.qualityReport} /> : null}
       {isLoading && !suggestions.length ? (
         <p className="empty-state grounded-ai-loading">
@@ -274,6 +349,90 @@ export function GroundedSuggestionsPanel({
         <span>{meta?.model ?? providerLabel}</span>
       </div>
       {body}
+    </section>
+  );
+}
+
+function GroundedAiTriagePanel({
+  locale,
+  report,
+}: {
+  locale: Locale;
+  report: GroundedSuggestionTriageReport;
+}) {
+  const topRecords = report.records.slice(0, 3);
+  const topRecord = report.records.find((record) => record.suggestion_id === report.top_suggestion_id) ?? report.records[0];
+  return (
+    <section className="grounded-ai-triage" data-state={report.state}>
+      <div className="grounded-ai-quality-header">
+        <span>
+          <Gauge size={14} />
+          {text(locale, "aiTriage")}
+        </span>
+        <strong>{topRecord ? `${topRecord.priority_score}` : "-"}</strong>
+      </div>
+      <SummaryPillRow
+        items={[
+          {
+            icon: <AlertTriangle size={13} />,
+            key: "high",
+            label: text(locale, "aiTriageHigh"),
+            tone: (report.summary.high ?? 0) ? "warning" : "default",
+            value: String(report.summary.high ?? 0),
+          },
+          {
+            icon: <ShieldAlert size={13} />,
+            key: "needs-review",
+            label: text(locale, "aiTriageNeedsReview"),
+            tone: (report.summary.needs_review ?? 0) ? "warning" : "ok",
+            value: String(report.summary.needs_review ?? 0),
+          },
+          {
+            icon: <Check size={13} />,
+            key: "top",
+            label: text(locale, "aiTriageTop"),
+            tone: topRecord ? triageTone(topRecord) : "default",
+            value: topRecord ? topRecord.suggestion_id : "-",
+          },
+        ]}
+      />
+      {topRecord ? (
+        <p>
+          <strong>{triageActionLabel(topRecord.recommended_action, locale)}</strong>
+          {" · "}
+          {triagePriorityLabel(topRecord.priority, locale)} · {topRecord.rationale}
+        </p>
+      ) : (
+        <p>{text(locale, "aiTriageNoRecords")}</p>
+      )}
+      {topRecords.length ? (
+        <ContextWindow
+          icon={<Network size={14} />}
+          meta={`${topRecords.length}/${report.records.length}`}
+          title={text(locale, "aiTriageQueue")}
+        >
+          <div className="grounded-ai-triage-list">
+            {topRecords.map((record) => (
+              <article data-tone={triageTone(record)} key={record.suggestion_id}>
+                <div>
+                  <strong>{record.suggestion_id}</strong>
+                  <span>
+                    {triagePriorityLabel(record.priority, locale)} / {triageActionLabel(record.recommended_action, locale)}
+                  </span>
+                </div>
+                <p>{record.rationale}</p>
+                {record.topic_labels.length ? (
+                  <div className="grounded-token-list">
+                    {record.topic_labels.map((label) => (
+                      <em key={`${record.suggestion_id}-${label}`}>{label}</em>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        </ContextWindow>
+      ) : null}
     </section>
   );
 }
@@ -422,7 +581,7 @@ function GroundedSuggestionCard({
       <div className="grounded-suggestion-header">
         <span className="grounded-suggestion-type">
           <Sparkles size={13} />
-          {suggestion.suggestion_type}
+          {suggestionTypeLabel(suggestion.suggestion_type, locale)}
         </span>
         <span className="grounded-suggestion-decision">{decisionLabel}</span>
       </div>
