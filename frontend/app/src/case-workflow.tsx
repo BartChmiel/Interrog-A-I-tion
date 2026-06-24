@@ -130,8 +130,8 @@ export function CaseCatalogBadges({ caseId, locale }: { caseId: string; locale: 
   return (
     <span className="case-catalog-badges">
       <span className="case-catalog-badge">{meta.scenarioLabel}</span>
-      {meta.recommendedDemo ? (
-        <span className="case-catalog-badge case-catalog-badge--demo">{text(locale, "recommendedDemoBadge")}</span>
+      {meta.recommendedDefaultCase ? (
+        <span className="case-catalog-badge case-catalog-badge--default">{text(locale, "recommendedDefaultCaseBadge")}</span>
       ) : null}
     </span>
   );

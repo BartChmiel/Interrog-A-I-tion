@@ -223,7 +223,7 @@ export type EnvironmentHealth = {
   summary: Record<string, number>;
 };
 
-export type DemoReadinessCheck = {
+export type WorkflowReadinessCheck = {
   id: string;
   label: string;
   state: EnvironmentHealthState;
@@ -232,22 +232,22 @@ export type DemoReadinessCheck = {
   next_action: string;
 };
 
-export type DemoReadinessAction = {
+export type WorkflowReadinessAction = {
   id: string;
   label: string;
   state: EnvironmentHealthState;
   action: string;
 };
 
-export type DemoReadinessReport = {
+export type WorkflowReadinessReport = {
   workspace_id: string;
   case_id: string;
   session_id: string | null;
   state: EnvironmentHealthState;
   ready: boolean;
   generated_at: string;
-  checks: DemoReadinessCheck[];
-  recommended_actions: DemoReadinessAction[];
+  checks: WorkflowReadinessCheck[];
+  recommended_actions: WorkflowReadinessAction[];
   summary: Record<EnvironmentHealthState, number>;
 };
 

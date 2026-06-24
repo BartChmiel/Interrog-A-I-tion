@@ -1002,6 +1002,7 @@ class ApiAppTest(unittest.TestCase):
         )
         create_workspace = endpoint(app, "create_workspace")
         get_case_quality = endpoint(app, "get_workspace_case_quality")
+        get_workflow_readiness = endpoint(app, "get_workspace_demo_readiness")
         start_session = endpoint(app, "start_session")
         add_answer_endpoint = endpoint(app, "add_session_answer")
         review_claim = endpoint(app, "review_session_claim")
@@ -1204,6 +1205,43 @@ class ApiAppTest(unittest.TestCase):
         )
         self.assertEqual(bundle["audit_event"]["action"], "export_bundle_created")
         self.assertEqual(bundle["audit_event"]["details"]["case_id"], "case-001")
+
+        localized_quality = get_case_quality(
+            "api-workspace-case-quality",
+            case_id="case-001",
+            session_id="api-session-case-quality",
+            locale="pl",
+        )
+        localized_dimensions = {
+            dimension["id"]: dimension
+            for dimension in localized_quality["dimensions"]
+        }
+        self.assertEqual(localized_dimensions["session_capture"]["label"], "Zapis sesji")
+        self.assertIn("Sesja api-session-case-quality", localized_dimensions["session_capture"]["detail"])
+        self.assertEqual(localized_dimensions["claim_review"]["label"], "Dyscyplina przeglądu claimów")
+        self.assertEqual(localized_dimensions["evidence_coverage"]["label"], "Pokrycie materiałami")
+        self.assertEqual(localized_dimensions["material_grounding"]["label"], "Powiązania materiałów")
+        self.assertEqual(localized_dimensions["ai_trace"]["label"], "Ślad AI ze źródeł")
+        self.assertEqual(localized_dimensions["audit_export"]["label"], "Integralność audytu i eksportu")
+        self.assertNotIn(
+            "Session capture",
+            {dimension["label"] for dimension in localized_quality["dimensions"]},
+        )
+
+        localized_readiness = get_workflow_readiness(
+            "api-workspace-case-quality",
+            case_id="case-001",
+            session_id="api-session-case-quality",
+            locale="pl",
+        )
+        localized_checks = {check["id"]: check for check in localized_readiness["checks"]}
+        self.assertEqual(localized_checks["session_capture"]["label"], "Zapis sesji")
+        self.assertIn("Sesja api-session-case-quality", localized_checks["session_capture"]["detail"])
+        self.assertEqual(localized_checks["export_bundle"]["label"], "Paczka eksportu")
+        self.assertNotIn(
+            "Session capture",
+            {check["label"] for check in localized_readiness["checks"]},
+        )
 
     def test_question_drafts_can_be_answered_with_workspace_context(self) -> None:
         app = create_app(

@@ -19,6 +19,43 @@ const GROUNDED_DECISION_ACTIONS = new Set([
   "grounded_suggestion_rejected",
 ]);
 
+function reportLabel(locale: Locale, en: string, pl: string): string {
+  return locale === "pl" ? pl : en;
+}
+
+function pluralizeReportUnit(locale: Locale, count: number, unit: "events" | "records" | "bytes"): string {
+  if (locale === "en") {
+    return unit;
+  }
+  if (unit === "bytes") {
+    return "bajtów";
+  }
+  if (unit === "records") {
+    return count === 1 ? "rekord" : count >= 2 && count <= 4 ? "rekordy" : "rekordów";
+  }
+  return count === 1 ? "zdarzenie" : count >= 2 && count <= 4 ? "zdarzenia" : "zdarzeń";
+}
+
+function groundedSuggestionTypeLabel(type: string, locale: Locale): string {
+  const labels: Record<Locale, Record<string, string>> = {
+    pl: {
+      contradiction_check: "kontrola sprzeczności",
+      evidence_request: "prośba o źródła",
+      follow_up_question: "pytanie doprecyzowujące",
+      material_link: "powiązanie materiału",
+      summary: "podsumowanie",
+    },
+    en: {
+      contradiction_check: "contradiction check",
+      evidence_request: "evidence request",
+      follow_up_question: "follow-up question",
+      material_link: "material link",
+      summary: "summary",
+    },
+  };
+  return labels[locale][type] ?? type.replace(/_/g, " ");
+}
+
 export type GroundedAiAuditEntry = {
   action: string;
   suggestionId: string;
@@ -123,28 +160,30 @@ export function extractGroundedAiAuditEntries(events: AuditEvent[]): GroundedAiA
 
 export function buildSessionReportExport(baseMarkdown: string, input: SessionReportExportInput): string {
   const questionsById = new Map(input.questions.map((question) => [question.id, question]));
+  const eventsUnit = pluralizeReportUnit(input.locale, input.workspaceAuditCount, "events");
+  const sessionEventsUnit = pluralizeReportUnit(input.locale, input.sessionAuditCount, "events");
 
   const contextLines = [
-    "## Session context",
+    `## ${reportLabel(input.locale, "Session context", "Kontekst sesji")}`,
     "",
-    `- Case: ${input.config.caseId}`,
-    input.caseData ? `- Title: ${localize(input.caseData.title, input.locale)}` : "",
-    `- Session: ${input.config.sessionId}`,
-    `- Participant: ${input.config.participantId}`,
-    `- Workspace: ${input.config.workspaceId}`,
-    `- Generated at: ${new Date().toISOString()}`,
+    `- ${reportLabel(input.locale, "Case", "Sprawa")}: ${input.config.caseId}`,
+    input.caseData ? `- ${reportLabel(input.locale, "Title", "Tytuł")}: ${localize(input.caseData.title, input.locale)}` : "",
+    `- ${reportLabel(input.locale, "Session", "Sesja")}: ${input.config.sessionId}`,
+    `- ${reportLabel(input.locale, "Participant", "Uczestnik")}: ${input.config.participantId}`,
+    `- ${reportLabel(input.locale, "Workspace", "Workspace")}: ${input.config.workspaceId}`,
+    `- ${reportLabel(input.locale, "Generated at", "Wygenerowano")}: ${new Date().toISOString()}`,
     "",
-    "## Provenance summary",
+    `## ${reportLabel(input.locale, "Provenance summary", "Podsumowanie pochodzenia")}`,
     "",
     `- ${text(input.locale, "sourceMaterials")}: ${input.materialCount}`,
-    `- ${text(input.locale, "operationsAi")}: ${input.groundedCount} grounded suggestions`,
+    `- ${text(input.locale, "operationsAi")}: ${input.groundedCount} ${reportLabel(input.locale, "grounded suggestions", "sugestii ze źródłami")}`,
     `- ${text(input.locale, "operatorDecisionTrail")}: ${input.operatorDecisionCount}`,
-    `- ${text(input.locale, "workspaceAudit")}: ${input.workspaceAuditCount} events${
+    `- ${text(input.locale, "workspaceAudit")}: ${input.workspaceAuditCount} ${eventsUnit}${
       input.workspaceAuditValid === null
         ? ""
         : ` (${input.workspaceAuditValid ? text(input.locale, "chainValid") : text(input.locale, "chainInvalid")})`
     }`,
-    `- ${text(input.locale, "sessionAudit")}: ${input.sessionAuditCount} events`,
+    `- ${text(input.locale, "sessionAudit")}: ${input.sessionAuditCount} ${sessionEventsUnit}`,
     input.environmentState
       ? `- ${text(input.locale, "environmentHealth")}: ${environmentStateShortLabel(input.environmentState, input.locale)}`
       : "",
@@ -228,13 +267,13 @@ function buildAnswerSection(
     return [];
   }
 
-  const lines = ["## Recorded answers", ""];
+  const lines = [`## ${reportLabel(input.locale, "Recorded answers", "Zapisane odpowiedzi")}`, ""];
   for (const answer of input.answerViews) {
     const question = questionsById.get(answer.questionId);
     const questionLabel = question ? localize(question.text, input.locale) : answer.questionId;
     lines.push(`### ${answer.questionId}: ${questionLabel}`);
     lines.push("");
-    lines.push(`- Time: ${answer.time}`);
+    lines.push(`- ${reportLabel(input.locale, "Time", "Czas")}: ${answer.time}`);
     lines.push(`- ${localize(answer.text, input.locale)}`);
     lines.push("");
   }
@@ -255,7 +294,7 @@ function buildGroundedAiSection(
   }
 
   const activeQuestion = questionsById.get(input.activeQuestionId);
-  const lines = ["## Grounded AI trace", ""];
+  const lines = [`## ${reportLabel(input.locale, "Grounded AI trace", "Ślad AI ze źródeł")}`, ""];
 
   if (input.groundedModel) {
     lines.push(`- ${text(input.locale, "modelLabel")}: ${input.groundedModel}`);
@@ -265,7 +304,7 @@ function buildGroundedAiSection(
   }
   if (activeQuestion) {
     lines.push(
-      `- ${text(input.locale, "reportGroundedQuestion")}: ${input.activeQuestionId} — ${localize(activeQuestion.text, input.locale)}`,
+      `- ${text(input.locale, "reportGroundedQuestion")}: ${input.activeQuestionId} - ${localize(activeQuestion.text, input.locale)}`,
     );
   }
   lines.push("");
@@ -279,7 +318,7 @@ function buildGroundedAiSection(
     const decisionLabel = decision
       ? groundedSuggestionDecisionLabel(decision, input.locale)
       : text(input.locale, "reportSuggestionPending");
-    lines.push(`### ${suggestion.suggestion_type} (${decisionLabel})`);
+    lines.push(`### ${groundedSuggestionTypeLabel(suggestion.suggestion_type, input.locale)} (${decisionLabel})`);
     lines.push("");
     lines.push(suggestion.text);
     lines.push("");
@@ -303,19 +342,19 @@ function buildAuditedAiDecisionsSection(
     return [];
   }
 
-  const lines = ["## Audited AI decisions", ""];
+  const lines = [`## ${reportLabel(input.locale, "Audited AI decisions", "Zaudytowane decyzje AI")}`, ""];
   for (const entry of entries) {
     const question = entry.questionId ? questionsById.get(entry.questionId) : null;
     const questionLabel = question
-      ? `${entry.questionId} — ${localize(question.text, input.locale)}`
-      : (entry.questionId ?? "—");
+      ? `${entry.questionId} - ${localize(question.text, input.locale)}`
+      : (entry.questionId ?? "-");
     const decisionLabel = entry.decision
       ? groundedSuggestionDecisionLabel(entry.decision as GroundedSuggestionDecision, input.locale)
       : entry.action;
     lines.push(`### ${entry.suggestionId} (${decisionLabel})`);
     lines.push("");
     lines.push(`- ${text(input.locale, "reportGroundedQuestion")}: ${questionLabel}`);
-    lines.push(`- Time: ${entry.timestamp}`);
+    lines.push(`- ${reportLabel(input.locale, "Time", "Czas")}: ${entry.timestamp}`);
     if (entry.finalText) {
       lines.push(`- ${entry.finalText}`);
     }
@@ -331,20 +370,20 @@ function buildIntegrityManifestSection(input: SessionReportExportInput): string[
     return [];
   }
 
-  const lines = ["## Export integrity manifest", ""];
-  lines.push(`- Export ID: ${manifest.export_id}`);
+  const lines = [`## ${reportLabel(input.locale, "Export integrity manifest", "Manifest integralności eksportu")}`, ""];
+  lines.push(`- ${reportLabel(input.locale, "Export ID", "ID eksportu")}: ${manifest.export_id}`);
   if (manifest.manifest_hash) {
-    lines.push(`- Manifest hash: ${manifest.manifest_hash}`);
+    lines.push(`- ${reportLabel(input.locale, "Manifest hash", "Hash manifestu")}: ${manifest.manifest_hash}`);
   }
 
   for (const file of manifest.files) {
-    lines.push(`- ${file.path}: ${file.sha256} (${file.size_bytes} bytes)`);
+    lines.push(`- ${file.path}: ${file.sha256} (${file.size_bytes} ${pluralizeReportUnit(input.locale, file.size_bytes, "bytes")})`);
   }
 
   if (manifest.model_artifacts) {
     const reference = manifest.model_artifacts;
     lines.push(
-      `- ${text(input.locale, "modelArtifacts")}: ${reference.manifest_path} / ${reference.manifest_sha256 ?? "—"} / ${reference.record_count} records / ${reference.chain_valid ? text(input.locale, "chainValid") : text(input.locale, "chainInvalid")}`,
+      `- ${text(input.locale, "modelArtifacts")}: ${reference.manifest_path} / ${reference.manifest_sha256 ?? "-"} / ${reference.record_count} ${pluralizeReportUnit(input.locale, reference.record_count, "records")} / ${reference.chain_valid ? text(input.locale, "chainValid") : text(input.locale, "chainInvalid")}`,
     );
   }
 

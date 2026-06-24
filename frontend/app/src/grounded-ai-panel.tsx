@@ -1,6 +1,22 @@
 import { useMemo } from "react";
-import { AlertTriangle, Check, Loader2, Pencil, RefreshCw, ShieldCheck, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  BookOpen,
+  Check,
+  FileText,
+  Fingerprint,
+  Gauge,
+  Loader2,
+  Network,
+  Pencil,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { text, type CopyKey } from "./i18n";
+import { ActionMenu, ContextWindow, SummaryPillRow, type UiAction } from "./ui-patterns";
 import type {
   ApiMode,
   GroundedSuggestion,
@@ -27,6 +43,23 @@ function shortHash(value: string): string {
 
 function shortArtifact(artifact: ModelArtifactSummary): string {
   return `${artifact.artifact_id} / ${shortHash(artifact.sha256)}`;
+}
+
+function formatConfidence(value: number | null): string {
+  return value === null ? "-" : value.toFixed(2);
+}
+
+function formatSuggestionTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString(undefined, {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  });
 }
 
 export function groundedSuggestionDecisionLabel(
@@ -122,9 +155,34 @@ export function GroundedSuggestionsPanel({
 
   const toolbar = (
     <div className="grounded-ai-toolbar">
-      <span className="grounded-ai-provider-badge" data-provider={localModelConfig?.effective_provider ?? "unknown"}>
-        {providerLabel}
-      </span>
+      <div className="grounded-ai-toolbar-main">
+        <span className="grounded-ai-provider-badge" data-provider={localModelConfig?.effective_provider ?? "unknown"}>
+          {providerLabel}
+        </span>
+        <SummaryPillRow
+          items={[
+            {
+              icon: <Sparkles size={13} />,
+              key: "suggestions",
+              label: text(locale, "groundingSuggestionsShort"),
+              value: String(suggestions.length),
+            },
+            {
+              icon: <ShieldCheck size={13} />,
+              key: "decisions",
+              label: text(locale, "auditedAiDecisionsShort"),
+              value: String(Object.keys(decisions).length),
+            },
+            {
+              icon: <AlertTriangle size={13} />,
+              key: "warnings",
+              label: text(locale, "warning"),
+              tone: warnings.length ? "warning" : "ok",
+              value: String(warnings.length),
+            },
+          ]}
+        />
+      </div>
       <button disabled={!canRegenerate} type="button" onClick={onRegenerate}>
         {isLoading ? <Loader2 className="spin" size={14} /> : <RefreshCw size={14} />}
         {isLoading ? text(locale, "groundedAiGenerating") : text(locale, "regenerateGroundedAi")}
@@ -142,34 +200,40 @@ export function GroundedSuggestionsPanel({
         </p>
       ) : null}
       {meta ? (
-        <div className="grounded-ai-meta">
-          <span>
-            {text(locale, "modelLabel")}: {meta.model}
-          </span>
-          <span>
-            {text(locale, "promptVersion")}: {meta.promptVersion}
-          </span>
-          {meta.promptArtifact ? (
+        <ContextWindow
+          icon={<Fingerprint size={14} />}
+          meta={`${meta.model} / ${meta.promptVersion}`}
+          title={text(locale, "groundedAiTrace")}
+        >
+          <div className="grounded-ai-meta">
             <span>
-              {text(locale, "promptArtifact")}: {shortArtifact(meta.promptArtifact)}
+              {text(locale, "modelLabel")}: <strong>{meta.model}</strong>
             </span>
-          ) : null}
-          {meta.contextArtifact ? (
             <span>
-              {text(locale, "contextArtifact")}: {shortArtifact(meta.contextArtifact)}
+              {text(locale, "promptVersion")}: <strong>{meta.promptVersion}</strong>
             </span>
-          ) : null}
-          {meta.outputArtifact ? (
-            <span>
-              {text(locale, "outputArtifact")}: {shortArtifact(meta.outputArtifact)}
-            </span>
-          ) : null}
-          {meta.artifactWarning ? (
-            <span>
-              {text(locale, "artifactWarning")}: {meta.artifactWarning}
-            </span>
-          ) : null}
-        </div>
+            {meta.promptArtifact ? (
+              <span>
+                {text(locale, "promptArtifact")}: <strong>{shortArtifact(meta.promptArtifact)}</strong>
+              </span>
+            ) : null}
+            {meta.contextArtifact ? (
+              <span>
+                {text(locale, "contextArtifact")}: <strong>{shortArtifact(meta.contextArtifact)}</strong>
+              </span>
+            ) : null}
+            {meta.outputArtifact ? (
+              <span>
+                {text(locale, "outputArtifact")}: <strong>{shortArtifact(meta.outputArtifact)}</strong>
+              </span>
+            ) : null}
+            {meta.artifactWarning ? (
+              <span>
+                {text(locale, "artifactWarning")}: <strong>{meta.artifactWarning}</strong>
+              </span>
+            ) : null}
+          </div>
+        </ContextWindow>
       ) : null}
       {meta?.qualityReport ? <GroundedAiQualityPanel locale={locale} report={meta.qualityReport} /> : null}
       {isLoading && !suggestions.length ? (
@@ -231,21 +295,46 @@ function GroundedAiQualityPanel({
         </span>
         <strong>{report.score}%</strong>
       </div>
-      <div className="grounded-ai-quality-summary">
-        <span>{text(locale, "ready")}: {report.summary.ready ?? 0}</span>
-        <span>{text(locale, "warning")}: {report.warning_count}</span>
-        <span>{text(locale, "blocked")}: {report.error_count}</span>
-      </div>
+      <SummaryPillRow
+        items={[
+          {
+            icon: <Check size={13} />,
+            key: "ready",
+            label: text(locale, "ready"),
+            tone: "ok",
+            value: String(report.summary.ready ?? 0),
+          },
+          {
+            icon: <AlertTriangle size={13} />,
+            key: "warnings",
+            label: text(locale, "warning"),
+            tone: report.warning_count ? "warning" : "default",
+            value: String(report.warning_count),
+          },
+          {
+            icon: <ShieldAlert size={13} />,
+            key: "blocked",
+            label: text(locale, "blocked"),
+            tone: report.error_count ? "danger" : "default",
+            value: String(report.error_count),
+          },
+        ]}
+      />
       {visibleIssues.length ? (
-        <div className="grounded-ai-quality-issues">
-          <span>{text(locale, "aiQualityIssues")}</span>
-          {visibleIssues.map((issue, index) => (
-            <article data-severity={issue.severity} key={`${issue.suggestion_id}-${issue.code}-${index}`}>
-              <strong>{issue.code}</strong>
-              <p>{issue.detail}</p>
-            </article>
-          ))}
-        </div>
+        <ContextWindow
+          icon={<ShieldAlert size={14} />}
+          meta={`${visibleIssues.length}/${report.issues.length}`}
+          title={text(locale, "aiQualityIssues")}
+        >
+          <div className="grounded-ai-quality-issues">
+            {visibleIssues.map((issue, index) => (
+              <article data-severity={issue.severity} key={`${issue.suggestion_id}-${issue.code}-${index}`}>
+                <strong>{issue.code}</strong>
+                <p>{issue.detail}</p>
+              </article>
+            ))}
+          </div>
+        </ContextWindow>
       ) : (
         <p>{text(locale, "aiQualityNoIssues")}</p>
       )}
@@ -277,6 +366,56 @@ function GroundedSuggestionCard({
   onUse: (suggestion: GroundedSuggestion) => void;
 }) {
   const visibleText = draft ?? suggestion.text;
+  const decisionLabel = decision ? groundedSuggestionDecisionLabel(decision, locale) : text(locale, "reportSuggestionPending");
+  const confidenceTone = suggestion.confidence === null
+    ? "default"
+    : suggestion.confidence >= 0.8
+      ? "ok"
+      : suggestion.confidence >= 0.55
+        ? "warning"
+        : "danger";
+  const primaryAction: UiAction = draft !== undefined
+    ? {
+        icon: <Check size={14} />,
+        key: "save",
+        label: text(locale, "saveEditSuggestion"),
+        onClick: () => onSaveEdit(suggestion),
+      }
+    : {
+        icon: <Check size={14} />,
+        key: "use",
+        label: text(locale, "useSuggestion"),
+        onClick: () => onUse(suggestion),
+      };
+  const secondaryActions: UiAction[] = draft !== undefined
+    ? [
+        {
+          icon: <Check size={14} />,
+          key: "use",
+          label: text(locale, "useSuggestion"),
+          onClick: () => onUse(suggestion),
+        },
+        {
+          icon: <X size={14} />,
+          key: "reject",
+          label: text(locale, "rejectSuggestion"),
+          onClick: () => onReject(suggestion),
+        },
+      ]
+    : [
+        {
+          icon: <Pencil size={14} />,
+          key: "edit",
+          label: text(locale, "editSuggestion"),
+          onClick: () => onEdit(suggestion),
+        },
+        {
+          icon: <X size={14} />,
+          key: "reject",
+          label: text(locale, "rejectSuggestion"),
+          onClick: () => onReject(suggestion),
+        },
+      ];
 
   return (
     <article className="grounded-suggestion-card" data-state={decision ?? "proposed"}>
@@ -285,7 +424,7 @@ function GroundedSuggestionCard({
           <Sparkles size={13} />
           {suggestion.suggestion_type}
         </span>
-        {decision ? <span className="meta">{groundedSuggestionDecisionLabel(decision, locale)}</span> : null}
+        <span className="grounded-suggestion-decision">{decisionLabel}</span>
       </div>
       {draft !== undefined ? (
         <textarea
@@ -294,42 +433,127 @@ function GroundedSuggestionCard({
           onChange={(event) => onDraftChange(suggestion.id, event.target.value)}
         />
       ) : (
-        <strong>{visibleText}</strong>
+        <strong className="grounded-suggestion-title">{visibleText}</strong>
       )}
-      <p>{suggestion.reason}</p>
-      <div className="grounded-source-list">
-        <span>{text(locale, "sourceIds")}</span>
-        {suggestion.linked_evidence.map((sourceId, index) => (
-          <em key={`${sourceId}-${index}`}>{sourceId}</em>
-        ))}
-      </div>
-      {warnings.length ? (
-        <div className="grounded-warning">
-          <AlertTriangle size={14} />
-          <span>{text(locale, "citationsWarning")}</span>
+
+      <SummaryPillRow
+        items={[
+          {
+            icon: <Gauge size={13} />,
+            key: "confidence",
+            label: text(locale, "suggestionConfidence"),
+            tone: confidenceTone,
+            value: formatConfidence(suggestion.confidence),
+          },
+          {
+            icon: <BookOpen size={13} />,
+            key: "evidence",
+            label: text(locale, "sourceIds"),
+            value: String(suggestion.linked_evidence.length),
+          },
+          {
+            icon: <Network size={13} />,
+            key: "topics",
+            label: text(locale, "suggestionTopics"),
+            value: String(suggestion.linked_topics.length),
+          },
+          {
+            icon: <AlertTriangle size={13} />,
+            key: "warnings",
+            label: text(locale, "warning"),
+            tone: warnings.length ? "warning" : "default",
+            value: String(warnings.length),
+          },
+        ]}
+      />
+
+      <ContextWindow
+        icon={<FileText size={14} />}
+        meta={text(locale, "expandWhenNeeded")}
+        title={text(locale, "suggestionContext")}
+      >
+        <div className="grounded-suggestion-context">
+          <span>{text(locale, "suggestionReason")}</span>
+          <p>{suggestion.reason}</p>
+          {draft === undefined ? (
+            <>
+              <span>{text(locale, "reportGroundedQuestion")}</span>
+              <p>{visibleText}</p>
+            </>
+          ) : null}
         </div>
-      ) : null}
-      <div className="grounded-suggestion-actions">
-        <button type="button" onClick={() => onUse(suggestion)}>
-          <Check size={14} />
-          {text(locale, "useSuggestion")}
-        </button>
-        {draft !== undefined ? (
-          <button type="button" onClick={() => onSaveEdit(suggestion)}>
-            <Check size={14} />
-            {text(locale, "saveEditSuggestion")}
-          </button>
-        ) : (
-          <button type="button" onClick={() => onEdit(suggestion)}>
-            <Pencil size={14} />
-            {text(locale, "editSuggestion")}
-          </button>
-        )}
-        <button type="button" onClick={() => onReject(suggestion)}>
-          <X size={14} />
-          {text(locale, "rejectSuggestion")}
-        </button>
-      </div>
+      </ContextWindow>
+
+      <ContextWindow
+        icon={<Fingerprint size={14} />}
+        meta={`${suggestion.linked_evidence.length} / ${suggestion.linked_topics.length}`}
+        title={text(locale, "suggestionEvidenceContext")}
+      >
+        <div className="grounded-suggestion-context-grid">
+          <div>
+            <span>{text(locale, "sourceIds")}</span>
+            {suggestion.linked_evidence.length ? (
+              <div className="grounded-token-list">
+                {suggestion.linked_evidence.map((sourceId, index) => (
+                  <em key={`${sourceId}-${index}`}>{sourceId}</em>
+                ))}
+              </div>
+            ) : (
+              <p>{text(locale, "noLinkedEvidence")}</p>
+            )}
+          </div>
+          <div>
+            <span>{text(locale, "suggestionTopics")}</span>
+            {suggestion.linked_topics.length ? (
+              <div className="grounded-token-list">
+                {suggestion.linked_topics.map((topicId) => (
+                  <em key={topicId}>{topicId}</em>
+                ))}
+              </div>
+            ) : (
+              <p>{text(locale, "noLinkedTopics")}</p>
+            )}
+          </div>
+          <div>
+            <span>{text(locale, "suggestionRisks")}</span>
+            {suggestion.risk_flags.length ? (
+              <div className="grounded-token-list">
+                {suggestion.risk_flags.map((risk) => (
+                  <em key={risk}>{risk}</em>
+                ))}
+              </div>
+            ) : (
+              <p>{text(locale, "noRiskFlags")}</p>
+            )}
+          </div>
+          <div>
+            <span>{text(locale, "suggestionStatus")}</span>
+            <p>
+              {suggestion.status} / {formatSuggestionTime(suggestion.created_at)}
+            </p>
+          </div>
+          {warnings.length ? (
+            <div className="grounded-warning-list">
+              <span>{text(locale, "citationsWarning")}</span>
+              {warnings.map((warning, index) => (
+                <article key={`${warning.warning_type}-${index}`}>
+                  <AlertTriangle size={14} />
+                  <div>
+                    <strong>{warning.warning_type}</strong>
+                    <p>{warning.detail}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </ContextWindow>
+
+      <ActionMenu
+        moreLabel={text(locale, "moreActions")}
+        primaryAction={primaryAction}
+        secondaryActions={secondaryActions}
+      />
     </article>
   );
 }

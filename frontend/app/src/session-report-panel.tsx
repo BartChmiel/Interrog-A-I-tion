@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Braces, CheckCircle2, ClipboardCopy, FileArchive, FileDown, Loader2, XCircle } from "lucide-react";
+import {
+  Braces,
+  CheckCircle2,
+  ClipboardCopy,
+  FileArchive,
+  FileDown,
+  FileText,
+  Fingerprint,
+  Loader2,
+  XCircle,
+} from "lucide-react";
 import { loadExportBundle, loadExportIntegrityPreview } from "./api";
 import { downloadBase64File } from "./export-bundle";
 import { text } from "./i18n";
@@ -8,6 +18,7 @@ import {
   buildSessionReportJson,
   type SessionReportExportInput,
 } from "./session-report";
+import { ActionMenu, ContextWindow, SummaryPillRow, type UiAction } from "./ui-patterns";
 import type {
   ApiMode,
   ExportBundleResponse,
@@ -123,6 +134,52 @@ export function SessionReportPanel({
   }, [exportInputWithIntegrity, markdownExport]);
 
   const available = apiMode === "online" && Boolean(markdownExport);
+  const reportLineCount = markdownExport ? markdownExport.split(/\r?\n/).length : 0;
+  const reportFileCount = integrityManifest?.files.length ?? 0;
+  const integrityStateLabel = isIntegrityLoading
+    ? text(locale, "integrityPreviewLoading")
+    : integrityVerification?.verified
+      ? text(locale, "integrityVerified")
+      : integrityError
+        ? text(locale, "integrityFailed")
+        : text(locale, "integrityPreviewUnavailable");
+  const primaryExportAction: UiAction | null = available
+    ? {
+        disabled: isBundleDownloading,
+        icon: isBundleDownloading ? <Loader2 className="spin" size={14} /> : <FileArchive size={14} />,
+        key: "download-bundle",
+        label: isBundleDownloading ? "..." : text(locale, "sessionReportDownloadBundle"),
+        onClick: () => void downloadBundle(),
+      }
+    : null;
+  const secondaryExportActions: UiAction[] = available
+    ? [
+        {
+          icon: <FileDown size={14} />,
+          key: "download-markdown",
+          label: text(locale, "sessionReportDownload"),
+          onClick: downloadMarkdown,
+        },
+        {
+          icon: <ClipboardCopy size={14} />,
+          key: "copy-markdown",
+          label: text(locale, "sessionReportCopy"),
+          onClick: () => void copyMarkdown(),
+        },
+        {
+          icon: <Braces size={14} />,
+          key: "download-json",
+          label: text(locale, "sessionReportDownloadJson"),
+          onClick: downloadJson,
+        },
+        {
+          icon: <Braces size={14} />,
+          key: "copy-json",
+          label: text(locale, "sessionReportCopyJson"),
+          onClick: () => void copyJson(),
+        },
+      ]
+    : [];
 
   async function copyMarkdown() {
     if (!markdownExport) {
@@ -188,34 +245,54 @@ export function SessionReportPanel({
       <p className="session-report-disclaimer">{text(locale, "sessionReportDisclaimer")}</p>
       {available ? (
         <>
-          <div className="session-report-actions">
-            <button type="button" onClick={downloadMarkdown}>
-              <FileDown size={14} />
-              {text(locale, "sessionReportDownload")}
-            </button>
-            <button type="button" onClick={() => void copyMarkdown()}>
-              <ClipboardCopy size={14} />
-              {text(locale, "sessionReportCopy")}
-            </button>
-            <button type="button" onClick={downloadJson}>
-              <Braces size={14} />
-              {text(locale, "sessionReportDownloadJson")}
-            </button>
-            <button type="button" onClick={() => void copyJson()}>
-              <Braces size={14} />
-              {text(locale, "sessionReportCopyJson")}
-            </button>
-            <button disabled={isBundleDownloading} type="button" onClick={() => void downloadBundle()}>
-              {isBundleDownloading ? <Loader2 className="spin" size={14} /> : <FileArchive size={14} />}
-              {text(locale, "sessionReportDownloadBundle")}
-            </button>
+          <div className="session-report-export-card">
+            <div className="session-report-export-header">
+              <div>
+                <strong>{text(locale, "reportExportReady")}</strong>
+                <span>{text(locale, "reportExportSummary")}</span>
+              </div>
+              <ActionMenu
+                moreLabel={text(locale, "moreActions")}
+                primaryAction={primaryExportAction}
+                secondaryActions={secondaryExportActions}
+              />
+            </div>
+            <SummaryPillRow
+              items={[
+                {
+                  icon: <FileText size={13} />,
+                  key: "lines",
+                  label: text(locale, "reportLines"),
+                  value: String(reportLineCount),
+                },
+                {
+                  icon: <Braces size={13} />,
+                  key: "formats",
+                  label: text(locale, "reportFormats"),
+                  value: "MD/JSON/ZIP",
+                },
+                {
+                  icon: <Fingerprint size={13} />,
+                  key: "integrity",
+                  label: integrityStateLabel,
+                  tone: integrityVerification?.verified ? "ok" : integrityError ? "danger" : "default",
+                  value: reportFileCount ? String(reportFileCount) : undefined,
+                },
+              ]}
+            />
           </div>
           {bundleError ? <p className="grounding-pack-error">{bundleError}</p> : null}
           {bundleReceipt ? (
-            <div className="session-report-bundle-receipt">
-              <div className="session-report-bundle-receipt-header">
-                <FileArchive size={14} />
-                <strong>{text(locale, "exportBundleReady")}</strong>
+            <ContextWindow
+              icon={<FileArchive size={14} />}
+              meta={
+                bundleReceipt.verified && bundleReceipt.chainValid
+                  ? text(locale, "integrityVerified")
+                  : text(locale, "integrityFailed")
+              }
+              title={text(locale, "exportBundleReady")}
+            >
+              <div className="session-report-bundle-receipt">
                 <span
                   className="integrity-verification-badge"
                   data-verified={bundleReceipt.verified && bundleReceipt.chainValid ? "true" : "false"}
@@ -229,7 +306,6 @@ export function SessionReportPanel({
                     ? text(locale, "integrityVerified")
                     : text(locale, "integrityFailed")}
                 </span>
-              </div>
               <div className="session-report-bundle-grid">
                 <span>{bundleReceipt.filename}</span>
                 {bundleReceipt.bundleSha256 ? (
@@ -256,10 +332,15 @@ export function SessionReportPanel({
                   {text(locale, "exportBundleCopyCommand")}
                 </button>
               </div>
-            </div>
+              </div>
+            </ContextWindow>
           ) : null}
-          <div className="session-report-integrity">
-            <strong>{text(locale, "exportIntegrityPreview")}</strong>
+          <ContextWindow
+            icon={<Fingerprint size={14} />}
+            meta={integrityStateLabel}
+            title={text(locale, "exportIntegrityPreview")}
+          >
+            <div className="session-report-integrity">
             {isIntegrityLoading ? (
               <p className="grounded-ai-loading">
                 <Loader2 className="spin" size={14} />
@@ -301,11 +382,15 @@ export function SessionReportPanel({
             ) : (
               <p className="empty-state">{text(locale, "integrityPreviewUnavailable")}</p>
             )}
-          </div>
-          <details className="session-report-preview">
-            <summary>{text(locale, "sessionReportPreview")}</summary>
-            <pre>{markdownExport}</pre>
-          </details>
+            </div>
+          </ContextWindow>
+          <ContextWindow
+            icon={<FileText size={14} />}
+            meta={`${reportLineCount} ${text(locale, "reportLines")}`}
+            title={text(locale, "sessionReportPreview")}
+          >
+            <pre className="session-report-preview-body">{markdownExport}</pre>
+          </ContextWindow>
         </>
       ) : (
         <p className="session-report-unavailable">{text(locale, "sessionReportUnavailable")}</p>

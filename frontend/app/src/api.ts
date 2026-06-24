@@ -5,7 +5,7 @@ import type {
   CaseStarterMaterialsResponse,
   ClaimReviewDecisionResponse,
   ClaimReviewStatus,
-  DemoReadinessReport,
+  WorkflowReadinessReport,
   EncryptionStatus,
   EnvironmentHealth,
   GroundedSuggestionDecision,
@@ -286,11 +286,15 @@ export async function loadWorkspaceSecurity(config: RuntimeConfig): Promise<Work
   return fetchJson(config, `/workspaces/${encodeURIComponent(config.workspaceId)}/security`);
 }
 
-export async function loadWorkspaceDemoReadiness(config: RuntimeConfig): Promise<DemoReadinessReport> {
+export async function loadWorkspaceWorkflowReadiness(
+  config: RuntimeConfig,
+  locale: string,
+): Promise<WorkflowReadinessReport> {
   const workspaceId = encodeURIComponent(config.workspaceId);
   const query = new URLSearchParams({
     case_id: config.caseId,
     session_id: config.sessionId,
+    locale,
   });
   return fetchJson(config, `/workspaces/${workspaceId}/demo-readiness?${query.toString()}`);
 }

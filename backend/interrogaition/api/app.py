@@ -137,6 +137,7 @@ from interrogaition.export.integrity_manifest import (
     verify_export_manifest_contents,
 )
 from interrogaition.export.markdown_report import render_review_markdown
+from interrogaition.i18n.localization import normalize_locale
 from interrogaition.security.access_policy import (
     WorkspaceAction,
     WorkspaceRole,
@@ -602,6 +603,7 @@ def create_app(
         workspace_id: str,
         case_id: str | None = Query(default=None),
         session_id: str | None = Query(default=None),
+        locale: str = Query(default="en"),
         role: WorkspaceRole = WorkspaceRole.INVESTIGATOR,
     ) -> dict[str, Any]:
         try:
@@ -629,6 +631,7 @@ def create_app(
                 workspace_manager=workspace_manager,
                 store=store,
                 local_model_config=local_model_config,
+                locale=locale,
             )
         )
 
@@ -2076,7 +2079,9 @@ def _build_demo_readiness_report(
     workspace_manager: CaseWorkspaceManager,
     store: SessionStore,
     local_model_config: LocalModelRuntimeConfig,
+    locale: str,
 ) -> dict[str, Any]:
+    normalized_locale = normalize_locale(locale)
     workspace_events = _workspace_audit_events(store.list_audit_events(), workspace.manifest.workspace_id)
     session_events = _session_audit_events(store.list_audit_events(), session_id) if session_id else ()
     workspace_security = assess_workspace_security(
@@ -2096,78 +2101,147 @@ def _build_demo_readiness_report(
     checks = [
         _demo_readiness_check(
             "workspace",
-            "Case workspace",
+            _case_quality_text(normalized_locale, en="Case workspace", pl="Workspace sprawy"),
             "ready",
-            f"Workspace {workspace.manifest.workspace_id} is open for case {case_id}.",
+            _case_quality_text(
+                normalized_locale,
+                en=f"Workspace {workspace.manifest.workspace_id} is open for case {case_id}.",
+                pl=f"Workspace {workspace.manifest.workspace_id} jest otwarty dla sprawy {case_id}.",
+            ),
             {"data_sensitivity": workspace.manifest.data_sensitivity.value},
             "",
         ),
         _demo_readiness_check(
             "workspace_security",
-            "Workspace security",
+            _case_quality_text(normalized_locale, en="Workspace security", pl="Bezpieczeństwo workspace"),
             workspace_security.state,
-            _first_issue_detail(workspace_security.issues) or "Workspace security posture is ready for synthetic workflow data.",
+            _first_issue_detail(workspace_security.issues)
+            or _case_quality_text(
+                normalized_locale,
+                en="Workspace security posture is ready for synthetic workflow data.",
+                pl="Postawa bezpieczeństwa workspace jest gotowa dla syntetycznych danych procesu.",
+            ),
             {"issue_count": workspace_security.issue_count},
-            "Resolve workspace security findings before continuing the workflow.",
+            _case_quality_text(
+                normalized_locale,
+                en="Resolve workspace security findings before continuing the workflow.",
+                pl="Rozwiąż ustalenia bezpieczeństwa workspace przed kontynuacją procesu.",
+            ),
         ),
         _demo_readiness_check(
             "audit_chain",
-            "Audit chain",
+            _case_quality_text(normalized_locale, en="Audit chain", pl="Łańcuch audytu"),
             "ready" if store.verify_audit_chain() else "blocked",
-            f"{len(workspace_events)} workspace audit events and {len(session_events)} session audit events are available.",
+            _case_quality_text(
+                normalized_locale,
+                en=(
+                    f"{len(workspace_events)} workspace audit events and "
+                    f"{len(session_events)} session audit events are available."
+                ),
+                pl=(
+                    f"Dostępne zdarzenia audytu: workspace {len(workspace_events)}, "
+                    f"sesja {len(session_events)}."
+                ),
+            ),
             {
                 "workspace_event_count": len(workspace_events),
                 "session_event_count": len(session_events),
             },
-            "Refresh the workspace and session audit views, then investigate any chain mismatch before continuing.",
+            _case_quality_text(
+                normalized_locale,
+                en=(
+                    "Refresh the workspace and session audit views, then investigate any chain mismatch "
+                    "before continuing."
+                ),
+                pl=(
+                    "Odśwież widoki audytu workspace i sesji, a potem wyjaśnij każdą niespójność łańcucha "
+                    "przed kontynuacją."
+                ),
+            ),
         ),
         _demo_readiness_check(
             "session_capture",
-            "Session capture",
+            _case_quality_text(normalized_locale, en="Session capture", pl="Zapis sesji"),
             _session_capture_state(session_id=session_id, session=session),
-            _session_capture_detail(session_id=session_id, session=session),
+            _session_capture_detail(session_id=session_id, session=session, locale=normalized_locale),
             {"answer_count": len(session.answers) if session is not None else 0},
-            "Start the session and record at least one answer before the final review.",
+            _case_quality_text(
+                normalized_locale,
+                en="Start the session and record at least one answer before the final review.",
+                pl="Rozpocznij sesję i zapisz co najmniej jedną odpowiedź przed finalnym przeglądem.",
+            ),
         ),
         _demo_readiness_check(
             "model_artifacts",
-            "Model artifact trace",
+            _case_quality_text(normalized_locale, en="Model artifact trace", pl="Ślad artefaktów modelu"),
             _model_artifact_demo_state(artifact_isolation.state, artifact_manifest.record_count),
-            _model_artifact_demo_detail(artifact_isolation.state, artifact_manifest.record_count),
+            _model_artifact_demo_detail(
+                artifact_isolation.state,
+                artifact_manifest.record_count,
+                normalized_locale,
+            ),
             {
                 "isolation_state": artifact_isolation.state,
                 "record_count": artifact_manifest.record_count,
                 "chain_valid": artifact_manifest.chain_valid,
             },
-            "Initialize model artifact isolation and generate grounded AI once so prompt/context/output records exist.",
+            _case_quality_text(
+                normalized_locale,
+                en="Initialize model artifact isolation and generate grounded AI once so prompt/context/output records exist.",
+                pl="Zainicjalizuj izolację artefaktów modelu i raz wygeneruj grounded AI, aby powstały rekordy prompt/context/output.",
+            ),
         ),
         _demo_readiness_check(
             "model_experiment_stop",
-            "Real-model STOP gate",
+            _case_quality_text(normalized_locale, en="Real-model STOP gate", pl="Bramka STOP modelu live"),
             "ready" if model_readiness.can_run_real_smoke else "warning",
-            (
-                "Controlled real-model smoke is approved."
-                if model_readiness.can_run_real_smoke
-                else "Default workflow remains deterministic; real-model smoke still needs its separate STOP gate."
+            _case_quality_text(
+                normalized_locale,
+                en=(
+                    "Controlled real-model smoke is approved."
+                    if model_readiness.can_run_real_smoke
+                    else "Default workflow remains deterministic; real-model smoke still needs its separate STOP gate."
+                ),
+                pl=(
+                    "Kontrolowany smoke modelu live jest zatwierdzony."
+                    if model_readiness.can_run_real_smoke
+                    else "Domyślny proces pozostaje deterministyczny; smoke modelu live nadal wymaga osobnej bramki STOP."
+                ),
             ),
             {
                 "provider": model_readiness.provider,
                 "effective_provider": model_readiness.effective_provider,
                 "issue_count": model_readiness.issue_count,
             },
-            "Keep the default workflow deterministic unless you deliberately run the separate real-model STOP approval.",
+            _case_quality_text(
+                normalized_locale,
+                en="Keep the default workflow deterministic unless you deliberately run the separate real-model STOP approval.",
+                pl="Utrzymuj domyślny proces jako deterministyczny, chyba że celowo uruchamiasz osobną zgodę STOP dla modelu live.",
+            ),
         ),
         _demo_readiness_check(
             "export_bundle",
-            "Export bundle",
+            _case_quality_text(normalized_locale, en="Export bundle", pl="Paczka eksportu"),
             "ready" if export_events else "warning",
-            (
-                "A ZIP export bundle is recorded in the workspace audit chain."
-                if export_events
-                else "Download a ZIP export bundle from Review before the final review."
+            _case_quality_text(
+                normalized_locale,
+                en=(
+                    "A ZIP export bundle is recorded in the workspace audit chain."
+                    if export_events
+                    else "Download a ZIP export bundle from Review before the final review."
+                ),
+                pl=(
+                    "Paczka eksportu ZIP jest zapisana w łańcuchu audytu workspace."
+                    if export_events
+                    else "Pobierz paczkę eksportu ZIP z przeglądu przed finalnym przeglądem."
+                ),
             ),
             _latest_export_bundle_evidence(export_events),
-            "Download the ZIP export bundle and verify it offline with the generated SHA-256 command.",
+            _case_quality_text(
+                normalized_locale,
+                en="Download the ZIP export bundle and verify it offline with the generated SHA-256 command.",
+                pl="Pobierz paczkę eksportu ZIP i zweryfikuj ją offline wygenerowaną komendą SHA-256.",
+            ),
         ),
     ]
     state = _demo_readiness_state(checks)
@@ -2243,14 +2317,30 @@ def _session_capture_state(*, session_id: str | None, session: InterviewSession 
     return "ready" if session.answers else "warning"
 
 
-def _session_capture_detail(*, session_id: str | None, session: InterviewSession | None) -> str:
+def _session_capture_detail(*, session_id: str | None, session: InterviewSession | None, locale: str) -> str:
     if not session_id:
-        return "No session id was supplied for this readiness report."
+        return _case_quality_text(
+            locale,
+            en="No session id was supplied for this readiness report.",
+            pl="Nie podano identyfikatora sesji dla tego raportu gotowości.",
+        )
     if session is None:
-        return f"Session {session_id} has not been started through the API yet."
+        return _case_quality_text(
+            locale,
+            en=f"Session {session_id} has not been started through the API yet.",
+            pl=f"Sesja {session_id} nie została jeszcze uruchomiona przez API.",
+        )
     if not session.answers:
-        return f"Session {session_id} exists but has no recorded answers yet."
-    return f"Session {session_id} has {len(session.answers)} recorded answers."
+        return _case_quality_text(
+            locale,
+            en=f"Session {session_id} exists but has no recorded answers yet.",
+            pl=f"Sesja {session_id} istnieje, ale nie ma jeszcze zapisanych odpowiedzi.",
+        )
+    return _case_quality_text(
+        locale,
+        en=f"Session {session_id} has {len(session.answers)} recorded answers.",
+        pl=f"Sesja {session_id} ma {len(session.answers)} zapisanych odpowiedzi.",
+    )
 
 
 def _model_artifact_demo_state(isolation_state: str, record_count: int) -> str:
@@ -2261,12 +2351,24 @@ def _model_artifact_demo_state(isolation_state: str, record_count: int) -> str:
     return "ready"
 
 
-def _model_artifact_demo_detail(isolation_state: str, record_count: int) -> str:
+def _model_artifact_demo_detail(isolation_state: str, record_count: int, locale: str) -> str:
     if isolation_state != "ready":
-        return "Model artifact isolation should be initialized before reviewing grounded AI traceability."
+        return _case_quality_text(
+            locale,
+            en="Model artifact isolation should be initialized before reviewing grounded AI traceability.",
+            pl="Izolacja artefaktów modelu powinna zostać zainicjalizowana przed przeglądem śladu AI opartego na źródłach.",
+        )
     if record_count == 0:
-        return "Model artifact isolation is ready, but no prompt/context/output artifacts are recorded yet."
-    return f"Model artifact manifest contains {record_count} hash-chained records."
+        return _case_quality_text(
+            locale,
+            en="Model artifact isolation is ready, but no prompt/context/output artifacts are recorded yet.",
+            pl="Izolacja artefaktów modelu jest gotowa, ale nie zapisano jeszcze artefaktów prompt/context/output.",
+        )
+    return _case_quality_text(
+        locale,
+        en=f"Model artifact manifest contains {record_count} hash-chained records.",
+        pl=f"Manifest artefaktów modelu zawiera {record_count} rekordów w łańcuchu hashy.",
+    )
 
 
 def _latest_export_bundle_evidence(export_events: tuple[AuditEvent, ...]) -> dict[str, Any]:
@@ -2292,6 +2394,7 @@ def _build_case_quality_report(
     store: SessionStore,
     material_texts: tuple[MaterialText, ...],
 ) -> dict[str, Any]:
+    normalized_locale = normalize_locale(locale)
     audit_events = store.list_audit_events()
     workspace_events = _workspace_audit_events(audit_events, workspace.manifest.workspace_id)
     session = store.get_session(session_id) if session_id else None
@@ -2305,7 +2408,7 @@ def _build_case_quality_report(
     )
     context = _build_evidence_context(
         case_id=case_id,
-        locale=locale,
+        locale=normalized_locale,
         session_id=session_id,
         store=store,
         material_texts=material_texts,
@@ -2351,24 +2454,30 @@ def _build_case_quality_report(
         session_id=session_id,
     )
     dimensions = [
-        _case_quality_case_scope_dimension(case_view, workspace, material_texts),
-        _case_quality_workspace_security_dimension(workspace_security),
-        _case_quality_session_dimension(session_id=session_id, session=session),
-        _case_quality_claim_review_dimension(session),
-        _case_quality_claim_provenance_dimension(provenance),
-        _case_quality_evidence_coverage_dimension(evidence_map),
-        _case_quality_material_grounding_dimension(evidence_map, evidence_alignment),
+        _case_quality_case_scope_dimension(case_view, workspace, material_texts, normalized_locale),
+        _case_quality_workspace_security_dimension(workspace_security, normalized_locale),
+        _case_quality_session_dimension(
+            locale=normalized_locale,
+            session_id=session_id,
+            session=session,
+        ),
+        _case_quality_claim_review_dimension(session, normalized_locale),
+        _case_quality_claim_provenance_dimension(provenance, normalized_locale),
+        _case_quality_evidence_coverage_dimension(evidence_map, normalized_locale),
+        _case_quality_material_grounding_dimension(evidence_map, evidence_alignment, normalized_locale),
         _case_quality_ai_trace_dimension(
             artifact_manifest=artifact_manifest,
             generation_events=grounded_generation_events,
             decision_events=grounded_decision_events,
+            locale=normalized_locale,
         ),
-        _case_quality_operator_dimension(operator_events),
+        _case_quality_operator_dimension(operator_events, normalized_locale),
         _case_quality_audit_export_dimension(
             chain_valid=chain_valid,
             workspace_events=workspace_events,
             session_events=session_events,
             export_events=export_events,
+            locale=normalized_locale,
         ),
     ]
     return {
@@ -2423,18 +2532,30 @@ def _case_quality_dimension(
     }
 
 
+def _case_quality_text(locale: str, *, en: str, pl: str) -> str:
+    return pl if locale == "pl" else en
+
+
 def _case_quality_case_scope_dimension(
     case: Case,
     workspace: CaseWorkspace,
     material_texts: tuple[MaterialText, ...],
+    locale: str,
 ) -> dict[str, Any]:
     return _case_quality_dimension(
         "case_scope",
-        "Case scope",
+        _case_quality_text(locale, en="Case scope", pl="Zakres sprawy"),
         "ready",
-        (
-            f"Case {case.id} has {len(case.questions)} planned questions, "
-            f"{len(case.topics)} topics and {len(material_texts)} registered materials."
+        _case_quality_text(
+            locale,
+            en=(
+                f"Case {case.id} has {len(case.questions)} planned questions, "
+                f"{len(case.topics)} topics and {len(material_texts)} registered materials."
+            ),
+            pl=(
+                f"Sprawa {case.id} ma {len(case.questions)} zaplanowanych pytań, "
+                f"{len(case.topics)} tematów i {len(material_texts)} zarejestrowanych materiałów."
+            ),
         ),
         {
             "question_count": len(case.questions),
@@ -2445,81 +2566,141 @@ def _case_quality_case_scope_dimension(
     )
 
 
-def _case_quality_workspace_security_dimension(workspace_security: Any) -> dict[str, Any]:
+def _case_quality_workspace_security_dimension(workspace_security: Any, locale: str) -> dict[str, Any]:
     return _case_quality_dimension(
         "workspace_security",
-        "Workspace security",
+        _case_quality_text(locale, en="Workspace security", pl="Bezpieczeństwo workspace"),
         workspace_security.state,
         _first_issue_detail(workspace_security.issues)
-        or "Workspace security posture is acceptable for the current case mode.",
+        or _case_quality_text(
+            locale,
+            en="Workspace security posture is acceptable for the current case mode.",
+            pl="Postawa bezpieczeństwa workspace jest akceptowalna dla bieżącego trybu sprawy.",
+        ),
         {"issue_count": workspace_security.issue_count},
-        "Resolve workspace security findings before using non-synthetic or externally shared outputs.",
+        _case_quality_text(
+            locale,
+            en="Resolve workspace security findings before using non-synthetic or externally shared outputs.",
+            pl=(
+                "Rozwiąż ustalenia bezpieczeństwa workspace przed użyciem danych innych niż syntetyczne "
+                "albo przed zewnętrznym udostępnieniem wyników."
+            ),
+        ),
     )
 
 
 def _case_quality_session_dimension(
     *,
+    locale: str,
     session_id: str | None,
     session: InterviewSession | None,
 ) -> dict[str, Any]:
     answer_count = len(session.answers) if session is not None else 0
     if not session_id:
         state = "unknown"
-        detail = "No session id was supplied, so live interview quality cannot be assessed."
+        detail = _case_quality_text(
+            locale,
+            en="No session id was supplied, so live interview quality cannot be assessed.",
+            pl="Nie podano identyfikatora sesji, więc nie można ocenić jakości rozmowy na żywo.",
+        )
     elif session is None:
         state = "warning"
-        detail = f"Session {session_id} has not been started through the API."
+        detail = _case_quality_text(
+            locale,
+            en=f"Session {session_id} has not been started through the API.",
+            pl=f"Sesja {session_id} nie została uruchomiona przez API.",
+        )
     elif answer_count == 0:
         state = "warning"
-        detail = f"Session {session_id} exists, but no answers have been captured."
+        detail = _case_quality_text(
+            locale,
+            en=f"Session {session_id} exists, but no answers have been captured.",
+            pl=f"Sesja {session_id} istnieje, ale nie zapisano żadnych odpowiedzi.",
+        )
     else:
         state = "ready"
-        detail = f"Session {session_id} has {answer_count} recorded answers."
+        detail = _case_quality_text(
+            locale,
+            en=f"Session {session_id} has {answer_count} recorded answers.",
+            pl=f"Sesja {session_id} ma {answer_count} zapisanych odpowiedzi.",
+        )
     return _case_quality_dimension(
         "session_capture",
-        "Session capture",
+        _case_quality_text(locale, en="Session capture", pl="Zapis sesji"),
         state,
         detail,
         {"answer_count": answer_count},
-        "Start the session and record answers before treating the case as review-ready.",
+        _case_quality_text(
+            locale,
+            en="Start the session and record answers before treating the case as review-ready.",
+            pl="Rozpocznij sesję i zapisz odpowiedzi, zanim uznasz sprawę za gotową do przeglądu.",
+        ),
     )
 
 
-def _case_quality_claim_review_dimension(session: InterviewSession | None) -> dict[str, Any]:
+def _case_quality_claim_review_dimension(session: InterviewSession | None, locale: str) -> dict[str, Any]:
     counts = _claim_review_counts(session)
     total = sum(counts.values())
     pending = counts[ClaimReviewStatus.PENDING.value]
     if session is None:
         state = "unknown"
-        detail = "Claim review cannot be assessed without a session."
+        detail = _case_quality_text(
+            locale,
+            en="Claim review cannot be assessed without a session.",
+            pl="Nie można ocenić przeglądu claimów bez sesji.",
+        )
     elif total == 0:
         state = "warning"
-        detail = "No claims are available for operator review yet."
+        detail = _case_quality_text(
+            locale,
+            en="No claims are available for operator review yet.",
+            pl="Nie ma jeszcze claimów dostępnych do przeglądu operatora.",
+        )
     elif pending:
         state = "warning"
-        detail = f"{pending} extracted claims still need operator review."
+        detail = _case_quality_text(
+            locale,
+            en=f"{pending} extracted claims still need operator review.",
+            pl=f"{pending} wyekstrahowanych claimów nadal wymaga przeglądu operatora.",
+        )
     else:
         state = "ready"
-        detail = f"All {total} claims have an operator review status."
+        detail = _case_quality_text(
+            locale,
+            en=f"All {total} claims have an operator review status.",
+            pl=f"Wszystkie claimy ({total}) mają status przeglądu operatora.",
+        )
     return _case_quality_dimension(
         "claim_review",
-        "Claim review discipline",
+        _case_quality_text(locale, en="Claim review discipline", pl="Dyscyplina przeglądu claimów"),
         state,
         detail,
         counts,
-        "Accept, edit or reject pending claims before relying on downstream indicators.",
+        _case_quality_text(
+            locale,
+            en="Accept, edit or reject pending claims before relying on downstream indicators.",
+            pl="Zaakceptuj, popraw albo odrzuć oczekujące claimy, zanim oprzesz się na dalszych wskaźnikach.",
+        ),
     )
 
 
-def _case_quality_claim_provenance_dimension(provenance: Any | None) -> dict[str, Any]:
+def _case_quality_claim_provenance_dimension(provenance: Any | None, locale: str) -> dict[str, Any]:
     if provenance is None:
         return _case_quality_dimension(
             "claim_provenance",
-            "Claim provenance",
+            _case_quality_text(locale, en="Claim provenance", pl="Pochodzenie claimów"),
             "unknown",
-            "Claim provenance cannot be assessed without a session.",
+            _case_quality_text(
+                locale,
+                en="Claim provenance cannot be assessed without a session.",
+                pl="Nie można ocenić pochodzenia claimów bez sesji.",
+            ),
             {},
-            "Run a session with extracted claims so provenance can be verified.",
+            _case_quality_text(
+                locale,
+                en="Run a session with extracted claims so provenance can be verified.",
+                pl="Uruchom sesję z wyekstrahowanymi claimami, aby można było zweryfikować ich pochodzenie.",
+            ),
         )
     metrics = {
         "claim_count": provenance.claim_count,
@@ -2531,31 +2712,51 @@ def _case_quality_claim_provenance_dimension(provenance: Any | None) -> dict[str
     if not provenance.chain_valid or provenance.issue_count:
         return _case_quality_dimension(
             "claim_provenance",
-            "Claim provenance",
+            _case_quality_text(locale, en="Claim provenance", pl="Pochodzenie claimów"),
             "blocked",
-            "Claim extraction provenance has audit-chain or trace issues.",
+            _case_quality_text(
+                locale,
+                en="Claim extraction provenance has audit-chain or trace issues.",
+                pl="Pochodzenie ekstrakcji claimów ma problemy z łańcuchem audytu albo śladem weryfikacji.",
+            ),
             metrics,
-            "Inspect the session claim provenance report before continuing.",
+            _case_quality_text(
+                locale,
+                en="Inspect the session claim provenance report before continuing.",
+                pl="Sprawdź raport pochodzenia claimów sesji przed kontynuacją.",
+            ),
         )
     if provenance.extracted_claim_count == 0:
         return _case_quality_dimension(
             "claim_provenance",
-            "Claim provenance",
+            _case_quality_text(locale, en="Claim provenance", pl="Pochodzenie claimów"),
             "warning",
-            "No extracted claims are available for provenance verification.",
+            _case_quality_text(
+                locale,
+                en="No extracted claims are available for provenance verification.",
+                pl="Brak wyekstrahowanych claimów do weryfikacji pochodzenia.",
+            ),
             metrics,
-            "Capture or extract claims so traceability can be demonstrated.",
+            _case_quality_text(
+                locale,
+                en="Capture or extract claims so traceability can be demonstrated.",
+                pl="Zapisz albo wyekstrahuj claimy, aby można było pokazać ścieżkę pochodzenia.",
+            ),
         )
     return _case_quality_dimension(
         "claim_provenance",
-        "Claim provenance",
+        _case_quality_text(locale, en="Claim provenance", pl="Pochodzenie claimów"),
         "ready",
-        f"{provenance.verified_claim_count} extracted claims are verified against audit snapshots.",
+        _case_quality_text(
+            locale,
+            en=f"{provenance.verified_claim_count} extracted claims are verified against audit snapshots.",
+            pl=f"{provenance.verified_claim_count} wyekstrahowanych claimów zweryfikowano względem snapshotów audytu.",
+        ),
         metrics,
     )
 
 
-def _case_quality_evidence_coverage_dimension(evidence_map: Any) -> dict[str, Any]:
+def _case_quality_evidence_coverage_dimension(evidence_map: Any, locale: str) -> dict[str, Any]:
     summary = evidence_map.summary
     high_missing = tuple(
         node for node in evidence_map.topic_nodes if node.status.value == "missing" and node.priority == "high"
@@ -2571,30 +2772,57 @@ def _case_quality_evidence_coverage_dimension(evidence_map: Any) -> dict[str, An
     }
     if summary.total_answers == 0:
         state = "warning"
-        detail = "No answers are captured, so topic coverage is not review-ready."
+        detail = _case_quality_text(
+            locale,
+            en="No answers are captured, so topic coverage is not review-ready.",
+            pl="Nie zapisano odpowiedzi, więc pokrycie tematów nie jest gotowe do przeglądu.",
+        )
     elif high_missing:
         state = "warning"
-        detail = f"{len(high_missing)} high-priority topics are still missing."
+        detail = _case_quality_text(
+            locale,
+            en=f"{len(high_missing)} high-priority topics are still missing.",
+            pl=f"Nadal brakuje {len(high_missing)} tematów wysokiego priorytetu.",
+        )
     elif summary.missing_topics or summary.contested_topics:
         state = "warning"
-        detail = (
-            f"{summary.missing_topics} topics are missing and "
-            f"{summary.contested_topics} topics are contested."
+        detail = _case_quality_text(
+            locale,
+            en=(
+                f"{summary.missing_topics} topics are missing and "
+                f"{summary.contested_topics} topics are contested."
+            ),
+            pl=(
+                f"{summary.missing_topics} tematów jest niepokrytych, a "
+                f"{summary.contested_topics} tematów jest spornych."
+            ),
         )
     else:
         state = "ready"
-        detail = "All case topics have coverage without contested evidence-map topics."
+        detail = _case_quality_text(
+            locale,
+            en="All case topics have coverage without contested evidence-map topics.",
+            pl="Wszystkie tematy sprawy mają pokrycie bez spornych tematów na mapie materiałów.",
+        )
     return _case_quality_dimension(
         "evidence_coverage",
-        "Evidence coverage",
+        _case_quality_text(locale, en="Evidence coverage", pl="Pokrycie materiałami"),
         state,
         detail,
         metrics,
-        "Use the evidence map to resolve missing, material-only or contested topics.",
+        _case_quality_text(
+            locale,
+            en="Use the evidence map to resolve missing, material-only or contested topics.",
+            pl="Użyj mapy materiałów, aby rozwiązać tematy brakujące, tylko-materiałowe albo sporne.",
+        ),
     )
 
 
-def _case_quality_material_grounding_dimension(evidence_map: Any, evidence_alignment: Any) -> dict[str, Any]:
+def _case_quality_material_grounding_dimension(
+    evidence_map: Any,
+    evidence_alignment: Any,
+    locale: str,
+) -> dict[str, Any]:
     summary = evidence_map.summary
     metrics = {
         "total_materials": summary.total_materials,
@@ -2608,26 +2836,50 @@ def _case_quality_material_grounding_dimension(evidence_map: Any, evidence_align
     }
     if summary.total_materials == 0:
         state = "warning"
-        detail = "No materials are registered for this case workspace."
+        detail = _case_quality_text(
+            locale,
+            en="No materials are registered for this case workspace.",
+            pl="W workspace tej sprawy nie ma zarejestrowanych materiałów.",
+        )
     elif evidence_alignment.total_proposed_links == 0:
         state = "warning"
-        detail = "Registered materials do not yet produce question-grounding links."
+        detail = _case_quality_text(
+            locale,
+            en="Registered materials do not yet produce question-grounding links.",
+            pl="Zarejestrowane materiały nie tworzą jeszcze powiązań z pytaniami.",
+        )
     elif evidence_alignment.pending_links:
         state = "warning"
-        detail = f"{evidence_alignment.pending_links} material-question links still need review."
+        detail = _case_quality_text(
+            locale,
+            en=f"{evidence_alignment.pending_links} material-question links still need review.",
+            pl=f"{evidence_alignment.pending_links} linków materiał-pytanie nadal wymaga przeglądu.",
+        )
     elif evidence_alignment.accepted_links == 0:
         state = "warning"
-        detail = "Material links were reviewed, but none are accepted as support."
+        detail = _case_quality_text(
+            locale,
+            en="Material links were reviewed, but none are accepted as support.",
+            pl="Linki materiałowe zostały przejrzane, ale żaden nie został zaakceptowany jako wsparcie.",
+        )
     else:
         state = "ready"
-        detail = f"{evidence_alignment.accepted_links} material-question links are accepted."
+        detail = _case_quality_text(
+            locale,
+            en=f"{evidence_alignment.accepted_links} material-question links are accepted.",
+            pl=f"{evidence_alignment.accepted_links} linków materiał-pytanie jest zaakceptowanych.",
+        )
     return _case_quality_dimension(
         "material_grounding",
-        "Material grounding",
+        _case_quality_text(locale, en="Material grounding", pl="Powiązania materiałów"),
         state,
         detail,
         metrics,
-        "Review proposed material-question links and accept the sources that genuinely support the case.",
+        _case_quality_text(
+            locale,
+            en="Review proposed material-question links and accept the sources that genuinely support the case.",
+            pl="Przejrzyj proponowane linki materiał-pytanie i zaakceptuj źródła, które realnie wspierają sprawę.",
+        ),
     )
 
 
@@ -2636,6 +2888,7 @@ def _case_quality_ai_trace_dimension(
     artifact_manifest: Any,
     generation_events: tuple[AuditEvent, ...],
     decision_events: tuple[AuditEvent, ...],
+    locale: str,
 ) -> dict[str, Any]:
     warning_count = sum(1 for event in generation_events if event.details.get("artifact_warning"))
     latest_generation = generation_events[-1] if generation_events else None
@@ -2656,52 +2909,100 @@ def _case_quality_ai_trace_dimension(
     }
     if not artifact_manifest.chain_valid:
         state = "blocked"
-        detail = "Model artifact manifest chain is invalid."
+        detail = _case_quality_text(
+            locale,
+            en="Model artifact manifest chain is invalid.",
+            pl="Łańcuch manifestu artefaktów modelu jest nieprawidłowy.",
+        )
     elif latest_quality_state == "blocked":
         state = "blocked"
-        detail = "Latest grounded AI quality report is blocked."
+        detail = _case_quality_text(
+            locale,
+            en="Latest grounded AI quality report is blocked.",
+            pl="Najnowszy raport jakości grounded AI jest zablokowany.",
+        )
     elif not generation_events:
         state = "warning"
-        detail = "No grounded AI suggestion batch is recorded for this case."
+        detail = _case_quality_text(
+            locale,
+            en="No grounded AI suggestion batch is recorded for this case.",
+            pl="Dla tej sprawy nie zapisano żadnej paczki sugestii grounded AI.",
+        )
     elif latest_quality_state == "warning":
         state = "warning"
-        detail = "Latest grounded AI quality report has warnings that need review."
+        detail = _case_quality_text(
+            locale,
+            en="Latest grounded AI quality report has warnings that need review.",
+            pl="Najnowszy raport jakości grounded AI ma ostrzeżenia wymagające przeglądu.",
+        )
     elif warning_count:
         state = "warning"
-        detail = "Grounded AI was generated without complete artifact capture."
+        detail = _case_quality_text(
+            locale,
+            en="Grounded AI was generated without complete artifact capture.",
+            pl="Sugestie grounded AI wygenerowano bez pełnego zapisu artefaktów.",
+        )
     elif artifact_manifest.record_count == 0:
         state = "warning"
-        detail = "Grounded AI is recorded, but no prompt/context/output artifacts are present."
+        detail = _case_quality_text(
+            locale,
+            en="Grounded AI is recorded, but no prompt/context/output artifacts are present.",
+            pl="Zapisano grounded AI, ale brakuje artefaktów prompt/context/output.",
+        )
     elif len(decision_events) < len(generation_events):
         state = "warning"
-        detail = "Grounded AI suggestions need explicit accepted/edited/rejected operator decisions."
+        detail = _case_quality_text(
+            locale,
+            en="Grounded AI suggestions need explicit accepted/edited/rejected operator decisions.",
+            pl="Sugestie grounded AI wymagają jawnych decyzji operatora: zaakceptowano, poprawiono albo odrzucono.",
+        )
     else:
         state = "ready"
-        detail = "Grounded AI generation, artifacts and operator decisions are auditable."
+        detail = _case_quality_text(
+            locale,
+            en="Grounded AI generation, artifacts and operator decisions are auditable.",
+            pl="Generowanie grounded AI, artefakty i decyzje operatora są audytowalne.",
+        )
     return _case_quality_dimension(
         "ai_trace",
-        "Grounded AI trace",
+        _case_quality_text(locale, en="Grounded AI trace", pl="Ślad AI ze źródeł"),
         state,
         detail,
         metrics,
-        "Generate grounded suggestions with artifact isolation enabled, then record operator decisions.",
+        _case_quality_text(
+            locale,
+            en="Generate grounded suggestions with artifact isolation enabled, then record operator decisions.",
+            pl="Wygeneruj sugestie grounded z włączoną izolacją artefaktów, a potem zapisz decyzje operatora.",
+        ),
     )
 
 
-def _case_quality_operator_dimension(operator_events: tuple[AuditEvent, ...]) -> dict[str, Any]:
+def _case_quality_operator_dimension(operator_events: tuple[AuditEvent, ...], locale: str) -> dict[str, Any]:
     if operator_events:
         state = "ready"
-        detail = f"{len(operator_events)} operator work-queue decisions are recorded."
+        detail = _case_quality_text(
+            locale,
+            en=f"{len(operator_events)} operator work-queue decisions are recorded.",
+            pl=f"Zapisano {len(operator_events)} decyzji operatora z kolejki pracy.",
+        )
     else:
         state = "warning"
-        detail = "No operator work-queue decisions are recorded for this case/session."
+        detail = _case_quality_text(
+            locale,
+            en="No operator work-queue decisions are recorded for this case/session.",
+            pl="Nie zapisano decyzji operatora z kolejki pracy dla tej sprawy/sesji.",
+        )
     return _case_quality_dimension(
         "operator_decisions",
-        "Operator decision trail",
+        _case_quality_text(locale, en="Operator decision trail", pl="Ślad decyzji operatora"),
         state,
         detail,
         {"decision_count": len(operator_events)},
-        "Open, skip, dismiss or convert recommended operator actions so the workflow trail is explicit.",
+        _case_quality_text(
+            locale,
+            en="Open, skip, dismiss or convert recommended operator actions so the workflow trail is explicit.",
+            pl="Otwórz, pomiń, zamknij albo przekonwertuj rekomendowane akcje operatora, aby ślad procesu był jawny.",
+        ),
     )
 
 
@@ -2711,6 +3012,7 @@ def _case_quality_audit_export_dimension(
     workspace_events: tuple[AuditEvent, ...],
     session_events: tuple[AuditEvent, ...],
     export_events: tuple[AuditEvent, ...],
+    locale: str,
 ) -> dict[str, Any]:
     metrics = {
         "chain_valid": chain_valid,
@@ -2720,20 +3022,36 @@ def _case_quality_audit_export_dimension(
     }
     if not chain_valid:
         state = "blocked"
-        detail = "Audit chain verification failed."
+        detail = _case_quality_text(
+            locale,
+            en="Audit chain verification failed.",
+            pl="Weryfikacja łańcucha audytu nie powiodła się.",
+        )
     elif not export_events:
         state = "warning"
-        detail = "No export bundle is recorded for this case workspace."
+        detail = _case_quality_text(
+            locale,
+            en="No export bundle is recorded for this case workspace.",
+            pl="Dla workspace tej sprawy nie zapisano paczki eksportu.",
+        )
     else:
         state = "ready"
-        detail = "Audit chain is valid and at least one export bundle is recorded."
+        detail = _case_quality_text(
+            locale,
+            en="Audit chain is valid and at least one export bundle is recorded.",
+            pl="Łańcuch audytu jest poprawny i zapisano co najmniej jedną paczkę eksportu.",
+        )
     return _case_quality_dimension(
         "audit_export",
-        "Audit and export integrity",
+        _case_quality_text(locale, en="Audit and export integrity", pl="Integralność audytu i eksportu"),
         state,
         detail,
         metrics,
-        "Create and verify a ZIP export bundle once the case is review-ready.",
+        _case_quality_text(
+            locale,
+            en="Create and verify a ZIP export bundle once the case is review-ready.",
+            pl="Utwórz i zweryfikuj paczkę eksportu ZIP, gdy sprawa będzie gotowa do przeglądu.",
+        ),
     )
 
 

@@ -41,21 +41,31 @@ Supported runtime query parameters:
 - `participant`: participant id,
 - `workspace`: local case workspace id used for security, access, and export-integrity status.
 
-The right insight rail includes a compact security panel backed by the local API. It shows the current workspace, storage mode, encryption runtime status, workspace access decision, and export manifest readiness.
+The main workspace is organized into work modes instead of one overloaded panel:
 
-The security rail begins with an environment health report. It summarizes local API
+- Interview keeps the active question, linked materials, answer history, and answer composer in the primary lane.
+- Materials gives the case-material register its own canvas for hashes, previews, verification, and material-question links.
+- AI contains grounded suggestions, operator decisions, and the source grounding pack.
+- Review groups the session report, case quality, workflow readiness, STOP readiness, findings, indicators, and audit trace.
+- System contains environment health, security gates, local model runtime readiness, model artifact isolation, and the case map.
+
+The right rail is now a context inspector. It shows the active work mode, next
+operator actions, and the active question context without duplicating the full
+Materials, AI, Review, or System workspaces.
+
+The System mode starts with an environment health report. It summarizes local API
 readiness, synthetic fixtures, workspace root status, encryption readiness, and
 local model gating with expandable details and remediation text.
 
-The security rail also shows local model runtime readiness. It displays the
-configured model, effective provider, live-output gate, runtime restrictions, and a
-safe smoke-test button. The smoke check is deterministic by default and does not
-send case material or interview notes to a real model.
+System mode also shows local model runtime readiness. It displays the configured
+model, effective provider, live-output gate, runtime restrictions, and a safe
+smoke-test button. The smoke check is deterministic by default and does not send
+case material or interview notes to a real model.
 
-The same area shows model artifact isolation. It reports whether the workspace has
-dedicated prompt, context, output, cache, and evaluation directories under
-`models/`, plus a local artifact policy manifest. The UI can initialize this
-isolation before real local model experiments.
+The model artifact isolation panel reports whether the workspace has dedicated
+prompt, context, output, cache, and evaluation directories under `models/`, plus
+a local artifact policy manifest. The UI can initialize this isolation before
+real local model experiments.
 
 The model artifact panel also shows the current artifact manifest record count and
 the latest artifact type/hash, plus whether the artifact manifest hash chain is
@@ -64,11 +74,11 @@ be written by controlled model workflows. Backend writes deduplicate repeated
 artifacts by type and SHA-256, so deterministic refreshes can reuse existing
 prompt/context/output records.
 
-The same rail includes a compact case map. It groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
+The case map groups topics with question, answer, material, claim, finding, and indicator counts so the operator can see coverage, grounding, and clarification needs without an automated verdict.
 
 The case map also shows an advisory Evidence Alignment Indicator as a gradient bar with a numeric value, band (`insufficient review`, `low`, `medium`, `high`), reviewed/confidence meta, and explanation bullets. It is derived only from human-reviewed material-question links and does not assert truth, guilt, or credibility (see ADR 0017).
 
-The same rail includes a grounded AI panel. It calls the local
+The AI mode calls the local
 `/grounded-suggestions` endpoint for the active question and shows suggested
 follow-up questions, topic gaps, potential inconsistencies, and summaries with
 their reasons, source ids, model id, prompt version, citation warnings, and compact
@@ -77,9 +87,9 @@ artifacts.
 Each suggestion has `use`, `edit`, and `reject` controls. Online decisions are
 recorded through the backend append-only audit chain with the original text,
 final operator text, source ids, model id, prompt version, and prompt/context/output
-hashes. Offline decisions remain local demo state only.
+hashes. Offline decisions remain local sample state only.
 
-The same rail includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
+The Materials mode includes a case-material register for synthetic text materials. It can create a controlled workspace material record, list registered materials, show size/hash metadata, and call backend verification for each record.
 
 Each material card can open a bounded text preview through the local API. The preview shows line/character counts and indicates when the backend truncated long material text.
 
@@ -87,13 +97,13 @@ Registered materials are also linked deterministically to interview questions th
 
 Material cards also expose compact accept/reject controls and matched-term audit
 details for each material-question link. Online decisions are recorded through the
-backend audit chain; offline decisions remain local demo state.
+backend audit chain; offline decisions remain local sample state.
 
 The operator work queue records `opened`, `skipped`, and `dismissed` audit decisions
 from queue controls and shows a compact recent-decision trail. The trail is provenance
 support only; it does not turn prototype actions into official procedural records.
 
-The review tab includes a compact case-trace timeline. It merges workspace audit
+The Review mode includes a compact case-trace timeline. It merges workspace audit
 events and session audit events into a newest-first operational view while keeping
 the backend audit endpoints as the chain-ordered integrity sources of truth.
 

@@ -1,6 +1,6 @@
 import type { Answer, AnswerView, Locale, Question, QuestionView, RuntimeConfig } from "./types";
 import { text, type CopyKey } from "./i18n";
-import { seedAnswers, seedQuestions } from "./demoData";
+import { seedAnswers, seedQuestions } from "./sampleData";
 
 export function runtimeConfig(): RuntimeConfig {
   const params = new URLSearchParams(window.location.search);
@@ -156,17 +156,17 @@ export function scorePercent(score: number | null): string {
 export function caseCatalogMeta(
   caseId: string,
   locale: Locale,
-): { recommendedDemo: boolean; scenarioLabel: string } {
-  const scenarios: Record<string, { labelKey: CopyKey; recommendedDemo?: boolean }> = {
+): { recommendedDefaultCase: boolean; scenarioLabel: string } {
+  const scenarios: Record<string, { labelKey: CopyKey; recommendedDefaultCase?: boolean }> = {
     "case-001": { labelKey: "caseScenarioTheft" },
     "case-002": { labelKey: "caseScenarioPharmacy" },
-    "case-003": { labelKey: "caseScenarioCare", recommendedDemo: true },
+    "case-003": { labelKey: "caseScenarioCare", recommendedDefaultCase: true },
   };
   const scenario = scenarios[caseId] ?? scenarios["case-001"];
 
   return {
     scenarioLabel: text(locale, scenario.labelKey),
-    recommendedDemo: scenario.recommendedDemo ?? false,
+    recommendedDefaultCase: scenario.recommendedDefaultCase ?? false,
   };
 }
 

@@ -16,6 +16,7 @@ import {
   KeyRound,
   Languages,
   ListChecks,
+  MoreHorizontal,
   Network,
   Pencil,
   Plus,
@@ -54,7 +55,7 @@ import {
   loadWorkspaceAccess,
   loadWorkspaceAudit,
   loadWorkspaceCaseQuality,
-  loadWorkspaceDemoReadiness,
+  loadWorkspaceWorkflowReadiness,
   loadWorkspaceSecurity,
   loadWorkspaceStopReviews,
   loadWorkspaceMaterials,
@@ -80,7 +81,7 @@ import {
 } from "./grounded-ai-panel";
 import { SessionReportPanel } from "./session-report-panel";
 import type { SessionReportExportInput } from "./session-report";
-import { seedAnswers, seedCaseCatalog, seedFindings, seedIndicators, seedQuestions } from "./demoData";
+import { seedAnswers, seedCaseCatalog, seedFindings, seedIndicators, seedQuestions } from "./sampleData";
 import { domainLabel, localize, text, type CopyKey } from "./i18n";
 import type {
   Answer,
@@ -93,7 +94,7 @@ import type {
   CaseTopic,
   ClaimReviewStatus,
   ClaimView,
-  DemoReadinessReport,
+  WorkflowReadinessReport,
   EncryptionStatus,
   EnvironmentHealth,
   EnvironmentHealthState,
@@ -166,6 +167,15 @@ type MaterialDraft = {
 };
 
 type OperationsTab = "monitor" | "ai" | "materials" | "review";
+type WorkMode = "interview" | OperationsTab;
+
+type WorkModeDescriptor = {
+  id: WorkMode;
+  label: string;
+  detail: string;
+  value: string;
+  icon: ReactNode;
+};
 
 type OperatorActionKind = "ask" | "materials" | "review";
 
@@ -233,7 +243,7 @@ const config = runtimeConfig();
 export function App() {
   const [locale, setLocale] = useState<Locale>("pl");
   const [apiMode, setApiMode] = useState<ApiMode>("offline");
-  const [statusKey, setStatusKey] = useState<CopyKey>("localDemo");
+  const [statusKey, setStatusKey] = useState<CopyKey>("localMode");
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [caseCatalog, setCaseCatalog] = useState<CaseCatalogItem[]>(seedCaseCatalog[locale]);
   const [caseStarterMaterials, setCaseStarterMaterials] = useState<StarterMaterial[]>([]);
@@ -253,7 +263,7 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceResponse | null>(null);
   const [workspaceSecurity, setWorkspaceSecurity] = useState<WorkspaceSecurityReport | null>(null);
   const [workspaceAccess, setWorkspaceAccess] = useState<WorkspaceAccessDecision | null>(null);
-  const [demoReadiness, setDemoReadiness] = useState<DemoReadinessReport | null>(null);
+  const [workflowReadiness, setWorkflowReadiness] = useState<WorkflowReadinessReport | null>(null);
   const [caseQuality, setCaseQuality] = useState<CaseQualityReport | null>(null);
   const [stopReviewList, setStopReviewList] = useState<StopReviewListResponse | null>(null);
   const [workspaceAudit, setWorkspaceAudit] = useState<WorkspaceAuditResponse | null>(null);
@@ -313,6 +323,7 @@ export function App() {
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
+  const [activeWorkMode, setActiveWorkMode] = useState<WorkMode>("interview");
   const [activeOperationsTab, setActiveOperationsTab] = useState<OperationsTab>("monitor");
   const [dismissedOperatorActionIds, setDismissedOperatorActionIds] = useState<Set<string>>(new Set());
   const [answerText, setAnswerText] = useState("");
@@ -324,11 +335,12 @@ export function App() {
   const [isArtifactIsolationSubmitting, setIsArtifactIsolationSubmitting] = useState(false);
   const [isModelSmokeRunning, setIsModelSmokeRunning] = useState(false);
   const didInitializeApi = useRef(false);
-  const [demoReviewVisited, setDemoReviewVisited] = useState(false);
+  const [workflowReviewVisited, setWorkflowReviewVisited] = useState(false);
   const [leftRailCollapsed, setLeftRailCollapsed] = useState(false);
   const [rightRailCollapsed, setRightRailCollapsed] = useState(true);
   const [tutorialActive, setTutorialActive] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const localeRef = useRef<Locale>(locale);
 
   const questions = useMemo<QuestionView[]>(() => {
     const caseQuestions = caseData?.questions.length ? caseData.questions.map(toQuestionView) : seedQuestions;
@@ -340,6 +352,9 @@ export function App() {
   const materialsById = useMemo(() => {
     return new Map(workspaceMaterials.map((material) => [material.id, material]));
   }, [workspaceMaterials]);
+  const starterMaterialsById = useMemo(() => {
+    return new Map(caseStarterMaterials.map((material) => [material.id, material]));
+  }, [caseStarterMaterials]);
   const activeQuestionLinks = useMemo(() => {
     const directLinks = materialQuestionLinks.filter((link) => link.question_id === activeQuestion?.id);
     const draft = questionDrafts.find((candidate) => candidate.id === activeQuestion?.id);
@@ -395,6 +410,7 @@ export function App() {
   const materialTasks = useMemo(
     () =>
       buildMaterialTasks({
+        caseStarterMaterials,
         decisions: materialQuestionLinkDecisions,
         evidenceMap,
         links: materialQuestionLinks,
@@ -404,6 +420,7 @@ export function App() {
         verifications: materialVerifications,
       }),
     [
+      caseStarterMaterials,
       evidenceMap,
       materialQuestionLinkDecisions,
       materialQuestionLinks,
@@ -418,6 +435,7 @@ export function App() {
       buildOperatorActions({
         activeQuestionId: activeQuestion?.id,
         answerViews,
+        caseStarterMaterials,
         evidenceMap,
         findings: visibleFindings,
         links: materialQuestionLinks,
@@ -429,6 +447,7 @@ export function App() {
     [
       activeQuestion?.id,
       answerViews,
+      caseStarterMaterials,
       evidenceMap,
       materialQuestionLinks,
       materialTasks,
@@ -444,14 +463,15 @@ export function App() {
   );
 
   useEffect(() => {
+    localeRef.current = locale;
     document.documentElement.lang = locale;
   }, [locale]);
 
   useEffect(() => {
-    if (activeOperationsTab === "review") {
-      setDemoReviewVisited(true);
+    if (activeOperationsTab === "review" || activeWorkMode === "review") {
+      setWorkflowReviewVisited(true);
     }
-  }, [activeOperationsTab]);
+  }, [activeOperationsTab, activeWorkMode]);
 
   const startTutorial = useCallback(() => {
     setLeftRailCollapsed(false);
@@ -464,32 +484,40 @@ export function App() {
     setTutorialStepIndex(0);
   }, []);
 
+  function openWorkMode(mode: WorkMode) {
+    setActiveWorkMode(mode);
+    if (mode !== "interview") {
+      setActiveOperationsTab(mode);
+    }
+    if (mode === "review") {
+      setWorkflowReviewVisited(true);
+    }
+    setRightRailCollapsed(true);
+  }
+
   const handleTutorialStepEnter = useCallback((step: TutorialStepDefinition) => {
-    if (step.id === "zone-left" || step.id === "case-dossier" || step.id === "demo-walkthrough") {
+    if (step.id === "zone-left" || step.id === "case-dossier" || step.id === "workflow-path") {
       setLeftRailCollapsed(false);
     }
 
-    if (
-      step.id === "zone-operations" ||
-      step.id === "operations-tabs" ||
-      step.id === "tab-monitor" ||
-      step.id === "tab-ai" ||
-      step.id === "tab-materials" ||
-      step.id === "tab-review"
-    ) {
+    if (step.id === "zone-operations") {
       setRightRailCollapsed(false);
     }
 
     if (step.id === "tab-monitor") {
+      setActiveWorkMode("monitor");
       setActiveOperationsTab("monitor");
     }
     if (step.id === "tab-ai") {
+      setActiveWorkMode("ai");
       setActiveOperationsTab("ai");
     }
     if (step.id === "tab-materials") {
+      setActiveWorkMode("materials");
       setActiveOperationsTab("materials");
     }
     if (step.id === "tab-review") {
+      setActiveWorkMode("review");
       setActiveOperationsTab("review");
     }
   }, []);
@@ -524,43 +552,43 @@ export function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [startTutorial, tutorialActive]);
 
-  const demoChecklist = useMemo(() => {
+  const workflowChecklist = useMemo(() => {
     const answeredCount = new Set(answerViews.map((answer) => answer.questionId)).size;
     return [
       {
         id: "question",
-        label: text(locale, "demoStepQuestion"),
+        label: text(locale, "workflowPathStepQuestion"),
         done: answeredCount > 0,
       },
       {
         id: "local-ai",
-        label: text(locale, "demoStepLocalAi"),
+        label: text(locale, "workflowPathStepLocalAi"),
         done: environmentHealth !== null || localModelConfig !== null,
       },
       {
         id: "materials",
-        label: text(locale, "demoStepMaterials"),
+        label: text(locale, "workflowPathStepMaterials"),
         done: workspaceMaterials.length > 0,
       },
       {
         id: "grounded-ai",
-        label: text(locale, "demoStepGroundedAi"),
+        label: text(locale, "workflowPathStepGroundedAi"),
         done: groundedSuggestions.length > 0,
       },
       {
         id: "review",
-        label: text(locale, "demoStepReview"),
-        done: demoReviewVisited,
+        label: text(locale, "workflowPathStepReview"),
+        done: workflowReviewVisited,
       },
       {
         id: "report",
-        label: text(locale, "demoStepReport"),
+        label: text(locale, "workflowPathStepReport"),
         done: sessionReportExported,
       },
     ];
   }, [
     answerViews,
-    demoReviewVisited,
+    workflowReviewVisited,
     environmentHealth,
     groundedSuggestions.length,
     locale,
@@ -583,15 +611,19 @@ export function App() {
       return;
     }
 
+    const requestLocale = localeRef.current;
     setApiMode("connecting");
     setStatusKey("connecting");
 
     try {
       const [catalog, caseReview, starterMaterials] = await Promise.all([
-        loadCaseCatalog(config, locale).catch(() => ({ cases: seedCaseCatalog[locale] })),
-        loadCaseReview(config, locale),
-        loadCaseStarterMaterials(config, locale).catch(() => ({ case_id: config.caseId, materials: [] })),
+        loadCaseCatalog(config, requestLocale).catch(() => ({ cases: seedCaseCatalog[requestLocale] })),
+        loadCaseReview(config, requestLocale),
+        loadCaseStarterMaterials(config, requestLocale).catch(() => ({ case_id: config.caseId, materials: [] })),
       ]);
+      if (localeRef.current !== requestLocale) {
+        return;
+      }
       const firstQuestionId = caseReview.case.questions[0]?.id ?? activeQuestionId;
       setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
@@ -600,10 +632,13 @@ export function App() {
       setIndicators(caseReview.indicators);
       setReview(caseReview.review);
       setFindings(caseReview.review.findings);
-      await refreshSecurityState(firstQuestionId);
+      await refreshSecurityState(firstQuestionId, requestLocale);
       await startOrResumeSession(config);
-      const sessionReview = await loadSessionReview(config, locale);
+      const sessionReview = await loadSessionReview(config, requestLocale);
       const nextSessionAudit = await loadSessionAuditOrNull();
+      if (localeRef.current !== requestLocale) {
+        return;
+      }
       setSession(sessionReview.session);
       setSessionAudit(nextSessionAudit);
       setIndicators(sessionReview.indicators);
@@ -613,8 +648,11 @@ export function App() {
       setApiMode("online");
       setStatusKey("online");
     } catch (error) {
-      console.warn("Local API unavailable, using static demo data.", error);
-      setCaseCatalog(seedCaseCatalog[locale]);
+      if (localeRef.current !== requestLocale) {
+        return;
+      }
+      console.warn("Local API unavailable, using static sample data.", error);
+      setCaseCatalog(seedCaseCatalog[requestLocale]);
       setCaseStarterMaterials([]);
       setReview(null);
       setReportMarkdown(null);
@@ -623,7 +661,7 @@ export function App() {
     }
   }
 
-  async function refreshSecurityState(questionId = activeQuestionId) {
+  async function refreshSecurityState(questionId = activeQuestionId, requestLocale: Locale = localeRef.current) {
     try {
       const [security, health, modelConfig, ensuredWorkspace] = await Promise.all([
         loadEncryptionStatus(config),
@@ -631,7 +669,7 @@ export function App() {
         loadLocalModelConfig(config),
         ensureWorkspace(config),
       ]);
-      await seedWorkspaceMaterials(config, locale).catch((error) => {
+      await seedWorkspaceMaterials(config, requestLocale).catch((error) => {
         console.warn("Could not seed starter materials.", error);
         return null;
       });
@@ -640,7 +678,7 @@ export function App() {
         artifactManifest,
         artifactIsolation,
         workspaceSecurityReport,
-        nextDemoReadiness,
+        nextWorkflowReadiness,
         nextCaseQuality,
         experimentReadiness,
         stopReviews,
@@ -655,25 +693,28 @@ export function App() {
         loadModelArtifactManifest(config),
         loadModelArtifactIsolation(config),
         loadWorkspaceSecurity(config),
-        loadDemoReadinessOrNull(),
-        loadCaseQualityOrNull(locale),
+        loadWorkflowReadinessOrNull(requestLocale),
+        loadCaseQualityOrNull(requestLocale),
         loadLocalModelExperimentReadiness(config),
         loadStopReviewsOrNull(),
         loadWorkspaceMaterials(config),
         loadQuestionDraftsOrEmpty(),
-        loadMaterialQuestionLinksOrEmpty(locale),
-        loadEvidenceMapOrNull(locale),
+        loadMaterialQuestionLinksOrEmpty(requestLocale),
+        loadEvidenceMapOrNull(requestLocale),
         loadOperatorActionDecisionsOrEmpty(),
-        loadGroundedSuggestionsOrEmpty(locale, questionId),
+        loadGroundedSuggestionsOrEmpty(requestLocale, questionId),
       ]);
       const auditTrail = await loadWorkspaceAuditOrNull();
+      if (localeRef.current !== requestLocale) {
+        return;
+      }
       setEncryptionStatus(security);
       setEnvironmentHealth(health);
       setLocalModelConfig(modelConfig);
       setModelArtifactManifest(artifactManifest);
       setModelArtifactIsolation(artifactIsolation);
       setWorkspaceSecurity(workspaceSecurityReport);
-      setDemoReadiness(nextDemoReadiness);
+      setWorkflowReadiness(nextWorkflowReadiness);
       setCaseQuality(nextCaseQuality);
       setModelExperimentReadiness(experimentReadiness);
       setStopReviewList(stopReviews);
@@ -698,7 +739,7 @@ export function App() {
       setWorkspace(null);
       setWorkspaceSecurity(null);
       setWorkspaceAccess(null);
-      setDemoReadiness(null);
+      setWorkflowReadiness(null);
       setCaseQuality(null);
       setStopReviewList(null);
       setWorkspaceAudit(null);
@@ -776,11 +817,11 @@ export function App() {
     }
   }
 
-  async function loadDemoReadinessOrNull(): Promise<DemoReadinessReport | null> {
+  async function loadWorkflowReadinessOrNull(nextLocale: Locale = localeRef.current): Promise<WorkflowReadinessReport | null> {
     try {
-      return await loadWorkspaceDemoReadiness(config);
+      return await loadWorkspaceWorkflowReadiness(config, nextLocale);
     } catch (error) {
-      console.warn("Could not refresh demo readiness report.", error);
+      console.warn("Could not refresh workflow readiness report.", error);
       return null;
     }
   }
@@ -813,15 +854,15 @@ export function App() {
   }
 
   async function refreshAuditTrails() {
-    const [nextWorkspaceAudit, nextSessionAudit, nextDemoReadiness, nextCaseQuality] = await Promise.all([
+    const [nextWorkspaceAudit, nextSessionAudit, nextWorkflowReadiness, nextCaseQuality] = await Promise.all([
       loadWorkspaceAuditOrNull(),
       loadSessionAuditOrNull(),
-      loadDemoReadinessOrNull(),
-      loadCaseQualityOrNull(),
+      loadWorkflowReadinessOrNull(localeRef.current),
+      loadCaseQualityOrNull(localeRef.current),
     ]);
     setWorkspaceAudit(nextWorkspaceAudit);
     setSessionAudit(nextSessionAudit);
-    setDemoReadiness(nextDemoReadiness);
+    setWorkflowReadiness(nextWorkflowReadiness);
     setCaseQuality(nextCaseQuality);
   }
 
@@ -915,37 +956,46 @@ export function App() {
   }
 
   async function refreshLocalizedApiState(nextLocale: Locale) {
-    if (apiMode !== "online") {
-      return;
-    }
-
+    const requestLocale = nextLocale;
     setApiMode("connecting");
     setStatusKey("connecting");
     groundedCacheRef.current = {};
     setGroundedCacheTick((value) => value + 1);
 
     try {
+      await startOrResumeSession(config);
+      await seedWorkspaceMaterials(config, requestLocale).catch((error) => {
+        console.warn("Could not seed starter materials for localized refresh.", error);
+        return null;
+      });
       const [
         catalog,
         caseReview,
         starterMaterials,
         sessionReview,
         draftList,
+        materialList,
         materialLinks,
         nextEvidenceMap,
+        nextWorkflowReadiness,
         nextCaseQuality,
         nextGroundedSuggestions,
       ] = await Promise.all([
-        loadCaseCatalog(config, nextLocale).catch(() => ({ cases: seedCaseCatalog[nextLocale] })),
-        loadCaseReview(config, nextLocale),
-        loadCaseStarterMaterials(config, nextLocale).catch(() => ({ case_id: config.caseId, materials: [] })),
-        loadSessionReview(config, nextLocale),
+        loadCaseCatalog(config, requestLocale).catch(() => ({ cases: seedCaseCatalog[requestLocale] })),
+        loadCaseReview(config, requestLocale),
+        loadCaseStarterMaterials(config, requestLocale).catch(() => ({ case_id: config.caseId, materials: [] })),
+        loadSessionReview(config, requestLocale),
         loadQuestionDraftsOrEmpty(),
-        loadMaterialQuestionLinksOrEmpty(nextLocale),
-        loadEvidenceMapOrNull(nextLocale),
-        loadCaseQualityOrNull(nextLocale),
-        loadGroundedSuggestionsOrEmpty(nextLocale, activeQuestionId),
+        loadWorkspaceMaterials(config),
+        loadMaterialQuestionLinksOrEmpty(requestLocale),
+        loadEvidenceMapOrNull(requestLocale),
+        loadWorkflowReadinessOrNull(requestLocale),
+        loadCaseQualityOrNull(requestLocale),
+        loadGroundedSuggestionsOrEmpty(requestLocale, activeQuestionId),
       ]);
+      if (localeRef.current !== requestLocale) {
+        return;
+      }
       setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
       setCaseStarterMaterials(starterMaterials.materials);
@@ -958,15 +1008,20 @@ export function App() {
       setFindings(sessionReview.snapshot.review.findings);
       setReportMarkdown(sessionReview.report_markdown);
       setQuestionDrafts(sortQuestionDrafts(draftList));
+      setWorkspaceMaterials(sortMaterials(materialList.materials));
       setMaterialQuestionLinks(materialLinks);
       setEvidenceMap(nextEvidenceMap);
+      setWorkflowReadiness(nextWorkflowReadiness);
       setCaseQuality(nextCaseQuality);
       applyGroundedSuggestions(nextGroundedSuggestions);
       setApiMode("online");
       setStatusKey("reviewUpdated");
     } catch (error) {
+      if (localeRef.current !== requestLocale) {
+        return;
+      }
       console.warn("Could not refresh localized API state.", error);
-      setCaseCatalog(seedCaseCatalog[nextLocale]);
+      setCaseCatalog(seedCaseCatalog[requestLocale]);
       setCaseStarterMaterials([]);
       setReview(null);
       setReportMarkdown(null);
@@ -1307,6 +1362,7 @@ export function App() {
       const draft = response.draft;
       setQuestionDrafts((current) => sortQuestionDrafts(upsertQuestionDraft(current, draft)));
       setActiveQuestionId(draft.id);
+      setActiveWorkMode("interview");
       setActiveOperationsTab("monitor");
       const [sessionReview, nextEvidenceMap, nextGroundedSuggestions] = await Promise.all([
         loadSessionReview(config, locale),
@@ -1423,6 +1479,7 @@ export function App() {
   }
 
   function changeLocale(nextLocale: Locale) {
+    localeRef.current = nextLocale;
     setLocale(nextLocale);
     if (apiMode !== "online") {
       setCaseCatalog(seedCaseCatalog[nextLocale]);
@@ -1435,21 +1492,20 @@ export function App() {
       setLeftRailCollapsed(false);
     }
     if (stage === "interview") {
+      setActiveWorkMode("interview");
       setRightRailCollapsed(true);
       return;
     }
 
-    setRightRailCollapsed(false);
     if (stage === "materials") {
-      setActiveOperationsTab("materials");
+      openWorkMode("materials");
       return;
     }
     if (stage === "ai") {
-      setActiveOperationsTab("ai");
+      openWorkMode("ai");
       return;
     }
-    setActiveOperationsTab("review");
-    setDemoReviewVisited(true);
+    openWorkMode("review");
   }
 
   function openCase(caseId: string) {
@@ -1470,7 +1526,7 @@ export function App() {
     window.location.assign(nextUrl.toString());
   }
 
-  function startFreshDemo() {
+  function startNewWorkflowSession() {
     const nextUrl = new URL(window.location.href);
     const stamp = Date.now();
     nextUrl.searchParams.set("session", `${config.caseId}-session-${stamp}`);
@@ -1478,9 +1534,9 @@ export function App() {
     window.location.assign(nextUrl.toString());
   }
 
-  async function copyDemoSummary() {
+  async function copyWorkflowBrief() {
     const answeredCount = new Set(answerViews.map((answer) => answer.questionId)).size;
-    const summary = buildDemoSummaryText({
+    const summary = buildWorkflowBriefText({
       locale,
       config,
       caseData,
@@ -1501,9 +1557,9 @@ export function App() {
 
     try {
       await navigator.clipboard.writeText(summary);
-      setStatusKey("demoSummaryCopied");
+      setStatusKey("workflowBriefCopied");
     } catch {
-      setStatusKey("demoSummaryCopyFailed");
+      setStatusKey("workflowBriefCopyFailed");
     }
   }
 
@@ -1554,6 +1610,7 @@ export function App() {
       selectActiveQuestion(action.targetQuestionId);
     }
     if (action.targetTab) {
+      setActiveWorkMode(action.targetTab);
       setActiveOperationsTab(action.targetTab);
     }
   }
@@ -1679,6 +1736,54 @@ export function App() {
       icon: <ListChecks size={15} />,
     },
   ];
+  const activeOperationsMode: OperationsTab = activeWorkMode === "interview" ? activeOperationsTab : activeWorkMode;
+  const activeWorkModeLabel =
+    activeWorkMode === "interview"
+      ? text(locale, "workModeInterview")
+      : activeWorkMode === "monitor"
+        ? text(locale, "workModeSystem")
+      : operationsTabs.find((tab) => tab.id === activeOperationsMode)?.label ?? text(locale, "operationsMonitor");
+  const workModes: WorkModeDescriptor[] = [
+    {
+      id: "interview",
+      label: text(locale, "workModeInterview"),
+      detail: text(locale, "workModeInterviewDetail"),
+      value: questionCoverageLabel,
+      icon: <FileText size={16} />,
+    },
+    {
+      id: "materials",
+      label: text(locale, "operationsMaterials"),
+      detail: text(locale, "workModeMaterialsDetail"),
+      value: String(workspaceMaterials.length),
+      icon: <FolderArchive size={16} />,
+    },
+    {
+      id: "ai",
+      label: text(locale, "operationsAi"),
+      detail: text(locale, "workModeAiDetail"),
+      value: String(groundedSuggestions.length),
+      icon: <Sparkles size={16} />,
+    },
+    {
+      id: "review",
+      label: text(locale, "operationsReview"),
+      detail: text(locale, "workModeReviewDetail"),
+      value: String(visibleFindings.length),
+      icon: <ListChecks size={16} />,
+    },
+    {
+      id: "monitor",
+      label: text(locale, "workModeSystem"),
+      detail: text(locale, "workModeSystemDetail"),
+      value: environmentHealth
+        ? environmentStateShortLabel(environmentHealth.state, locale)
+        : apiMode === "connecting"
+          ? "..."
+          : apiMode,
+      icon: <ShieldCheck size={16} />,
+    },
+  ];
   const primaryGuidanceAction = visibleOperatorActions[0];
   const linkedActiveQuestionMaterials = activeQuestionId
     ? materialQuestionLinks
@@ -1707,18 +1812,16 @@ export function App() {
           variant: "primary",
         },
     ...operationsTabQuickActions({
-      activeTab: activeOperationsTab,
+      activeTab: activeOperationsMode,
       firstMaterial: firstGuidanceMaterial,
       locale,
-      onOpenAi: () => setActiveOperationsTab("ai"),
-      onOpenMaterials: () => setActiveOperationsTab("materials"),
-      onOpenMonitor: () => setActiveOperationsTab("monitor"),
-      onOpenReview: () => {
-        setActiveOperationsTab("review");
-        setDemoReviewVisited(true);
-      },
+      onOpenAi: () => openWorkMode("ai"),
+      onOpenMaterials: () => openWorkMode("materials"),
+      onOpenMonitor: () => openWorkMode("monitor"),
+      onOpenReview: () => openWorkMode("review"),
       onPreviewMaterial: (materialId) => void toggleMaterialPreview(materialId),
       onRegenerateAi: () => void refreshGroundedSuggestions(),
+      starterMaterialsById,
     }),
   ];
 
@@ -1765,10 +1868,18 @@ export function App() {
         </div>
       </header>
 
+      <WorkModeNavigation
+        activeMode={activeWorkMode}
+        locale={locale}
+        modes={workModes}
+        onSelect={openWorkMode}
+      />
+
       <main
         className="workspace"
         data-left-collapsed={leftRailCollapsed ? "true" : "false"}
         data-right-collapsed={rightRailCollapsed ? "true" : "false"}
+        data-work-mode={activeWorkMode}
       >
         <WorkspaceZone
           collapsed={leftRailCollapsed}
@@ -1793,7 +1904,7 @@ export function App() {
               locale={locale}
               materialCount={workspaceMaterials.length}
               reportExported={sessionReportExported}
-              reviewVisited={demoReviewVisited}
+              reviewVisited={workflowReviewVisited}
               onNavigate={navigateCaseWorkflow}
             />
             <CaseDossierPanel
@@ -1802,24 +1913,25 @@ export function App() {
               locale={locale}
               review={review}
               starterMaterials={caseStarterMaterials}
-              onOpenMaterials={() => setActiveOperationsTab("materials")}
+              onOpenMaterials={() => openWorkMode("materials")}
             />
-            <DemoWalkthroughPanel
-              checklist={demoChecklist}
+            <WorkflowPathPanel
+              checklist={workflowChecklist}
               locale={locale}
-              onCopySummary={() => void copyDemoSummary()}
-              onOpenAi={() => setActiveOperationsTab("ai")}
-              onOpenMaterials={() => setActiveOperationsTab("materials")}
-              onOpenMonitor={() => setActiveOperationsTab("monitor")}
+              onCopySummary={() => void copyWorkflowBrief()}
+              onOpenAi={() => openWorkMode("ai")}
+              onOpenMaterials={() => openWorkMode("materials")}
+              onOpenMonitor={() => openWorkMode("monitor")}
               onOpenNextQuestion={() => {
                 const answeredQuestionIds = new Set(answerViews.map((answer) => answer.questionId));
                 const nextQuestion = questions.find((question) => !answeredQuestionIds.has(question.id));
                 if (nextQuestion) {
+                  setActiveWorkMode("interview");
                   selectActiveQuestion(nextQuestion.id);
                 }
               }}
-              onOpenReview={() => setActiveOperationsTab("review")}
-              onStartFresh={startFreshDemo}
+              onOpenReview={() => openWorkMode("review")}
+              onStartFresh={startNewWorkflowSession}
             />
             <CollapsibleSection
               className="question-panel"
@@ -1851,12 +1963,14 @@ export function App() {
 
         <WorkspaceZone
           collapsed={false}
-          label={text(locale, "zoneInterview")}
+          label={activeWorkMode === "interview" ? text(locale, "zoneInterview") : activeWorkModeLabel}
           locale={locale}
           side="center"
           onToggleCollapse={() => undefined}
         >
-          <section className="interview-workspace">
+          <section className="work-mode-canvas" data-mode={activeWorkMode}>
+            {activeWorkMode === "interview" ? (
+              <div className="interview-workspace">
             <InterviewContextStrip
               activeQuestionLabel={localize(activeQuestion?.text, locale)}
               caseId={config.caseId}
@@ -1908,6 +2022,7 @@ export function App() {
                 links={activeQuestionLinks}
                 locale={locale}
                 materialsById={materialsById}
+                starterMaterialsById={starterMaterialsById}
               />
             </WorkspaceCard>
 
@@ -1952,63 +2067,387 @@ export function App() {
                   {isSubmitting ? "..." : text(locale, "record")}
                 </button>
               </div>
-            </WorkspaceCard>
+                </WorkspaceCard>
+              </div>
+            ) : null}
+
+            {activeWorkMode === "materials" ? (
+              <>
+                <WorkModeHeader
+                  detail={text(locale, "workModeMaterialsDetail")}
+                  icon={<FolderArchive size={18} />}
+                  metrics={[
+                    { label: text(locale, "materialRecordCount"), value: String(workspaceMaterials.length) },
+                    { label: text(locale, "materialLinksShort"), value: String(materialQuestionLinks.length) },
+                    { label: text(locale, "pendingLinks"), value: String(materialTasks.length) },
+                  ]}
+                  title={text(locale, "operationsMaterials")}
+                />
+                {apiMode !== "online" ? (
+                  <WorkspaceEmptyState
+                    detail={text(locale, "operationsOfflineDetail")}
+                    locale={locale}
+                    title={text(locale, "operationsOfflineTitle")}
+                  />
+                ) : (
+                  <div className="mode-surface mode-surface--materials">
+                    <MaterialsPanel
+                      activePreviewId={activeMaterialPreviewId}
+                      apiMode={apiMode}
+                      bare
+                      decisions={materialQuestionLinkDecisions}
+                      draft={materialDraft}
+                      isSubmitting={isMaterialSubmitting}
+                      locale={locale}
+                      links={materialQuestionLinks}
+                      materials={workspaceMaterials}
+                      starterMaterials={caseStarterMaterials}
+                      tasks={materialTasks}
+                      isQuestionDraftSubmitting={isQuestionDraftSubmitting}
+                      previews={materialPreviews}
+                      verifications={materialVerifications}
+                      onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
+                      onCreateQuestionDraft={(task) => void createQuestionDraftFromMaterialTask(task)}
+                      onDraftChange={setMaterialDraft}
+                      onOpenQuestion={(questionId) => {
+                        setActiveWorkMode("interview");
+                        selectActiveQuestion(questionId);
+                      }}
+                      onPreview={(materialId) => void toggleMaterialPreview(materialId)}
+                      onSubmit={() => void registerMaterial()}
+                      onVerify={(materialId) => void verifyMaterial(materialId)}
+                    />
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            {activeWorkMode === "ai" ? (
+              <>
+                <WorkModeHeader
+                  detail={text(locale, "workModeAiDetail")}
+                  icon={<Sparkles size={18} />}
+                  metrics={[
+                    { label: text(locale, "operationsAi"), value: String(groundedSuggestions.length) },
+                    { label: text(locale, "auditedAiDecisionsShort"), value: String(auditedGroundedDecisionCount) },
+                    { label: text(locale, "activeQuestion"), value: activeQuestion?.id ?? "-" },
+                  ]}
+                  title={text(locale, "groundedAi")}
+                />
+                {apiMode !== "online" ? (
+                  <WorkspaceEmptyState
+                    detail={text(locale, "operationsOfflineDetail")}
+                    locale={locale}
+                    title={text(locale, "operationsOfflineTitle")}
+                  />
+                ) : (
+                  <div className="mode-grid mode-grid--ai">
+                    <section className="mode-section mode-section--main">
+                      <PanelHeader title={text(locale, "groundedAi")} meta={String(groundedSuggestions.length)} compact />
+                      <GroundedSuggestionsPanel
+                        apiMode={apiMode}
+                        bare
+                        decisions={suggestionDecisions}
+                        drafts={suggestionDrafts}
+                        error={groundedSuggestionsError}
+                        isLoading={isGroundedSuggestionsLoading}
+                        locale={locale}
+                        localModelConfig={localModelConfig}
+                        meta={groundedSuggestionMeta}
+                        suggestions={groundedSuggestions}
+                        warnings={groundedSuggestionWarnings}
+                        onDraftChange={(suggestionId, value) =>
+                          setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
+                        }
+                        onEdit={startEditingSuggestion}
+                        onRegenerate={() => void refreshGroundedSuggestions()}
+                        onReject={rejectSuggestion}
+                        onSaveEdit={saveEditedSuggestion}
+                        onUse={(suggestion) => {
+                          setActiveWorkMode("interview");
+                          useSuggestion(suggestion);
+                        }}
+                      />
+                    </section>
+                    <div className="mode-side-stack">
+                      <CollapsibleSection
+                        accordionGroup="mode-ai"
+                        className="mode-section"
+                        defaultOpen
+                        hint={text(locale, "expandWhenNeeded")}
+                        meta={text(locale, "developerPreview")}
+                        title={text(locale, "groundingPack")}
+                      >
+                        <GroundingPackPanel
+                          activeQuestionId={activeQuestionId}
+                          apiMode={apiMode}
+                          config={config}
+                          locale={locale}
+                          questions={questions}
+                        />
+                      </CollapsibleSection>
+                      <CollapsibleSection
+                        accordionGroup="mode-ai"
+                        className="mode-section"
+                        hint={text(locale, "expandWhenNeeded")}
+                        meta={text(locale, "localOnly")}
+                        title={text(locale, "assistant")}
+                      >
+                        <div className="suggestion-list">
+                          {assistantHints.map((hint) => (
+                            <SuggestionCard detail={hint.detail} key={hint.title} title={hint.title} />
+                          ))}
+                        </div>
+                      </CollapsibleSection>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            {activeWorkMode === "review" ? (
+              <>
+                <WorkModeHeader
+                  detail={text(locale, "workModeReviewDetail")}
+                  icon={<ListChecks size={18} />}
+                  metrics={[
+                    { label: text(locale, "caseQuality"), value: caseQuality ? `${caseQuality.quality_score}%` : "-" },
+                    { label: text(locale, "findings"), value: String(visibleFindings.length) },
+                    {
+                      label: text(locale, "auditEvents"),
+                      value: String((workspaceAudit?.events.length ?? 0) + (sessionAudit?.events.length ?? 0)),
+                    },
+                  ]}
+                  title={text(locale, "operationsReview")}
+                />
+                {apiMode !== "online" ? (
+                  <WorkspaceEmptyState
+                    detail={text(locale, "operationsOfflineDetail")}
+                    locale={locale}
+                    title={text(locale, "operationsOfflineTitle")}
+                  />
+                ) : (
+                  <div className="mode-grid mode-grid--review">
+                    <section className="mode-section mode-section--main">
+                      <PanelHeader title={text(locale, "sessionReport")} meta={text(locale, "sessionReportMeta")} compact />
+                      <SessionReportPanel
+                        apiMode={apiMode}
+                        config={config}
+                        exportInput={sessionReportExportInput}
+                        locale={locale}
+                        preview={reportMarkdown}
+                        onExported={() => {
+                          setSessionReportExported(true);
+                          setStatusKey("sessionReportCopied");
+                          void refreshAuditTrails();
+                        }}
+                      />
+                    </section>
+                    <div className="mode-side-stack">
+                      <CollapsibleSection
+                        accordionGroup="mode-review"
+                        className="mode-section"
+                        defaultOpen
+                        hint={text(locale, "expandWhenNeeded")}
+                        meta={caseQuality ? `${caseQuality.quality_score}%` : text(locale, "unknown")}
+                        title={text(locale, "caseQuality")}
+                      >
+                        <CaseQualityPanel bare locale={locale} report={caseQuality} />
+                      </CollapsibleSection>
+                      <CollapsibleSection
+                        accordionGroup="mode-review"
+                        className="mode-section"
+                        defaultOpen
+                        hint={text(locale, "expandWhenNeeded")}
+                        meta={workflowReadiness ? environmentStateLabel(workflowReadiness.state, locale) : text(locale, "unknown")}
+                        title={text(locale, "workflowReadiness")}
+                      >
+                        <WorkflowReadinessPanel bare locale={locale} report={workflowReadiness} />
+                      </CollapsibleSection>
+                      <CollapsibleSection
+                        accordionGroup="mode-review"
+                        className="mode-section"
+                        hint={text(locale, "expandWhenNeeded")}
+                        meta={text(locale, "noAutomatedVerdict")}
+                        title={text(locale, "stopReadiness")}
+                      >
+                        <StopReadinessPanel
+                          bare
+                          encryptionStatus={encryptionStatus}
+                          locale={locale}
+                          localModelConfig={localModelConfig}
+                          modelArtifactManifest={modelArtifactManifest}
+                          sessionAudit={sessionAudit}
+                          workspace={workspace}
+                          workspaceAudit={workspaceAudit}
+                        />
+                      </CollapsibleSection>
+                    </div>
+                    <CollapsibleSection
+                      accordionGroup="mode-review-secondary"
+                      className="mode-section"
+                      hint={text(locale, "expandWhenNeeded")}
+                      meta={text(locale, "reviewSignals")}
+                      title={text(locale, "investigativeBoard")}
+                    >
+                      <InvestigativeBoardPanel
+                        bare
+                        caseData={caseData}
+                        evidenceMap={evidenceMap}
+                        findings={visibleFindings}
+                        locale={locale}
+                        materialsById={materialsById}
+                        starterMaterialsById={starterMaterialsById}
+                      />
+                    </CollapsibleSection>
+                    <CollapsibleSection
+                      accordionGroup="mode-review-secondary"
+                      className="mode-section"
+                      hint={text(locale, "expandWhenNeeded")}
+                      meta={`${(workspaceAudit?.events.length ?? 0) + (sessionAudit?.events.length ?? 0)} ${text(locale, "auditEvents")}`}
+                      title={text(locale, "provenanceTimeline")}
+                    >
+                      <ProvenanceTimelinePanel
+                        bare
+                        locale={locale}
+                        sessionAudit={sessionAudit}
+                        workspaceAudit={workspaceAudit}
+                      />
+                    </CollapsibleSection>
+                    <CollapsibleSection
+                      accordionGroup="mode-review-secondary"
+                      className="mode-section"
+                      hint={text(locale, "expandWhenNeeded")}
+                      meta={text(locale, "visible")}
+                      title={text(locale, "indicators")}
+                    >
+                      <div className="indicator-list">
+                        {visibleIndicators.map((indicator) => (
+                          <IndicatorCard indicator={indicator} key={indicator.id} locale={locale} />
+                        ))}
+                      </div>
+                    </CollapsibleSection>
+                    <CollapsibleSection
+                      accordionGroup="mode-review-secondary"
+                      className="mode-section"
+                      hint={text(locale, "expandWhenNeeded")}
+                      meta={formatCount(visibleFindings.length, locale, {
+                        singular: text(locale, "findingSingular"),
+                        pluralFew: text(locale, "findingPluralFew"),
+                        pluralMany: text(locale, "findingPluralMany"),
+                      })}
+                      title={text(locale, "findings")}
+                    >
+                      <div className="finding-list">
+                        {visibleFindings.map((finding) => (
+                          <FindingCard finding={finding} key={`${finding.category}-${finding.title}`} locale={locale} />
+                        ))}
+                      </div>
+                    </CollapsibleSection>
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            {activeWorkMode === "monitor" ? (
+              <>
+                <WorkModeHeader
+                  detail={text(locale, "workModeSystemDetail")}
+                  icon={<ShieldCheck size={18} />}
+                  metrics={[
+                    {
+                      label: text(locale, "environmentHealth"),
+                      value: environmentHealth ? environmentStateShortLabel(environmentHealth.state, locale) : "-",
+                    },
+                    { label: text(locale, "sourceMaterials"), value: String(workspaceMaterials.length) },
+                    { label: text(locale, "workspaceAudit"), value: String(workspaceAudit?.events.length ?? 0) },
+                  ]}
+                  title={text(locale, "workModeSystem")}
+                />
+                {apiMode !== "online" ? (
+                  <WorkspaceEmptyState
+                    detail={text(locale, "operationsOfflineDetail")}
+                    locale={locale}
+                    title={text(locale, "operationsOfflineTitle")}
+                  />
+                ) : (
+                  <div className="mode-grid mode-grid--system">
+                    <section className="mode-section mode-section--main">
+                      <PanelHeader
+                        title={text(locale, "security")}
+                        meta={workspace?.manifest?.status ?? text(locale, "unknown")}
+                        compact
+                      />
+                      <SecurityPanel
+                        accessDecision={workspaceAccess}
+                        auditedGroundedDecisionCount={auditedGroundedDecisionCount}
+                        bare
+                        cachedGroundedQuestionCount={cachedGroundedQuestionCount}
+                        encryptionStatus={encryptionStatus}
+                        environmentHealth={environmentHealth}
+                        groundedSuggestionCount={groundedSuggestions.length}
+                        isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
+                        isModelSmokeRunning={isModelSmokeRunning}
+                        isStopReviewSubmitting={isStopReviewSubmitting}
+                        locale={locale}
+                        localModelConfig={localModelConfig}
+                        localModelSmoke={localModelSmoke}
+                        modelExperimentReadiness={modelExperimentReadiness}
+                        modelArtifactManifest={modelArtifactManifest}
+                        modelArtifactIsolation={modelArtifactIsolation}
+                        materials={workspaceMaterials}
+                        onArtifactIsolation={() => void initializeModelArtifactIsolation()}
+                        onModelSmoke={(executeReal) => void smokeLocalModel(executeReal)}
+                        onStopReviewDecision={(decision) => void submitStopReviewDecision(decision)}
+                        stopReviewList={stopReviewList}
+                        workspace={workspace}
+                        workspaceAudit={workspaceAudit}
+                        workspaceSecurity={workspaceSecurity}
+                      />
+                    </section>
+                    <CollapsibleSection
+                      accordionGroup="mode-system"
+                      className="mode-section"
+                      defaultOpen
+                      hint={text(locale, "expandWhenNeeded")}
+                      meta={evidenceMap ? String(evidenceMap.topic_nodes.length) : "0"}
+                      title={text(locale, "caseMap")}
+                    >
+                      <EvidenceMapPanel
+                        alignment={evidenceAlignment}
+                        bare
+                        evidenceMap={evidenceMap}
+                        locale={locale}
+                      />
+                    </CollapsibleSection>
+                  </div>
+                )}
+              </>
+            ) : null}
           </section>
         </WorkspaceZone>
 
         <WorkspaceZone
           collapsed={rightRailCollapsed}
           disclosureHint={text(locale, "expandWhenNeeded")}
-          label={text(locale, "zoneOperations")}
+          label={text(locale, "zoneInspector")}
           locale={locale}
           side="right"
           tutorialId="zone-operations"
           onToggleCollapse={() => setRightRailCollapsed((current) => !current)}
         >
-          <aside className="insight-panel">
-          <div className="operations-rail-toolbar">
-            <div className="operations-rail-header">
+          <aside className="insight-panel contextual-inspector">
+            <div className="inspector-toolbar">
               <div>
-                <span>{text(locale, "operationsRail")}</span>
-                <strong>{operationsTabs.find((tab) => tab.id === activeOperationsTab)?.label ?? text(locale, "operationsMonitor")}</strong>
+                <span>{text(locale, "modeInspector")}</span>
+                <strong>{activeWorkModeLabel}</strong>
               </div>
               <span className="meta">{apiMode === "online" ? text(locale, "online") : text(locale, statusKey)}</span>
             </div>
-            <div
-              className="operations-tabs"
-              data-tutorial="operations-tabs"
-              role="tablist"
-              aria-label={text(locale, "operationsRail")}
-            >
-              {operationsTabs.map((tab) => (
-                <button
-                  aria-selected={activeOperationsTab === tab.id}
-                  className={activeOperationsTab === tab.id ? "is-active" : ""}
-                  data-tutorial={`operations-tab-${tab.id}`}
-                  key={tab.id}
-                  role="tab"
-                  type="button"
-                  onClick={() => setActiveOperationsTab(tab.id)}
-                >
-                  {tab.icon}
-                  <span>{tab.label}</span>
-                  <strong>{tab.value}</strong>
-                </button>
-              ))}
-            </div>
-          </div>
 
-          <div className="operations-content" data-tab={activeOperationsTab}>
-            {apiMode !== "online" ? (
-              <WorkspaceEmptyState
-                detail={text(locale, "operationsOfflineDetail")}
-                locale={locale}
-                title={text(locale, "operationsOfflineTitle")}
-              />
-            ) : null}
             {apiMode === "online" ? (
               <OperationsGuidanceCard
-                activeTab={activeOperationsTab}
+                activeTab={activeOperationsMode}
                 actions={operationsGuidanceActions}
                 answeredCount={answeredQuestionCount}
                 findingCount={visibleFindings.length}
@@ -2018,283 +2457,57 @@ export function App() {
                 reportExported={sessionReportExported}
                 suggestionCount={groundedSuggestions.length}
               />
-            ) : null}
-            {activeOperationsTab === "monitor" ? (
-              <>
-                <CollapsibleSection
-                  accordionGroup="ops-monitor"
-                  className="operations-section"
-                  defaultOpen
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={workspace?.manifest?.status ?? text(locale, "unknown")}
-                  title={text(locale, "security")}
-                >
-                  <SecurityPanel
-                    accessDecision={workspaceAccess}
-                    auditedGroundedDecisionCount={auditedGroundedDecisionCount}
-                    bare
-                    cachedGroundedQuestionCount={cachedGroundedQuestionCount}
-                    encryptionStatus={encryptionStatus}
-                    environmentHealth={environmentHealth}
-                    groundedSuggestionCount={groundedSuggestions.length}
-                    isArtifactIsolationSubmitting={isArtifactIsolationSubmitting}
-                    isModelSmokeRunning={isModelSmokeRunning}
-                    isStopReviewSubmitting={isStopReviewSubmitting}
-                    locale={locale}
-                    localModelConfig={localModelConfig}
-                    localModelSmoke={localModelSmoke}
-                    modelExperimentReadiness={modelExperimentReadiness}
-                    modelArtifactManifest={modelArtifactManifest}
-                    modelArtifactIsolation={modelArtifactIsolation}
-                    materials={workspaceMaterials}
-                    onArtifactIsolation={() => void initializeModelArtifactIsolation()}
-                    onModelSmoke={(executeReal) => void smokeLocalModel(executeReal)}
-                    onStopReviewDecision={(decision) => void submitStopReviewDecision(decision)}
-                    stopReviewList={stopReviewList}
-                    workspace={workspace}
-                    workspaceAudit={workspaceAudit}
-                    workspaceSecurity={workspaceSecurity}
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-monitor"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={evidenceMap ? String(evidenceMap.topic_nodes.length) : "0"}
-                  title={text(locale, "caseMap")}
-                >
-                  <EvidenceMapPanel
-                    alignment={evidenceAlignment}
-                    bare
-                    evidenceMap={evidenceMap}
-                    locale={locale}
-                  />
-                </CollapsibleSection>
-              </>
-            ) : null}
+            ) : (
+              <WorkspaceEmptyState
+                detail={text(locale, "operationsOfflineDetail")}
+                locale={locale}
+                title={text(locale, "operationsOfflineTitle")}
+              />
+            )}
 
-            {activeOperationsTab === "ai" ? (
-              <>
-                <CollapsibleSection
-                  accordionGroup="ops-ai"
-                  className="operations-section"
-                  defaultOpen
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={String(groundedSuggestions.length)}
-                  title={text(locale, "groundedAi")}
-                >
-                  <GroundedSuggestionsPanel
-                    apiMode={apiMode}
-                    bare
-                    decisions={suggestionDecisions}
-                    drafts={suggestionDrafts}
-                    error={groundedSuggestionsError}
-                    isLoading={isGroundedSuggestionsLoading}
-                    locale={locale}
-                    localModelConfig={localModelConfig}
-                    meta={groundedSuggestionMeta}
-                    suggestions={groundedSuggestions}
-                    warnings={groundedSuggestionWarnings}
-                    onDraftChange={(suggestionId, value) =>
-                      setSuggestionDrafts((current) => ({ ...current, [suggestionId]: value }))
-                    }
-                    onEdit={startEditingSuggestion}
-                    onRegenerate={() => void refreshGroundedSuggestions()}
-                    onReject={rejectSuggestion}
-                    onSaveEdit={saveEditedSuggestion}
-                    onUse={useSuggestion}
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-ai"
-                  className="operations-section"
-                  defaultOpen={false}
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={text(locale, "developerPreview")}
-                  title={text(locale, "groundingPack")}
-                >
-                  <GroundingPackPanel
-                    activeQuestionId={activeQuestionId}
-                    apiMode={apiMode}
-                    config={config}
-                    locale={locale}
-                    questions={questions}
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-ai"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={text(locale, "localOnly")}
-                  title={text(locale, "assistant")}
-                >
-                  <div className="suggestion-list">
-                    {assistantHints.map((hint) => (
-                      <SuggestionCard detail={hint.detail} key={hint.title} title={hint.title} />
-                    ))}
-                  </div>
-                </CollapsibleSection>
-              </>
-            ) : null}
-
-            {activeOperationsTab === "materials" ? (
-              <CollapsibleSection
-                accordionGroup="ops-materials"
-                className="operations-section"
-                defaultOpen
-                hint={text(locale, "expandWhenNeeded")}
-                meta={`${workspaceMaterials.length} ${text(locale, "registered")}`}
-                title={text(locale, "materialRegister")}
-              >
-                <MaterialsPanel
-                  apiMode={apiMode}
-                  bare
-                  decisions={materialQuestionLinkDecisions}
-                  draft={materialDraft}
-                  isSubmitting={isMaterialSubmitting}
+            <CollapsibleSection
+              className="inspector-section"
+              defaultOpen
+              hint={text(locale, "expandWhenNeeded")}
+              meta={activeQuestion?.id ?? text(locale, "unknown")}
+              title={text(locale, "inspectorActiveQuestion")}
+            >
+              <div className="inspector-question">
+                <p>{localize(activeQuestion?.text, locale)}</p>
+                <LinkedMaterialStrip
+                  links={activeQuestionLinks}
                   locale={locale}
-                  links={materialQuestionLinks}
-                  materials={workspaceMaterials}
-                  tasks={materialTasks}
-                  isQuestionDraftSubmitting={isQuestionDraftSubmitting}
-                  activePreviewId={activeMaterialPreviewId}
-                  previews={materialPreviews}
-                  verifications={materialVerifications}
-                  onDecideLink={(link, decision) => void decideMaterialQuestionLink(link, decision)}
-                  onCreateQuestionDraft={(task) => void createQuestionDraftFromMaterialTask(task)}
-                  onDraftChange={setMaterialDraft}
-                  onOpenQuestion={(questionId) => selectActiveQuestion(questionId)}
-                  onPreview={(materialId) => void toggleMaterialPreview(materialId)}
-                  onSubmit={() => void registerMaterial()}
-                  onVerify={(materialId) => void verifyMaterial(materialId)}
+                  materialsById={materialsById}
+                  starterMaterialsById={starterMaterialsById}
                 />
-              </CollapsibleSection>
-            ) : null}
+              </div>
+            </CollapsibleSection>
 
-            {activeOperationsTab === "review" ? (
-              <>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  defaultOpen
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={text(locale, "sessionReportMeta")}
-                  title={text(locale, "sessionReport")}
-                  tutorialId="session-report"
-                >
-                  <SessionReportPanel
-                    apiMode={apiMode}
-                    config={config}
-                    exportInput={sessionReportExportInput}
-                    locale={locale}
-                    preview={reportMarkdown}
-                    onExported={() => {
-                      setSessionReportExported(true);
-                      setStatusKey("sessionReportCopied");
-                      void refreshAuditTrails();
-                    }}
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  defaultOpen={false}
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={caseQuality ? `${caseQuality.quality_score}%` : text(locale, "unknown")}
-                  title={text(locale, "caseQuality")}
-                >
-                  <CaseQualityPanel bare locale={locale} report={caseQuality} />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={demoReadiness ? environmentStateLabel(demoReadiness.state, locale) : text(locale, "unknown")}
-                  title={text(locale, "demoReadiness")}
-                >
-                  <DemoReadinessPanel bare locale={locale} report={demoReadiness} />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={text(locale, "noAutomatedVerdict")}
-                  title={text(locale, "stopReadiness")}
-                >
-                  <StopReadinessPanel
-                    bare
-                    encryptionStatus={encryptionStatus}
-                    locale={locale}
-                    localModelConfig={localModelConfig}
-                    modelArtifactManifest={modelArtifactManifest}
-                    sessionAudit={sessionAudit}
-                    workspace={workspace}
-                    workspaceAudit={workspaceAudit}
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={text(locale, "reviewSignals")}
-                  title={text(locale, "investigativeBoard")}
-                >
-                  <InvestigativeBoardPanel
-                    bare
-                    caseData={caseData}
-                    evidenceMap={evidenceMap}
-                    findings={visibleFindings}
-                    locale={locale}
-                    materialsById={materialsById}
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={`${(workspaceAudit?.events.length ?? 0) + (sessionAudit?.events.length ?? 0)} ${text(locale, "auditEvents")}`}
-                  title={text(locale, "provenanceTimeline")}
-                >
-                  <ProvenanceTimelinePanel
-                    bare
-                    locale={locale}
-                    sessionAudit={sessionAudit}
-                    workspaceAudit={workspaceAudit}
-                  />
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={text(locale, "visible")}
-                  title={text(locale, "indicators")}
-                >
-                  <div className="indicator-list">
-                    {visibleIndicators.map((indicator) => (
-                      <IndicatorCard indicator={indicator} key={indicator.id} locale={locale} />
-                    ))}
-                  </div>
-                </CollapsibleSection>
-                <CollapsibleSection
-                  accordionGroup="ops-review"
-                  className="operations-section"
-                  hint={text(locale, "expandWhenNeeded")}
-                  meta={formatCount(visibleFindings.length, locale, {
-                    singular: text(locale, "findingSingular"),
-                    pluralFew: text(locale, "findingPluralFew"),
-                    pluralMany: text(locale, "findingPluralMany"),
-                  })}
-                  title={text(locale, "findings")}
-                >
-                  <div className="finding-list">
-                    {visibleFindings.map((finding) => (
-                      <FindingCard finding={finding} key={`${finding.category}-${finding.title}`} locale={locale} />
-                    ))}
-                  </div>
-                </CollapsibleSection>
-              </>
-            ) : null}
-          </div>
+            <CollapsibleSection
+              className="inspector-section"
+              defaultOpen={visibleOperatorActions.length > 0}
+              hint={text(locale, "expandWhenNeeded")}
+              meta={String(visibleOperatorActions.length)}
+              title={text(locale, "inspectorSignals")}
+            >
+              <div className="inspector-signal-list">
+                {visibleOperatorActions.length ? (
+                  visibleOperatorActions.slice(0, 3).map((action) => (
+                    <article key={action.id}>
+                      <span data-priority={action.priority}>{action.priority}</span>
+                      <strong>{action.title}</strong>
+                      <p>{action.detail}</p>
+                      <button type="button" onClick={() => runOperatorAction(action)}>
+                        <CheckCircle2 size={14} />
+                        {text(locale, "operationsActionPriority")}
+                      </button>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-state">{text(locale, "inspectorNoSignals")}</p>
+                )}
+              </div>
+            </CollapsibleSection>
           </aside>
         </WorkspaceZone>
       </main>
@@ -2303,7 +2516,10 @@ export function App() {
         <Modal
           locale={locale}
           subtitle={activeMaterialPreviewId}
-          title={materialsById.get(activeMaterialPreviewId)?.title ?? text(locale, "materialPreview")}
+          title={
+            materialDisplayTitle(materialsById.get(activeMaterialPreviewId), starterMaterialsById) ??
+            text(locale, "materialPreview")
+          }
           onClose={() => setActiveMaterialPreviewId(null)}
         >
           <MaterialPreviewPanel locale={locale} preview={materialPreviews[activeMaterialPreviewId]} />
@@ -2319,6 +2535,72 @@ export function App() {
         onStepEnter={handleTutorialStepEnter}
       />
     </div>
+  );
+}
+
+function WorkModeNavigation({
+  activeMode,
+  locale,
+  modes,
+  onSelect,
+}: {
+  activeMode: WorkMode;
+  locale: Locale;
+  modes: WorkModeDescriptor[];
+  onSelect: (mode: WorkMode) => void;
+}) {
+  return (
+    <nav className="work-mode-nav" data-tutorial="operations-tabs" aria-label={text(locale, "workModeNavigation")}>
+      {modes.map((mode) => (
+        <button
+          aria-current={activeMode === mode.id ? "page" : undefined}
+          className={activeMode === mode.id ? "is-active" : ""}
+          data-tutorial={mode.id === "interview" ? "work-mode-interview" : `operations-tab-${mode.id}`}
+          key={mode.id}
+          type="button"
+          onClick={() => onSelect(mode.id)}
+        >
+          <span className="work-mode-icon">{mode.icon}</span>
+          <span className="work-mode-copy">
+            <strong>{mode.label}</strong>
+            <em>{mode.detail}</em>
+          </span>
+          <span className="work-mode-value">{mode.value}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function WorkModeHeader({
+  detail,
+  icon,
+  metrics,
+  title,
+}: {
+  detail: string;
+  icon: ReactNode;
+  metrics: Array<{ label: string; value: string }>;
+  title: string;
+}) {
+  return (
+    <header className="work-mode-header">
+      <div className="work-mode-title">
+        <span>{icon}</span>
+        <div>
+          <h2>{title}</h2>
+          <p>{detail}</p>
+        </div>
+      </div>
+      <div className="work-mode-metrics">
+        {metrics.map((metric) => (
+          <span key={metric.label}>
+            <strong>{metric.value}</strong>
+            <em>{metric.label}</em>
+          </span>
+        ))}
+      </div>
+    </header>
   );
 }
 
@@ -2440,6 +2722,7 @@ function operationsTabQuickActions({
   onOpenReview,
   onPreviewMaterial,
   onRegenerateAi,
+  starterMaterialsById,
 }: {
   activeTab: OperationsTab;
   firstMaterial: MaterialRecord | undefined;
@@ -2450,6 +2733,7 @@ function operationsTabQuickActions({
   onOpenReview: () => void;
   onPreviewMaterial: (materialId: string) => void;
   onRegenerateAi: () => void;
+  starterMaterialsById: Map<string, StarterMaterial>;
 }): OperationsGuidanceAction[] {
   const openMaterialsAction: OperationsGuidanceAction = {
     id: "open-materials",
@@ -2482,7 +2766,9 @@ function operationsTabQuickActions({
   const previewMaterialAction: OperationsGuidanceAction = {
     id: firstMaterial ? `preview-${firstMaterial.id}` : "preview-empty",
     label: text(locale, "operationsActionPreviewMaterial"),
-    detail: firstMaterial?.title ?? text(locale, "operationsActionPreviewMaterialUnavailable"),
+    detail:
+      materialDisplayTitle(firstMaterial, starterMaterialsById) ??
+      text(locale, "operationsActionPreviewMaterialUnavailable"),
     disabled: !firstMaterial,
     icon: <Eye size={16} />,
     onClick: () => {
@@ -2739,40 +3025,40 @@ function buildCaseQualityBrief(report: CaseQualityReport, locale: Locale): strin
   return lines.join("\n");
 }
 
-function DemoReadinessPanel({
+function WorkflowReadinessPanel({
   bare = false,
   locale,
   report,
 }: {
   bare?: boolean;
   locale: Locale;
-  report: DemoReadinessReport | null;
+  report: WorkflowReadinessReport | null;
 }) {
   const state = report?.state ?? "unknown";
   async function copyBrief() {
     if (!report) {
       return;
     }
-    await navigator.clipboard.writeText(buildDemoReadinessBrief(report, locale));
+    await navigator.clipboard.writeText(buildWorkflowReadinessBrief(report, locale));
   }
 
   const body = report ? (
-    <div className="demo-readiness-body">
-      <p>{text(locale, "demoReadinessAdvisory")}</p>
-      <div className="demo-readiness-toolbar">
+    <div className="workflow-readiness-body">
+      <p>{text(locale, "workflowReadinessAdvisory")}</p>
+      <div className="workflow-readiness-toolbar">
         <button type="button" onClick={() => void copyBrief()}>
           <ClipboardCopy size={14} />
-          {text(locale, "demoReadinessCopyBrief")}
+          {text(locale, "workflowReadinessCopyBrief")}
         </button>
       </div>
-      <div className="demo-readiness-summary">
+      <div className="workflow-readiness-summary">
         <span>{text(locale, "ready")}: {report.summary.ready ?? 0}</span>
         <span>{text(locale, "warning")}: {report.summary.warning ?? 0}</span>
         <span>{text(locale, "blocked")}: {report.summary.blocked ?? 0}</span>
       </div>
       {report.recommended_actions.length ? (
-        <div className="demo-readiness-actions">
-          <span>{text(locale, "demoReadinessNextActions")}</span>
+        <div className="workflow-readiness-actions">
+          <span>{text(locale, "workflowReadinessNextActions")}</span>
           {report.recommended_actions.map((action) => (
             <article data-state={action.state} key={action.id}>
               <strong>{action.label}</strong>
@@ -2785,7 +3071,7 @@ function DemoReadinessPanel({
         {report.checks.map((check) => (
           <SecurityItem
             detail={check.detail}
-            icon={demoReadinessCheckIcon(check.id)}
+            icon={workflowReadinessCheckIcon(check.id)}
             key={check.id}
             state={check.state}
             title={check.label}
@@ -2795,28 +3081,28 @@ function DemoReadinessPanel({
       </div>
     </div>
   ) : (
-    <div className="demo-readiness-body">
-      <p className="empty-state">{text(locale, "demoReadinessUnavailable")}</p>
+    <div className="workflow-readiness-body">
+      <p className="empty-state">{text(locale, "workflowReadinessUnavailable")}</p>
     </div>
   );
 
   if (bare) {
     return (
-      <div className="demo-readiness-panel is-bare" data-state={state}>
+      <div className="workflow-readiness-panel is-bare" data-state={state}>
         {body}
       </div>
     );
   }
 
   return (
-    <section className="demo-readiness-panel" data-state={state}>
-      <PanelHeader title={text(locale, "demoReadiness")} meta={environmentStateLabel(state, locale)} compact />
+    <section className="workflow-readiness-panel" data-state={state}>
+      <PanelHeader title={text(locale, "workflowReadiness")} meta={environmentStateLabel(state, locale)} compact />
       {body}
     </section>
   );
 }
 
-function demoReadinessCheckIcon(checkId: string): ReactNode {
+function workflowReadinessCheckIcon(checkId: string): ReactNode {
   const icons: Record<string, ReactNode> = {
     audit_chain: <Fingerprint size={15} />,
     export_bundle: <FileDown size={15} />,
@@ -2829,9 +3115,9 @@ function demoReadinessCheckIcon(checkId: string): ReactNode {
   return icons[checkId] ?? <ListChecks size={15} />;
 }
 
-function buildDemoReadinessBrief(report: DemoReadinessReport, locale: Locale): string {
+function buildWorkflowReadinessBrief(report: WorkflowReadinessReport, locale: Locale): string {
   const lines = [
-    text(locale, "demoReadiness"),
+    text(locale, "workflowReadiness"),
     `${text(locale, "caseLabel")}: ${report.case_id}`,
     `${text(locale, "workspaceLabel")}: ${report.workspace_id}`,
     `${text(locale, "session")}: ${report.session_id ?? text(locale, "unknown")}`,
@@ -2841,14 +3127,14 @@ function buildDemoReadinessBrief(report: DemoReadinessReport, locale: Locale): s
       report.summary.warning ?? 0
     } / ${text(locale, "blocked")}: ${report.summary.blocked ?? 0}`,
     "",
-    text(locale, "demoReadinessNextActions"),
+    text(locale, "workflowReadinessNextActions"),
   ];
   if (report.recommended_actions.length) {
     report.recommended_actions.forEach((action) => {
       lines.push(`- ${action.label}: ${action.action}`);
     });
   } else {
-    lines.push(`- ${text(locale, "demoReadinessNoActions")}`);
+    lines.push(`- ${text(locale, "workflowReadinessNoActions")}`);
   }
   return lines.join("\n");
 }
@@ -2973,6 +3259,7 @@ function InvestigativeBoardPanel({
   findings,
   locale,
   materialsById,
+  starterMaterialsById,
 }: {
   bare?: boolean;
   caseData: CaseData | null;
@@ -2980,6 +3267,7 @@ function InvestigativeBoardPanel({
   findings: ReviewFinding[];
   locale: Locale;
   materialsById: Map<string, MaterialRecord>;
+  starterMaterialsById: Map<string, StarterMaterial>;
 }) {
   const timelineItems = buildTimelineItems(caseData);
   const clarificationItems = findings
@@ -3033,7 +3321,9 @@ function InvestigativeBoardPanel({
               <p>{evidenceStatusLabel(node.status, locale)}</p>
               <div>
                 {node.material_ids.slice(0, 3).map((materialId) => (
-                  <em key={materialId}>{materialsById.get(materialId)?.title ?? materialId}</em>
+                  <em key={materialId}>
+                    {materialDisplayTitle(materialsById.get(materialId), starterMaterialsById) ?? materialId}
+                  </em>
                 ))}
               </div>
             </article>
@@ -3506,6 +3796,7 @@ function topicPriorityLabel(topic: CaseTopic, locale: Locale): string {
 }
 
 function buildMaterialTasks({
+  caseStarterMaterials,
   decisions,
   evidenceMap,
   links,
@@ -3514,6 +3805,7 @@ function buildMaterialTasks({
   questions,
   verifications,
 }: {
+  caseStarterMaterials: StarterMaterial[];
   decisions: Record<string, MaterialQuestionLinkDecision>;
   evidenceMap: EvidenceMap | null;
   links: MaterialQuestionLink[];
@@ -3523,6 +3815,7 @@ function buildMaterialTasks({
   verifications: Record<string, MaterialVerification>;
 }): MaterialTask[] {
   const materialsById = new Map(materials.map((material) => [material.id, material]));
+  const starterMaterialsById = new Map(caseStarterMaterials.map((material) => [material.id, material]));
   const questionsById = new Map(questions.map((question) => [question.id, question]));
   const tasks: MaterialTask[] = [];
 
@@ -3536,7 +3829,7 @@ function buildMaterialTasks({
       id: `review-link-${pendingLink.material_id}-${pendingLink.question_id}`,
       kind: "review_link",
       title: text(locale, "materialTaskReviewLink"),
-      detail: `${material?.title ?? pendingLink.material_id} -> ${
+      detail: `${materialDisplayTitle(material, starterMaterialsById) ?? pendingLink.material_id} -> ${
         question?.id ?? pendingLink.question_id
       } (${text(locale, "confidenceShort")} ${pendingLink.confidence.toFixed(2)})`,
       priority: pendingLink.confidence >= 0.85 ? "high" : "medium",
@@ -3555,7 +3848,9 @@ function buildMaterialTasks({
       id: `verify-${unverifiedMaterial.id}`,
       kind: "verify_material",
       title: text(locale, "materialTaskVerifyIntegrity"),
-      detail: `${unverifiedMaterial.title} / ${shortHash(unverifiedMaterial.sha256)}`,
+      detail: `${materialDisplayTitle(unverifiedMaterial, starterMaterialsById)} / ${shortHash(
+        unverifiedMaterial.sha256,
+      )}`,
       priority: "medium",
       materialId: unverifiedMaterial.id,
       sourceObjectIds: [unverifiedMaterial.id],
@@ -3568,7 +3863,7 @@ function buildMaterialTasks({
       id: `material-only-${materialOnlyTopic.topic_id}`,
       kind: "material_only",
       title: text(locale, "materialTaskMaterialOnlyTopic"),
-      detail: buildEvidenceTopicTaskDetail(materialOnlyTopic, materialsById),
+      detail: buildEvidenceTopicTaskDetail(materialOnlyTopic, materialsById, starterMaterialsById),
       priority: "medium",
       materialId: materialOnlyTopic.material_ids[0],
       questionId: materialOnlyTopic.question_ids[0],
@@ -3587,7 +3882,7 @@ function buildMaterialTasks({
       id: `contested-${contestedTopic.topic_id}`,
       kind: "contested_topic",
       title: text(locale, "materialTaskContestedTopic"),
-      detail: buildEvidenceTopicTaskDetail(contestedTopic, materialsById),
+      detail: buildEvidenceTopicTaskDetail(contestedTopic, materialsById, starterMaterialsById),
       priority: contestedTopic.priority === "high" ? "high" : "medium",
       materialId: contestedTopic.material_ids[0],
       questionId: contestedTopic.question_ids[0],
@@ -3633,17 +3928,36 @@ function evidenceTopicPriorityToOperatorPriority(priority: string): OperatorActi
 function buildEvidenceTopicTaskDetail(
   node: EvidenceTopicNode,
   materialsById: Map<string, MaterialRecord>,
+  starterMaterialsById: Map<string, StarterMaterial>,
 ): string {
   const materialTitles = node.material_ids
     .slice(0, 2)
-    .map((materialId) => materialsById.get(materialId)?.title ?? materialId)
+    .map((materialId) => materialDisplayTitle(materialsById.get(materialId), starterMaterialsById) ?? materialId)
     .join(", ");
   return materialTitles ? `${node.label}: ${materialTitles}` : node.label;
+}
+
+function materialDisplayTitle(
+  material: MaterialRecord | undefined,
+  starterMaterialsById: Map<string, StarterMaterial>,
+): string | undefined {
+  if (!material) {
+    return undefined;
+  }
+  return starterMaterialsById.get(material.id)?.title ?? material.title;
+}
+
+function materialDisplayDescription(
+  material: MaterialRecord,
+  starterMaterialsById: Map<string, StarterMaterial>,
+): string {
+  return starterMaterialsById.get(material.id)?.description ?? material.description;
 }
 
 function buildOperatorActions({
   activeQuestionId,
   answerViews,
+  caseStarterMaterials,
   evidenceMap,
   findings,
   links,
@@ -3654,6 +3968,7 @@ function buildOperatorActions({
 }: {
   activeQuestionId: string | undefined;
   answerViews: AnswerView[];
+  caseStarterMaterials: StarterMaterial[];
   evidenceMap: EvidenceMap | null;
   findings: ReviewFinding[];
   links: MaterialQuestionLink[];
@@ -3664,6 +3979,7 @@ function buildOperatorActions({
 }): OperatorAction[] {
   const actions: OperatorAction[] = [];
   const answeredQuestionIds = new Set(answerViews.map((answer) => answer.questionId));
+  const starterMaterialsById = new Map(caseStarterMaterials.map((material) => [material.id, material]));
   const nextUnansweredQuestion = questions.find((question) => !answeredQuestionIds.has(question.id));
   if (nextUnansweredQuestion) {
     actions.push({
@@ -3683,7 +3999,13 @@ function buildOperatorActions({
   if (activeQuestionLinks.length) {
     const linkedMaterialTitles = activeQuestionLinks
       .slice(0, 2)
-      .map((link) => materials.find((material) => material.id === link.material_id)?.title ?? link.material_id)
+      .map(
+        (link) =>
+          materialDisplayTitle(
+            materials.find((material) => material.id === link.material_id),
+            starterMaterialsById,
+          ) ?? link.material_id,
+      )
       .join(", ");
     actions.push({
       id: `materials-${activeQuestionId}`,
@@ -3930,13 +4252,13 @@ function CaseDossierPanel({
   );
 }
 
-type DemoChecklistItem = {
+type WorkflowChecklistItem = {
   id: string;
   label: string;
   done: boolean;
 };
 
-function DemoWalkthroughPanel({
+function WorkflowPathPanel({
   checklist,
   locale,
   onCopySummary,
@@ -3947,7 +4269,7 @@ function DemoWalkthroughPanel({
   onOpenReview,
   onStartFresh,
 }: {
-  checklist: DemoChecklistItem[];
+  checklist: WorkflowChecklistItem[];
   locale: Locale;
   onCopySummary: () => void;
   onOpenAi: () => void;
@@ -3961,63 +4283,67 @@ function DemoWalkthroughPanel({
     {
       id: "question",
       icon: <Send size={14} />,
-      label: text(locale, "demoStepQuestion"),
-      detail: text(locale, "demoStepQuestionDetail"),
+      label: text(locale, "workflowPathStepQuestion"),
+      detail: text(locale, "workflowPathStepQuestionDetail"),
       onClick: onOpenNextQuestion,
     },
     {
       id: "local-ai",
       icon: <Network size={14} />,
-      label: text(locale, "demoStepLocalAi"),
-      detail: text(locale, "demoStepLocalAiDetail"),
+      label: text(locale, "workflowPathStepLocalAi"),
+      detail: text(locale, "workflowPathStepLocalAiDetail"),
       onClick: onOpenMonitor,
     },
     {
       id: "materials",
       icon: <FolderArchive size={14} />,
-      label: text(locale, "demoStepMaterials"),
-      detail: text(locale, "demoStepMaterialsDetail"),
+      label: text(locale, "workflowPathStepMaterials"),
+      detail: text(locale, "workflowPathStepMaterialsDetail"),
       onClick: onOpenMaterials,
     },
     {
       id: "grounded-ai",
       icon: <Sparkles size={14} />,
-      label: text(locale, "demoStepGroundedAi"),
-      detail: text(locale, "demoStepGroundedAiDetail"),
+      label: text(locale, "workflowPathStepGroundedAi"),
+      detail: text(locale, "workflowPathStepGroundedAiDetail"),
       onClick: onOpenAi,
     },
     {
       id: "review",
       icon: <Fingerprint size={14} />,
-      label: text(locale, "demoStepReview"),
-      detail: text(locale, "demoStepReviewDetail"),
+      label: text(locale, "workflowPathStepReview"),
+      detail: text(locale, "workflowPathStepReviewDetail"),
       onClick: onOpenReview,
     },
   ];
 
   const checklistDoneCount = checklist.filter((item) => item.done).length;
+  const checklistProgress = checklist.length ? Math.round((checklistDoneCount / checklist.length) * 100) : 0;
 
   return (
     <CollapsibleSection
-      className="demo-walkthrough-panel"
+      className="workflow-path-panel"
       hint={text(locale, "expandWhenNeeded")}
-      meta={`${checklistDoneCount}/${checklist.length} · ${text(locale, "demoReady")}`}
-      title={text(locale, "demoWalkthrough")}
-      tutorialId="demo-walkthrough"
+      meta={`${checklistDoneCount}/${checklist.length} · ${text(locale, "workflowPathReady")}`}
+      title={text(locale, "workflowPath")}
+      tutorialId="workflow-path"
     >
-      <div className="demo-tool-row">
-        <button type="button" onClick={onStartFresh} title={text(locale, "demoFreshStartDetail")}>
+      <div className="workflow-progress-meter" aria-label={text(locale, "workflowChecklist")}>
+        <span style={{ width: `${checklistProgress}%` }} />
+      </div>
+      <div className="workflow-tool-row">
+        <button type="button" onClick={onStartFresh} title={text(locale, "workflowNewSessionDetail")}>
           <RefreshCw size={14} />
-          {text(locale, "demoFreshStart")}
+          {text(locale, "workflowNewSession")}
         </button>
         <button type="button" onClick={onCopySummary}>
           <ClipboardCopy size={14} />
-          {text(locale, "demoCopySummary")}
+          {text(locale, "workflowCopyBrief")}
         </button>
       </div>
-      <div className="demo-checklist">
+      <div className="workflow-checklist">
         <span>
-          {text(locale, "demoChecklist")} ({checklistDoneCount}/{checklist.length})
+          {text(locale, "workflowChecklist")} ({checklistDoneCount}/{checklist.length})
         </span>
         <ul>
           {checklist.map((item) => (
@@ -4028,7 +4354,7 @@ function DemoWalkthroughPanel({
           ))}
         </ul>
       </div>
-      <div className="demo-step-list">
+      <div className="workflow-step-list">
         {steps.map((step) => (
           <button key={step.id} type="button" onClick={step.onClick}>
             <span>{step.icon}</span>
@@ -4041,7 +4367,7 @@ function DemoWalkthroughPanel({
   );
 }
 
-type DemoSummaryInput = {
+type WorkflowBriefInput = {
   locale: Locale;
   config: RuntimeConfig;
   caseData: CaseData | null;
@@ -4060,9 +4386,9 @@ type DemoSummaryInput = {
   sessionAuditCount: number;
 };
 
-function buildDemoSummaryText(input: DemoSummaryInput): string {
+function buildWorkflowBriefText(input: WorkflowBriefInput): string {
   const lines = [
-    text(input.locale, "demoSummaryTitle"),
+    text(input.locale, "workflowBriefTitle"),
     "---",
     `${text(input.locale, "caseCatalog")}: ${input.config.caseId}`,
     input.caseData ? localize(input.caseData.title, input.locale) : "",
@@ -4086,7 +4412,7 @@ function buildDemoSummaryText(input: DemoSummaryInput): string {
     }`,
     `${text(input.locale, "sessionAudit")}: ${input.sessionAuditCount} events`,
     "",
-    text(input.locale, "demoSummaryBoundary"),
+    text(input.locale, "workflowBriefBoundary"),
   ];
 
   return lines.filter((line) => line.length > 0).join("\n");
@@ -4096,10 +4422,12 @@ function LinkedMaterialStrip({
   links,
   locale,
   materialsById,
+  starterMaterialsById,
 }: {
   links: MaterialQuestionLink[];
   locale: Locale;
   materialsById: Map<string, MaterialRecord>;
+  starterMaterialsById: Map<string, StarterMaterial>;
 }) {
   if (!links.length) {
     return (
@@ -4118,7 +4446,7 @@ function LinkedMaterialStrip({
           const material = materialsById.get(link.material_id);
           return (
             <span key={`${link.material_id}-${link.question_id}`}>
-              {material?.title ?? link.material_id}
+              {materialDisplayTitle(material, starterMaterialsById) ?? link.material_id}
               <em>{link.confidence.toFixed(2)}</em>
             </span>
           );
@@ -4293,6 +4621,7 @@ function MaterialsPanel({
   links,
   locale,
   materials,
+  starterMaterials,
   tasks,
   isQuestionDraftSubmitting,
   onDecideLink,
@@ -4314,6 +4643,7 @@ function MaterialsPanel({
   links: MaterialQuestionLink[];
   locale: Locale;
   materials: MaterialRecord[];
+  starterMaterials: StarterMaterial[];
   tasks: MaterialTask[];
   isQuestionDraftSubmitting: boolean;
   onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
@@ -4329,6 +4659,7 @@ function MaterialsPanel({
   const disabled = apiMode !== "online" || isSubmitting;
   const acceptedLinkCount = Object.values(decisions).filter((decision) => decision === "accepted").length;
   const pendingLinkCount = Math.max(0, links.length - Object.keys(decisions).length);
+  const starterMaterialsById = new Map(starterMaterials.map((material) => [material.id, material]));
   const verifiedMaterialCount = materials.filter(
     (material) => materialVerificationState(verifications[material.id]) === "ready",
   ).length;
@@ -4380,6 +4711,7 @@ function MaterialsPanel({
               links={links.filter((link) => link.material_id === material.id)}
               locale={locale}
               material={material}
+              starterMaterialsById={starterMaterialsById}
               onDecideLink={onDecideLink}
               onPreview={onPreview}
               onVerify={onVerify}
@@ -4506,60 +4838,151 @@ function MaterialTasksPanel({
       </div>
       {tasks.length ? (
         <div className="material-task-list">
-          {tasks.map((task) => (
-            <article className="material-task-card" data-priority={task.priority} key={task.id}>
-              <div className="material-task-card-main">
-                <span className="material-task-icon">{materialTaskIcon(task.kind)}</span>
-                <div>
-                  <strong>{task.title}</strong>
-                  <p>{task.detail}</p>
-                  <em>{operatorPriorityLabel(task.priority, locale)}</em>
+          {tasks.map((task) => {
+            const actions = buildMaterialTaskActions({
+              isQuestionDraftSubmitting,
+              locale,
+              onCreateQuestionDraft,
+              onDecideLink,
+              onOpenQuestion,
+              onPreview,
+              task,
+            });
+            const primaryAction = actions.find((action) => action.isPrimary) ?? actions[0];
+            const secondaryActions = actions.filter((action) => action.key !== primaryAction?.key);
+
+            return (
+              <article className="material-task-card" data-priority={task.priority} key={task.id}>
+                <div className="material-task-card-main">
+                  <span className="material-task-icon">{materialTaskIcon(task.kind)}</span>
+                  <div>
+                    <strong>{task.title}</strong>
+                    <p>{task.detail}</p>
+                    <em>{operatorPriorityLabel(task.priority, locale)}</em>
+                  </div>
                 </div>
-              </div>
-              <div className="material-task-actions">
-                {task.questionId ? (
-                  <button type="button" onClick={() => onOpenQuestion(task.questionId!)}>
-                    <Send size={13} />
-                    {text(locale, "materialTaskOpenQuestion")}
-                  </button>
-                ) : null}
-                {canCreateQuestionFromMaterialTask(task) ? (
-                  <button
-                    type="button"
-                    disabled={isQuestionDraftSubmitting}
-                    onClick={() => onCreateQuestionDraft(task)}
-                  >
-                    <Pencil size={13} />
-                    {text(locale, "materialTaskCreateQuestion")}
-                  </button>
-                ) : null}
-                {task.materialId ? (
-                  <button type="button" onClick={() => onPreview(task.materialId!)}>
-                    <Eye size={13} />
-                    {text(locale, "previewMaterial")}
-                  </button>
-                ) : null}
-                {task.link ? (
-                  <>
-                    <button type="button" onClick={() => onDecideLink(task.link!, "accepted")}>
-                      <Check size={13} />
-                      {text(locale, "acceptLink")}
+                <div className="material-task-actions">
+                  {primaryAction ? (
+                    <button
+                      className="material-task-primary-action"
+                      type="button"
+                      disabled={primaryAction.disabled}
+                      onClick={primaryAction.onClick}
+                    >
+                      {primaryAction.icon}
+                      {primaryAction.label}
                     </button>
-                    <button type="button" onClick={() => onDecideLink(task.link!, "rejected")}>
-                      <X size={13} />
-                      {text(locale, "rejectLink")}
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            </article>
-          ))}
+                  ) : null}
+                  {secondaryActions.length ? (
+                    <details className="material-task-more">
+                      <summary aria-label={text(locale, "moreActions")} title={text(locale, "moreActions")}>
+                        <MoreHorizontal size={14} />
+                      </summary>
+                      <div>
+                        {secondaryActions.map((action) => (
+                          <button
+                            type="button"
+                            disabled={action.disabled}
+                            key={action.key}
+                            onClick={action.onClick}
+                          >
+                            {action.icon}
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
         </div>
       ) : (
         <p className="empty-state">{text(locale, "noMaterialTasks")}</p>
       )}
     </section>
   );
+}
+
+type MaterialTaskAction = {
+  disabled?: boolean;
+  icon: ReactNode;
+  isPrimary?: boolean;
+  key: string;
+  label: string;
+  onClick: () => void;
+};
+
+function buildMaterialTaskActions({
+  isQuestionDraftSubmitting,
+  locale,
+  onCreateQuestionDraft,
+  onDecideLink,
+  onOpenQuestion,
+  onPreview,
+  task,
+}: {
+  isQuestionDraftSubmitting: boolean;
+  locale: Locale;
+  onCreateQuestionDraft: (task: MaterialTask) => void;
+  onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
+  onOpenQuestion: (questionId: string) => void;
+  onPreview: (materialId: string) => void;
+  task: MaterialTask;
+}): MaterialTaskAction[] {
+  const actions: MaterialTaskAction[] = [];
+
+  if (task.questionId) {
+    actions.push({
+      icon: <Send size={13} />,
+      isPrimary: !task.link,
+      key: "open-question",
+      label: text(locale, "materialTaskOpenQuestion"),
+      onClick: () => onOpenQuestion(task.questionId!),
+    });
+  }
+
+  if (canCreateQuestionFromMaterialTask(task)) {
+    actions.push({
+      disabled: isQuestionDraftSubmitting,
+      icon: <Pencil size={13} />,
+      isPrimary: !task.questionId && !task.link,
+      key: "create-question",
+      label: text(locale, "materialTaskCreateQuestion"),
+      onClick: () => onCreateQuestionDraft(task),
+    });
+  }
+
+  if (task.materialId) {
+    actions.push({
+      icon: <Eye size={13} />,
+      isPrimary: !task.questionId && !task.link && !canCreateQuestionFromMaterialTask(task),
+      key: "preview-material",
+      label: text(locale, "previewMaterial"),
+      onClick: () => onPreview(task.materialId!),
+    });
+  }
+
+  if (task.link) {
+    actions.push(
+      {
+        icon: <Check size={13} />,
+        isPrimary: true,
+        key: "accept-link",
+        label: text(locale, "acceptLink"),
+        onClick: () => onDecideLink(task.link!, "accepted"),
+      },
+      {
+        icon: <X size={13} />,
+        key: "reject-link",
+        label: text(locale, "rejectLink"),
+        onClick: () => onDecideLink(task.link!, "rejected"),
+      },
+    );
+  }
+
+  return actions;
 }
 
 function materialTaskIcon(kind: MaterialTaskKind): ReactNode {
@@ -4587,6 +5010,7 @@ function MaterialCard({
   links,
   locale,
   material,
+  starterMaterialsById,
   onDecideLink,
   onPreview,
   onVerify,
@@ -4596,12 +5020,19 @@ function MaterialCard({
   links: MaterialQuestionLink[];
   locale: Locale;
   material: MaterialRecord;
+  starterMaterialsById: Map<string, StarterMaterial>;
   onDecideLink: (link: MaterialQuestionLink, decision: MaterialQuestionLinkDecision) => void;
   onPreview: (materialId: string) => void;
   onVerify: (materialId: string) => void;
   verification: MaterialVerification | undefined;
 }) {
   const state = materialVerificationState(verification);
+  const displayTitle = materialDisplayTitle(material, starterMaterialsById) ?? material.title;
+  const displayDescription = materialDisplayDescription(material, starterMaterialsById);
+  const acceptedCount = links.filter((link) => decisions[materialQuestionLinkKey(link)] === "accepted").length;
+  const proposedCount = links.filter((link) => !decisions[materialQuestionLinkKey(link)]).length;
+  const primaryLinks = links.slice(0, 3);
+  const hiddenLinkCount = Math.max(0, links.length - primaryLinks.length);
 
   return (
     <article className="material-card" data-state={state}>
@@ -4610,41 +5041,94 @@ function MaterialCard({
           <FileText size={15} />
         </span>
         <div>
-          <strong>{material.title}</strong>
+          <strong>{displayTitle}</strong>
           <span className="material-meta">
             {material.id} / {materialSourceLabel(material.source_type, locale)}
           </span>
         </div>
-      </div>
-      <div className="material-facts">
-        <span>
-          {text(locale, "size")}: <strong>{formatBytes(material.size_bytes)}</strong>
-        </span>
-        <span>
-          {text(locale, "hash")}: <strong>{shortHash(material.sha256)}</strong>
-        </span>
-      </div>
-      {material.description ? (
-        <p className="material-description">{material.description}</p>
-      ) : null}
-      {material.tags.length ? (
-        <div className="material-tags">
-          {material.tags.map((tag) => (
-            <span key={tag}>{tag}</span>
-          ))}
-        </div>
-      ) : null}
-      <MaterialQuestionChips
-        decisions={decisions}
-        links={links}
-        locale={locale}
-        onDecideLink={onDecideLink}
-      />
-      <div className="material-card-footer">
-        <span className="material-verification">
-          <ShieldQuestion size={14} />
+        <span className="material-status-pill" data-state={state}>
+          <ShieldQuestion size={13} />
           {materialVerificationLabel(verification, locale)}
         </span>
+      </div>
+      {displayDescription ? (
+        <p className="material-description">{displayDescription}</p>
+      ) : null}
+
+      <div className="material-card-summary">
+        <span>
+          <Network size={13} />
+          <strong>{links.length}</strong>
+          {text(locale, "materialLinksShort")}
+        </span>
+        <span>
+          <CheckCircle2 size={13} />
+          <strong>{acceptedCount}</strong>
+          {text(locale, "acceptedLinks")}
+        </span>
+        <span>
+          <ShieldQuestion size={13} />
+          <strong>{proposedCount}</strong>
+          {text(locale, "pendingLinks")}
+        </span>
+      </div>
+
+      {primaryLinks.length ? (
+        <div className="material-primary-links" aria-label={text(locale, "groundedQuestions")}>
+          {primaryLinks.map((link) => {
+            const decision = decisions[materialQuestionLinkKey(link)];
+            return (
+              <span data-state={decision ?? "proposed"} key={materialQuestionLinkKey(link)}>
+                {link.question_id}
+                <em>{link.confidence.toFixed(2)}</em>
+              </span>
+            );
+          })}
+          {hiddenLinkCount ? <span className="is-more">+{hiddenLinkCount}</span> : null}
+        </div>
+      ) : null}
+
+      <details className="material-context-window">
+        <summary>
+          <Network size={14} />
+          <span>{text(locale, "materialConnections")}</span>
+          <em>{links.length ? `${links.length} ${text(locale, "materialLinksShort")}` : text(locale, "noGrounding")}</em>
+        </summary>
+        <MaterialQuestionChips
+          decisions={decisions}
+          links={links}
+          locale={locale}
+          onDecideLink={onDecideLink}
+        />
+      </details>
+
+      <details className="material-context-window">
+        <summary>
+          <Database size={14} />
+          <span>{text(locale, "materialTechnicalDetails")}</span>
+          <em>{shortHash(material.sha256)}</em>
+        </summary>
+        <div className="material-facts">
+          <span>
+            {text(locale, "size")}: <strong>{formatBytes(material.size_bytes)}</strong>
+          </span>
+          <span>
+            {text(locale, "hash")}: <strong>{shortHash(material.sha256)}</strong>
+          </span>
+          <span>
+            {text(locale, "materialType")}: <strong>{materialSourceLabel(material.source_type, locale)}</strong>
+          </span>
+        </div>
+        {material.tags.length ? (
+          <div className="material-tags">
+            {material.tags.map((tag) => (
+              <span key={tag}>{tag}</span>
+            ))}
+          </div>
+        ) : null}
+      </details>
+
+      <div className="material-card-footer">
         <button type="button" onClick={() => onPreview(material.id)}>
           <Eye size={14} />
           {text(locale, "previewMaterial")}
