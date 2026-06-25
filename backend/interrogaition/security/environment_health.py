@@ -153,12 +153,12 @@ def _local_model_check(config: LocalModelRuntimeConfig) -> EnvironmentHealthChec
             detail="Real model live output is enabled before institutional STOP review.",
             remediation="Disable live model output until the STOP review is complete.",
         )
-    if config.provider == "ollama" and config.real_model_enabled:
+    if config.provider in {"ollama", "bridge"} and config.real_model_enabled:
         return EnvironmentHealthCheck(
             id="local_model",
             label="Local model runtime",
             state="warning",
-            detail=f"Ollama real-model execution is enabled for {config.configured_model}.",
+            detail=f"{config.provider} real-model execution is enabled for {config.configured_model}.",
             remediation="Use only smoke tests until model governance and evaluation are reviewed.",
         )
 

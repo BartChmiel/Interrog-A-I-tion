@@ -22,7 +22,7 @@ export function AiRuntimeStatusCard({
   const liveReady =
     localModelConfig?.live_output_enabled === true &&
     localModelConfig.real_model_enabled &&
-    localModelConfig.effective_provider === "ollama";
+    ["ollama", "bridge"].includes(localModelConfig.effective_provider);
 
   return (
     <div className="ai-runtime-status-card" data-live={liveReady ? "true" : "false"}>

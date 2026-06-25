@@ -286,6 +286,8 @@ export type LocalModelConfig = {
   effective_provider: string;
   configured_model: string;
   ollama_base_url: string;
+  bridge_base_url: string;
+  bridge_api_key_configured: boolean;
   timeout_seconds: number;
   temperature: number;
   real_model_enabled: boolean;

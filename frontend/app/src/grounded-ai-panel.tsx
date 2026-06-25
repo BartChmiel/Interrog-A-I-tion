@@ -228,6 +228,13 @@ export function groundedAiProviderLabel(
   ) {
     return `${text(locale, "groundedAiProviderLive")}: ${localModelConfig.configured_model}`;
   }
+  if (
+    localModelConfig.live_output_enabled &&
+    localModelConfig.real_model_enabled &&
+    localModelConfig.effective_provider === "bridge"
+  ) {
+    return `${text(locale, "groundedAiProviderBridge")}: ${localModelConfig.configured_model}`;
+  }
   return text(locale, "groundedAiProviderDeterministic");
 }
 

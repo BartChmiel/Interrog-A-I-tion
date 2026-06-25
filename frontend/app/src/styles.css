@@ -4162,6 +4162,11 @@ h2 {
   color: var(--accent-strong);
 }
 
+.grounded-ai-provider-badge[data-provider="bridge"] {
+  background: var(--ai-soft);
+  color: var(--ai);
+}
+
 .grounded-ai-toolbar button {
   display: inline-flex;
   align-items: center;

@@ -1,0 +1,16 @@
+# Developer-only bridged AI setup for InterrogA(I)tion.
+# The bridge must expose an OpenAI-compatible /v1/chat/completions endpoint.
+# Default guided workflow stays deterministic when these variables are not set.
+
+$env:INTERROGAITION_MODEL_PROVIDER = "bridge"
+$env:INTERROGAITION_BRIDGE_BASE_URL = "http://127.0.0.1:8080/v1"
+$env:INTERROGAITION_BRIDGE_MODEL = "bridge-model"
+$env:INTERROGAITION_ENABLE_REAL_MODEL = "1"
+$env:INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT = "1"
+
+# Optional, only when the bridge requires an API key:
+# $env:INTERROGAITION_BRIDGE_API_KEY = "replace-with-local-dev-token"
+
+Write-Host "Bridged AI developer mode enabled for this shell."
+Write-Host "Start the approved OpenAI-compatible bridge, then restart the backend from backend/:"
+Write-Host "  python -m interrogaition.api.app"

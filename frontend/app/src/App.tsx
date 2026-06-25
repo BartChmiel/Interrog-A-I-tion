@@ -5896,7 +5896,7 @@ function SecurityPanel({
             disabled={
               !localModelConfig ||
               isModelSmokeRunning ||
-              localModelConfig.provider !== "ollama" ||
+              !["ollama", "bridge"].includes(localModelConfig.provider) ||
               !localModelConfig.real_model_enabled ||
               modelExperimentReadiness?.can_run_real_smoke !== true
             }
@@ -6272,7 +6272,7 @@ function localizeDiagnosticText(value: string, locale: Locale): string {
       /^Disable live model output until the STOP review is complete\.$/,
       "Wyłącz wyjście modelu live do czasu zakończenia przeglądu STOP.",
     )
-    .replace(/^Ollama real-model execution is enabled for (.+)\.$/, "Realny model Ollama jest włączony dla $1.")
+    .replace(/^(.+) real-model execution is enabled for (.+)\.$/, "Realny model ($1) jest włączony dla $2.")
     .replace(
       /^Use only smoke tests until model governance and evaluation are reviewed\.$/,
       "Używaj tylko testów smoke do czasu przeglądu governance i ewaluacji modelu.",

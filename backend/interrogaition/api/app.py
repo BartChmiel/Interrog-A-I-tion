@@ -459,6 +459,8 @@ def create_app(
             "effective_provider": local_model_config.effective_provider,
             "configured_model": local_model_config.configured_model,
             "ollama_base_url": local_model_config.ollama_base_url,
+            "bridge_base_url": local_model_config.bridge_base_url,
+            "bridge_api_key_configured": local_model_config.bridge_api_key_configured,
             "timeout_seconds": local_model_config.timeout_seconds,
             "temperature": local_model_config.temperature,
             "real_model_enabled": local_model_config.real_model_enabled,

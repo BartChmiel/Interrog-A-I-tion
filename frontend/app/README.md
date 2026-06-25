@@ -58,9 +58,10 @@ readiness, synthetic fixtures, workspace root status, encryption readiness, and
 local model gating with expandable details and remediation text.
 
 System mode also shows local model runtime readiness. It displays the configured
-model, effective provider, live-output gate, runtime restrictions, and a safe
-smoke-test button. The smoke check is deterministic by default and does not send
-case material or interview notes to a real model.
+model, effective provider (`deterministic`, `ollama`, or `bridge`), live-output
+gate, runtime restrictions, and a safe smoke-test button. The smoke check is
+deterministic by default and does not send case material or interview notes to a
+real model.
 
 The model artifact isolation panel reports whether the workspace has dedicated
 prompt, context, output, cache, and evaluation directories under `models/`, plus

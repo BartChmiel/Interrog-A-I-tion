@@ -20,7 +20,7 @@ class ModelExperimentGateTest(unittest.TestCase):
         self.assertEqual(
             {issue.code for issue in report.issues},
             {
-                "ollama_provider_required",
+                "real_model_provider_required",
                 "real_model_disabled",
                 "stop_review_required",
                 "workspace_required",
@@ -32,6 +32,25 @@ class ModelExperimentGateTest(unittest.TestCase):
             config=LocalModelRuntimeConfig(
                 provider="ollama",
                 configured_model="llama3.1:8b",
+                real_model_enabled=True,
+                live_output_enabled=False,
+            ),
+            stop_review_approved=True,
+            workspace_id="workspace-001",
+            workspace_security_state="ready",
+            artifact_isolation_state="ready",
+        )
+
+        self.assertEqual(report.state, "ready")
+        self.assertTrue(report.can_run_real_smoke)
+        self.assertFalse(report.can_enable_live_output)
+        self.assertEqual(report.issue_count, 0)
+
+    def test_allows_bridge_controlled_real_smoke_when_all_gates_are_ready(self) -> None:
+        report = assess_model_experiment_readiness(
+            config=LocalModelRuntimeConfig(
+                provider="bridge",
+                configured_model="bridge-model",
                 real_model_enabled=True,
                 live_output_enabled=False,
             ),

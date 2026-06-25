@@ -147,15 +147,30 @@ GET /ai/local-model/experiment-readiness
 POST /ai/local-model/smoke
 ```
 
-The default runtime is deterministic. Ollama can be configured through environment variables, but real model execution requires explicit enablement. Live grounded suggestions use Ollama only when all of the following are set:
+The default runtime is deterministic. Ollama and OpenAI-compatible bridge endpoints can be configured through environment variables, but real model execution requires explicit enablement. Live grounded suggestions use a real provider only when the provider is selected and all real-output gates are set.
+
+Ollama developer shell:
 
 ```powershell
 $env:INTERROGAITION_MODEL_PROVIDER='ollama'
+$env:INTERROGAITION_OLLAMA_MODEL='llama3.1:8b'
 $env:INTERROGAITION_ENABLE_REAL_MODEL='1'
 $env:INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT='1'
 ```
 
-See `config/local-ai-developer.ps1.example` for a developer shell setup. This prevents real LLM output from entering live workflows by configuration drift alone.
+Bridge developer shell:
+
+```powershell
+$env:INTERROGAITION_MODEL_PROVIDER='bridge'
+$env:INTERROGAITION_BRIDGE_BASE_URL='http://127.0.0.1:8080/v1'
+$env:INTERROGAITION_BRIDGE_MODEL='bridge-model'
+$env:INTERROGAITION_ENABLE_REAL_MODEL='1'
+$env:INTERROGAITION_ENABLE_LIVE_MODEL_OUTPUT='1'
+# Optional:
+# $env:INTERROGAITION_BRIDGE_API_KEY='replace-with-local-dev-token'
+```
+
+See `config/local-ai-developer.ps1.example` and `config/bridged-ai-developer.ps1.example` for developer shell setups. This prevents real LLM output from entering live workflows by configuration drift alone.
 
 Controlled real-model smoke readiness is also gated by workspace state: the readiness endpoint derives STOP approval from the append-only workspace audit log, plus workspace security and model artifact isolation status. Record approval or rejection through `POST /workspaces/{workspace_id}/stop-reviews`; the newest STOP decision wins.
 

@@ -45,13 +45,13 @@ def assess_model_experiment_readiness(
     """Return readiness for a controlled local real-model smoke experiment."""
 
     issues: list[ModelExperimentIssue] = []
-    if config.provider != "ollama":
+    if config.provider not in {"ollama", "bridge"}:
         issues.append(
             ModelExperimentIssue(
-                code="ollama_provider_required",
+                code="real_model_provider_required",
                 severity="error",
-                detail="Controlled real-model experiments require provider=ollama.",
-                remediation="Set INTERROGAITION_MODEL_PROVIDER=ollama in the developer shell.",
+                detail="Controlled real-model experiments require provider=ollama or provider=bridge.",
+                remediation="Set INTERROGAITION_MODEL_PROVIDER=ollama or INTERROGAITION_MODEL_PROVIDER=bridge in the developer shell.",
             )
         )
     if not config.real_model_enabled:

@@ -42,7 +42,9 @@ def load_language_pack(
     )
 
 
-def normalize_locale(locale: str) -> str:
+def normalize_locale(locale: object) -> str:
+    if not isinstance(locale, str):
+        return DEFAULT_LOCALE
     normalized = locale.strip().lower().split("-")[0]
     if normalized not in SUPPORTED_LOCALES:
         return DEFAULT_LOCALE

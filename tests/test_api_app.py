@@ -79,6 +79,9 @@ class ApiAppTest(unittest.TestCase):
 
         self.assertEqual(config["provider"], "deterministic")
         self.assertEqual(config["effective_provider"], "deterministic")
+        self.assertIn("bridge_base_url", config)
+        self.assertFalse(config["bridge_api_key_configured"])
+        self.assertNotIn("bridge_api_key", config)
         self.assertFalse(config["real_model_enabled"])
         self.assertFalse(config["live_output_enabled"])
         self.assertTrue(smoke["ok"])
@@ -102,6 +105,26 @@ class ApiAppTest(unittest.TestCase):
         self.assertFalse(smoke["ok"])
         self.assertFalse(smoke["real_model_invoked"])
         self.assertIn("disabled", smoke["detail"])
+
+    def test_bridge_model_config_does_not_expose_api_key(self) -> None:
+        app = create_app(
+            local_model_config=LocalModelRuntimeConfig(
+                provider="bridge",
+                configured_model="bridge-test-model",
+                bridge_base_url="http://127.0.0.1:9999/v1",
+                bridge_api_key="secret-token",
+                real_model_enabled=True,
+            )
+        )
+
+        config = endpoint(app, "get_local_model_config")()
+
+        self.assertEqual(config["provider"], "bridge")
+        self.assertEqual(config["effective_provider"], "bridge")
+        self.assertEqual(config["configured_model"], "bridge-test-model")
+        self.assertEqual(config["bridge_base_url"], "http://127.0.0.1:9999/v1")
+        self.assertTrue(config["bridge_api_key_configured"])
+        self.assertNotIn("bridge_api_key", config)
 
     def test_local_model_experiment_readiness_requires_stop_and_workspace_gates(self) -> None:
         app = create_app()
