@@ -173,10 +173,45 @@ export type CaseCatalogItem = {
   question_count: number;
   answer_count: number;
   answered_question_count: number;
+  source?: "synthetic" | "local";
+  participant_count?: number;
 };
 
 export type CaseCatalogResponse = {
   cases: CaseCatalogItem[];
+};
+
+export type CaseParticipant = {
+  id: string;
+  name: string;
+  role: string;
+  notes: string;
+  created_at: string | null;
+};
+
+export type LocalCaseRuntime = {
+  case_id: string;
+  workspace_id: string;
+  session_id: string;
+  participant_id: string;
+};
+
+export type CreateLocalCaseResponse = {
+  case: CaseData;
+  participants: CaseParticipant[];
+  workspace: WorkspaceResponse;
+  runtime: LocalCaseRuntime;
+};
+
+export type CaseParticipantListResponse = {
+  case_id: string;
+  participants: CaseParticipant[];
+};
+
+export type AddCaseParticipantResponse = {
+  case_id: string;
+  participant: CaseParticipant;
+  participants: CaseParticipant[];
 };
 
 export type SessionReviewResponse = {

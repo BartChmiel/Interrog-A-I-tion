@@ -160,6 +160,10 @@ from interrogaition.security.model_artifacts import (
 )
 from interrogaition.security.workspace_security import assess_workspace_security
 from interrogaition.storage.json_case_loader import load_case_from_json
+from interrogaition.storage.local_case_registry import (
+    LocalCaseRegistry,
+    LocalCaseRegistryError,
+)
 from interrogaition.storage.material_registry import (
     MaterialRegistry,
     MaterialRegistryError,
@@ -175,6 +179,7 @@ from interrogaition.storage.synthetic_material_loader import (
 
 SYNTHETIC_CASES_ROOT = PROJECT_ROOT / "data" / "synthetic"
 DEFAULT_DATABASE_PATH = BACKEND_ROOT / "local-data" / "interrogaition.sqlite3"
+DEFAULT_LOCAL_CASES_ROOT = BACKEND_ROOT / "local-data" / "cases"
 DEFAULT_WORKSPACE_ROOT = BACKEND_ROOT / "local-data" / "workspaces"
 REQUIRED_CLAIM_FIELDS = ("id", "subject", "attribute", "value")
 MODEL_EXPERIMENT_STOP_GATE_ID = "local_model_real_smoke"
@@ -370,11 +375,28 @@ class MaterialQuestionLinkDecisionRequest:
     role: WorkspaceRole = WorkspaceRole.INVESTIGATOR
 
 
+@dataclass(frozen=True)
+class CreateLocalCaseRequest:
+    title: str
+    description: str = ""
+    participant_name: str = ""
+    created_by: str = "local-ui"
+    locale: str = "pl"
+
+
+@dataclass(frozen=True)
+class AddCaseParticipantRequest:
+    name: str
+    role: ParticipantRole = ParticipantRole.WITNESS
+    notes: str = ""
+
+
 def create_app(
     store: SessionStore | None = None,
     workspace_manager: CaseWorkspaceManager | None = None,
     model_client: ModelClient | None = None,
     local_model_config: LocalModelRuntimeConfig | None = None,
+    local_case_registry: LocalCaseRegistry | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="InterrogA(I)tion Local API",
@@ -406,6 +428,7 @@ def create_app(
 
     store = store or SQLiteSessionStore.in_memory()
     workspace_manager = workspace_manager or CaseWorkspaceManager(DEFAULT_WORKSPACE_ROOT)
+    local_case_registry = local_case_registry or LocalCaseRegistry(DEFAULT_LOCAL_CASES_ROOT)
     grounded_model_client_override = model_client
     local_model_config = local_model_config or load_local_model_runtime_config()
 
@@ -433,8 +456,42 @@ def create_app(
         return {
             "cases": [
                 _case_catalog_item(case)
-                for case in _list_synthetic_cases(locale=locale)
+                for case in _list_cases(local_case_registry, locale=locale)
             ]
+        }
+
+    @app.post("/cases")
+    def create_local_case(request: CreateLocalCaseRequest) -> dict[str, Any]:
+        try:
+            created = local_case_registry.create_case(
+                title=request.title,
+                description=request.description,
+                participant_name=request.participant_name,
+                created_by=request.created_by,
+                locale=request.locale,
+            )
+            case = _load_case(local_case_registry, created.case_id, locale=request.locale)
+            workspace = _create_default_workspace(
+                workspace_manager=workspace_manager,
+                case_id=created.case_id,
+                created_by=request.created_by,
+            )
+        except LocalCaseRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except WorkspaceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        session_id = f"{created.case_id}-session-{uuid.uuid4().hex[:8]}"
+        return {
+            "case": _to_jsonable(case),
+            "participants": _to_jsonable(local_case_registry.list_participants(created.case_id)),
+            "workspace": _workspace_response(workspace),
+            "runtime": {
+                "case_id": created.case_id,
+                "workspace_id": workspace.manifest.workspace_id,
+                "session_id": session_id,
+                "participant_id": created.participant_id,
+            },
         }
 
     @app.get("/cases/{case_id}/starter-materials")
@@ -442,10 +499,41 @@ def create_app(
         case_id: str,
         locale: str = Query(default="en"),
     ) -> dict[str, Any]:
-        _load_synthetic_case(case_id, locale=locale)
+        _load_case(local_case_registry, case_id, locale=locale)
         return {
             "case_id": case_id,
-            "materials": _to_jsonable(_load_synthetic_starter_materials(case_id, locale=locale)),
+            "materials": _to_jsonable(
+                _load_case_starter_materials(local_case_registry, case_id, locale=locale)
+            ),
+        }
+
+    @app.get("/cases/{case_id}/participants")
+    def list_case_participants(case_id: str) -> dict[str, Any]:
+        try:
+            participants = local_case_registry.list_participants(case_id)
+        except LocalCaseRegistryError:
+            _load_case(local_case_registry, case_id, locale="en")
+            participants = ()
+        return {"case_id": case_id, "participants": _to_jsonable(participants)}
+
+    @app.post("/cases/{case_id}/participants")
+    def add_case_participant(
+        case_id: str,
+        request: AddCaseParticipantRequest,
+    ) -> dict[str, Any]:
+        try:
+            participant = local_case_registry.add_participant(
+                case_id,
+                name=request.name,
+                role=request.role,
+                notes=request.notes,
+            )
+        except LocalCaseRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "case_id": case_id,
+            "participant": _to_jsonable(participant),
+            "participants": _to_jsonable(local_case_registry.list_participants(case_id)),
         }
 
     @app.get("/security/encryption")
@@ -679,6 +767,7 @@ def create_app(
                 locale=locale,
                 workspace_manager=workspace_manager,
                 store=store,
+                local_case_registry=local_case_registry,
                 material_texts=material_texts,
             )
         )
@@ -821,7 +910,8 @@ def create_app(
         if not decision.allowed:
             raise HTTPException(status_code=403, detail=decision.reason)
 
-        starter_materials = _load_synthetic_starter_materials(
+        starter_materials = _load_case_starter_materials(
+            local_case_registry,
             workspace.manifest.case_id,
             locale=request.locale,
         )
@@ -960,7 +1050,7 @@ def create_app(
         except MaterialRegistryError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-        case = _load_synthetic_case(case_id, locale=locale)
+        case = _load_case(local_case_registry, case_id, locale=locale)
         links = link_materials_to_questions(case, material_texts)
         return {"links": _to_jsonable(links)}
 
@@ -991,7 +1081,7 @@ def create_app(
         case_id = request.case_id or workspace.manifest.case_id
         if case_id != workspace.manifest.case_id:
             raise HTTPException(status_code=400, detail="case_id does not match workspace.")
-        case = _load_synthetic_case(case_id, locale="en")
+        case = _load_case(local_case_registry, case_id, locale="en")
         _validate_material_question_link_decision(
             material_id=material_id,
             question_id=question_id,
@@ -1094,7 +1184,7 @@ def create_app(
         case_id = request.case_id or workspace.manifest.case_id
         if case_id != workspace.manifest.case_id:
             raise HTTPException(status_code=400, detail="case_id does not match workspace.")
-        case = _load_synthetic_case(case_id, locale=request.locale)
+        case = _load_case(local_case_registry, case_id, locale=request.locale)
         topic = None
         if request.topic_id:
             topic = next((item for item in case.topics if item.id == request.topic_id), None)
@@ -1165,6 +1255,7 @@ def create_app(
             session_id=session_id,
         )
         context = _build_evidence_context(
+            local_case_registry=local_case_registry,
             case_id=case_id,
             locale=locale,
             session_id=session_id,
@@ -1201,6 +1292,7 @@ def create_app(
             session_id=session_id,
         )
         context = _build_evidence_context(
+            local_case_registry=local_case_registry,
             case_id=case_id,
             locale=locale,
             session_id=session_id,
@@ -1247,6 +1339,7 @@ def create_app(
             session_id=session_id,
         )
         context = _build_evidence_context(
+            local_case_registry=local_case_registry,
             case_id=case_id,
             locale=locale,
             session_id=session_id,
@@ -1431,7 +1524,7 @@ def create_app(
         case_id = request.case_id or workspace.manifest.case_id
         if case_id != workspace.manifest.case_id:
             raise HTTPException(status_code=400, detail="case_id does not match workspace.")
-        case = _load_synthetic_case(case_id, locale="en")
+        case = _load_case(local_case_registry, case_id, locale="en")
         _validate_operator_action_decision(request, question_ids={question.id for question in case.questions})
 
         audit_event = store.append_audit_event(
@@ -1710,12 +1803,12 @@ def create_app(
 
     @app.get("/cases/{case_id}")
     def get_case(case_id: str, locale: str = Query(default="en")) -> dict[str, Any]:
-        case = _load_synthetic_case(case_id, locale=locale)
+        case = _load_case(local_case_registry, case_id, locale=locale)
         return _to_jsonable(case)
 
     @app.get("/cases/{case_id}/review")
     def review_case_endpoint(case_id: str, locale: str = Query(default="en")) -> dict[str, Any]:
-        case = _load_synthetic_case(case_id, locale=locale)
+        case = _load_case(local_case_registry, case_id, locale=locale)
         review = review_case(case)
         indicators = generate_indicators(case, review)
         return {
@@ -1738,7 +1831,7 @@ def create_app(
         if store.get_session(request.session_id) is not None:
             raise HTTPException(status_code=409, detail="Session already exists.")
 
-        _load_synthetic_case(request.case_id, locale="en")
+        _load_case(local_case_registry, request.case_id, locale="en")
         session = start_interview_session(
             session_id=request.session_id,
             case_id=request.case_id,
@@ -1769,7 +1862,7 @@ def create_app(
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
 
-        case = _load_synthetic_case(session.case_id, locale="en")
+        case = _load_case(local_case_registry, session.case_id, locale="en")
         if request.workspace_id:
             workspace = _open_session_workspace(
                 workspace_manager=workspace_manager,
@@ -1898,7 +1991,7 @@ def create_app(
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found.")
 
-        case = _load_synthetic_case(session.case_id, locale=locale)
+        case = _load_case(local_case_registry, session.case_id, locale=locale)
         effective_workspace_id = workspace_id if isinstance(workspace_id, str) and workspace_id else None
         if effective_workspace_id:
             workspace = _open_session_workspace(
@@ -2019,16 +2112,62 @@ def _load_synthetic_case(case_id: str, locale: str) -> Case:
     return load_case_from_json(path, locale=locale)
 
 
+def _load_case(registry: LocalCaseRegistry, case_id: str, locale: str) -> Case:
+    if registry.case_exists(case_id):
+        try:
+            return registry.load_case(case_id, locale=locale)
+        except LocalCaseRegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return _load_synthetic_case(case_id, locale=locale)
+
+
 def _load_synthetic_starter_materials(case_id: str, locale: str) -> tuple[SyntheticMaterial, ...]:
     path = SYNTHETIC_CASES_ROOT / case_id / "materials.json"
     return load_synthetic_materials(path, locale=locale)
 
 
-def _list_synthetic_cases(locale: str) -> tuple[Case, ...]:
-    return tuple(
+def _load_case_starter_materials(
+    registry: LocalCaseRegistry,
+    case_id: str,
+    locale: str,
+) -> tuple[SyntheticMaterial, ...]:
+    if registry.case_exists(case_id):
+        return ()
+    return _load_synthetic_starter_materials(case_id, locale=locale)
+
+
+def _list_cases(registry: LocalCaseRegistry, locale: str) -> tuple[Case, ...]:
+    synthetic_cases = tuple(
         load_case_from_json(path, locale=locale)
         for path in sorted(SYNTHETIC_CASES_ROOT.glob("*/case.json"))
     )
+    return tuple(sorted((*registry.list_cases(locale=locale), *synthetic_cases), key=lambda case: case.id))
+
+
+def _create_default_workspace(
+    *,
+    workspace_manager: CaseWorkspaceManager,
+    case_id: str,
+    created_by: str,
+) -> CaseWorkspace:
+    workspace_id = f"{case_id}-workspace"
+    try:
+        return workspace_manager.create_workspace(
+            case_id=case_id,
+            created_by=created_by,
+            data_sensitivity=DataSensitivity.SYNTHETIC,
+            storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            workspace_id=workspace_id,
+        )
+    except WorkspaceError:
+        return workspace_manager.create_workspace(
+            case_id=case_id,
+            created_by=created_by,
+            data_sensitivity=DataSensitivity.SYNTHETIC,
+            storage_mode=StorageMode.PLAIN_SQLITE_PROTOTYPE,
+            workspace_id=f"{case_id}-workspace-{uuid.uuid4().hex[:6]}",
+        )
 
 
 def _case_catalog_item(case: Case) -> dict[str, Any]:
@@ -2039,6 +2178,7 @@ def _case_catalog_item(case: Case) -> dict[str, Any]:
         "title": case.title,
         "description": case.description,
         "created_at": case.created_at.isoformat(),
+        "source": "local" if case.id.startswith("case-local-") else "synthetic",
         "topic_count": len(case.topics),
         "high_priority_topic_count": len(high_priority_topics),
         "question_count": len(case.questions),
@@ -2402,6 +2542,7 @@ def _build_case_quality_report(
     locale: str,
     workspace_manager: CaseWorkspaceManager,
     store: SessionStore,
+    local_case_registry: LocalCaseRegistry,
     material_texts: tuple[MaterialText, ...],
 ) -> dict[str, Any]:
     normalized_locale = normalize_locale(locale)
@@ -2417,6 +2558,7 @@ def _build_case_quality_report(
         session_id=session_id,
     )
     context = _build_evidence_context(
+        local_case_registry=local_case_registry,
         case_id=case_id,
         locale=normalized_locale,
         session_id=session_id,
@@ -3541,6 +3683,7 @@ def _read_workspace_material_texts(registry: MaterialRegistry) -> tuple[Material
 
 def _build_evidence_context(
     *,
+    local_case_registry: LocalCaseRegistry,
     case_id: str,
     locale: str,
     session_id: str | None,
@@ -3550,7 +3693,7 @@ def _build_evidence_context(
     question_drafts: tuple[Question, ...] = (),
 ) -> dict[str, Any]:
     case = _case_with_question_drafts(
-        _load_synthetic_case(case_id, locale=locale),
+        _load_case(local_case_registry, case_id, locale=locale),
         question_drafts,
     )
     session = store.get_session(session_id) if session_id else None

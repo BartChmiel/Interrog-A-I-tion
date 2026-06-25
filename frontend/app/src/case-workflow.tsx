@@ -2,12 +2,22 @@ import { text } from "./i18n";
 import type { Locale } from "./types";
 import { caseCatalogMeta } from "./utils";
 
-export function CaseCatalogBadges({ caseId, locale }: { caseId: string; locale: Locale }) {
+export function CaseCatalogBadges({
+  caseId,
+  locale,
+  source,
+}: {
+  caseId: string;
+  locale: Locale;
+  source?: string;
+}) {
   const meta = caseCatalogMeta(caseId, locale);
 
   return (
     <span className="case-catalog-badges">
-      <span className="case-catalog-badge">{meta.scenarioLabel}</span>
+      <span className="case-catalog-badge">
+        {source === "local" ? text(locale, "localCaseBadge") : meta.scenarioLabel}
+      </span>
       {meta.recommendedDefaultCase ? (
         <span className="case-catalog-badge case-catalog-badge--default">{text(locale, "recommendedDefaultCaseBadge")}</span>
       ) : null}

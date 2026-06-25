@@ -6,7 +6,9 @@ from pathlib import Path
 
 from interrogaition.api.app import (
     AddAnswerRequest,
+    AddCaseParticipantRequest,
     ClaimReviewDecisionRequest,
+    CreateLocalCaseRequest,
     CreateQuestionDraftRequest,
     CreateWorkspaceRequest,
     ExportBundleRequest,
@@ -31,6 +33,7 @@ from interrogaition.domain.session import ParticipantRole
 from interrogaition.security.access_policy import WorkspaceAction, WorkspaceRole
 from interrogaition.security.case_workspace import CaseWorkspaceManager, DataSensitivity, StorageMode
 from interrogaition.security.encryption_status import EncryptionBackend, EncryptionStatus
+from interrogaition.storage.local_case_registry import LocalCaseRegistry
 from interrogaition.storage.material_registry import MaterialSourceType
 
 
@@ -403,6 +406,87 @@ class ApiAppTest(unittest.TestCase):
         self.assertEqual(cases["case-002"]["question_count"], 6)
         self.assertEqual(cases["case-003"]["topic_count"], 7)
         self.assertGreaterEqual(cases["case-003"]["high_priority_topic_count"], 4)
+
+    def test_local_case_can_be_created_and_used_for_live_workflow(self) -> None:
+        root = TEST_OUTPUT_ROOT / f"local-case-{uuid.uuid4()}"
+        app = create_app(
+            workspace_manager=CaseWorkspaceManager(
+                root / "workspaces",
+                encryption_status_provider=_unavailable_encryption_status,
+            ),
+            local_case_registry=LocalCaseRegistry(root / "cases"),
+        )
+        create_case = endpoint(app, "create_local_case")
+        add_participant = endpoint(app, "add_case_participant")
+        list_cases = endpoint(app, "list_cases")
+        start_session_endpoint = endpoint(app, "start_session")
+        register_material = endpoint(app, "register_workspace_material")
+        link_materials = endpoint(app, "link_workspace_materials_to_questions")
+        add_answer_endpoint = endpoint(app, "add_session_answer")
+        get_session_review = endpoint(app, "review_session_endpoint")
+        get_case_quality = endpoint(app, "get_workspace_case_quality")
+
+        created = create_case(
+            CreateLocalCaseRequest(
+                title="Sprawa testowa lokalna",
+                description="Robocza sprawa do przesłuchania w czasie rzeczywistym.",
+                participant_name="Anna Nowak",
+                locale="pl",
+            )
+        )
+        case_id = created["runtime"]["case_id"]
+        workspace_id = created["runtime"]["workspace_id"]
+        session_id = created["runtime"]["session_id"]
+        participant_id = created["runtime"]["participant_id"]
+
+        participant_response = add_participant(
+            case_id,
+            AddCaseParticipantRequest(name="Jan Kowalski", notes="Drugi świadek."),
+        )
+        catalog = list_cases(locale="pl")
+        self.assertIn(case_id, {item["id"] for item in catalog["cases"]})
+        self.assertEqual(participant_response["participants"][1]["name"], "Jan Kowalski")
+
+        session = start_session_endpoint(
+            StartSessionRequest(
+                session_id=session_id,
+                case_id=case_id,
+                participant_id=participant_id,
+                initial_role=ParticipantRole.WITNESS,
+            )
+        )
+        register_material(
+            workspace_id,
+            RegisterMaterialRequest(
+                id="local-material-001",
+                title="Notatka z chronologii",
+                content="Chronologia sprawy obejmuje rozmowę o 18:20 i późniejszą weryfikację materiałów.",
+                created_by="local-ui",
+                source_type=MaterialSourceType.TEXT_NOTE,
+                tags=["chronologia", "materialy"],
+            ),
+        )
+        links = link_materials(workspace_id, case_id=case_id, locale="pl")
+        updated = add_answer_endpoint(
+            session_id,
+            AddAnswerRequest(
+                id="local-answer-001",
+                question_id="q-001",
+                text="Świadek opisał sprawę od początku i wskazał osoby obecne przy zdarzeniu.",
+                event_id="local-event-answer-001",
+                topic_ids=["topic-scope", "topic-people"],
+                workspace_id=workspace_id,
+            ),
+        )
+        review = get_session_review(session_id, locale="pl", workspace_id=workspace_id)
+        quality = get_case_quality(workspace_id, case_id=case_id, session_id=session_id, locale="pl")
+
+        self.assertEqual(session["case_id"], case_id)
+        self.assertEqual(updated["answers"][0]["question_id"], "q-001")
+        self.assertTrue(links["links"])
+        self.assertEqual(review["session"]["id"], session_id)
+        self.assertEqual(quality["case_id"], case_id)
+        self.assertGreaterEqual(quality["quality_score"], 0)
 
     def test_case_starter_materials_endpoint_localizes_materials(self) -> None:
         app = create_app()

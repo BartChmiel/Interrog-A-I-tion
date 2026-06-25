@@ -1,10 +1,13 @@
 import type {
   CaseCatalogResponse,
+  CaseParticipantListResponse,
   CaseQualityReport,
   CaseReviewResponse,
   CaseStarterMaterialsResponse,
   ClaimReviewDecisionResponse,
   ClaimReviewStatus,
+  AddCaseParticipantResponse,
+  CreateLocalCaseResponse,
   WorkflowReadinessReport,
   EncryptionStatus,
   EnvironmentHealth,
@@ -66,6 +69,19 @@ export type RegisterMaterialPayload = {
   content: string;
   source_type: MaterialSourceType;
   tags: string[];
+};
+
+export type CreateLocalCasePayload = {
+  title: string;
+  description: string;
+  participant_name: string;
+  locale: string;
+};
+
+export type AddCaseParticipantPayload = {
+  name: string;
+  notes?: string;
+  role?: string;
 };
 
 export type GroundedSuggestionDecisionPayload = {
@@ -136,6 +152,39 @@ export type StopReviewDecisionPayload = {
 
 export async function loadCaseCatalog(config: RuntimeConfig, locale: string): Promise<CaseCatalogResponse> {
   return fetchJson(config, `/cases?locale=${locale}`);
+}
+
+export async function createLocalCase(
+  config: RuntimeConfig,
+  payload: CreateLocalCasePayload,
+): Promise<CreateLocalCaseResponse> {
+  return fetchJson(config, "/cases", {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      created_by: "local-ui",
+    }),
+  });
+}
+
+export async function loadCaseParticipants(
+  config: RuntimeConfig,
+): Promise<CaseParticipantListResponse> {
+  return fetchJson(config, `/cases/${encodeURIComponent(config.caseId)}/participants`);
+}
+
+export async function addCaseParticipant(
+  config: RuntimeConfig,
+  payload: AddCaseParticipantPayload,
+): Promise<AddCaseParticipantResponse> {
+  return fetchJson(config, `/cases/${encodeURIComponent(config.caseId)}/participants`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: payload.name,
+      notes: payload.notes ?? "",
+      role: payload.role ?? "witness",
+    }),
+  });
 }
 
 export async function loadCaseReview(config: RuntimeConfig, locale: string): Promise<CaseReviewResponse> {

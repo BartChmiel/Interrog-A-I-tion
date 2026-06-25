@@ -34,10 +34,13 @@ import {
 } from "lucide-react";
 import {
   addAnswer,
+  addCaseParticipant,
+  createLocalCase,
   createWorkspaceQuestionDraft,
   ensureModelArtifactIsolation,
   ensureWorkspace,
   loadCaseCatalog,
+  loadCaseParticipants,
   loadCaseReview,
   loadCaseStarterMaterials,
   loadEncryptionStatus,
@@ -91,6 +94,7 @@ import type {
   ApiMode,
   AuditEvent,
   CaseCatalogItem,
+  CaseParticipant,
   CaseData,
   CaseQualityReport,
   CaseTopic,
@@ -170,6 +174,12 @@ type MaterialDraft = {
   sourceType: MaterialSourceType;
 };
 
+type NewCaseDraft = {
+  title: string;
+  description: string;
+  participantName: string;
+};
+
 type OperationsTab = "monitor" | "ai" | "materials" | "review";
 type WorkMode = "interview" | OperationsTab;
 type WorkspacePerspective = "operator" | "auditor";
@@ -236,6 +246,12 @@ const emptyMaterialDraft: MaterialDraft = {
   content: "",
   tags: "",
   sourceType: "case_protocol",
+};
+
+const emptyNewCaseDraft: NewCaseDraft = {
+  title: "",
+  description: "",
+  participantName: "",
 };
 
 const materialSourceTypes: MaterialSourceType[] = [
@@ -366,6 +382,13 @@ export function App() {
     >
   >({});
   const [materialDraft, setMaterialDraft] = useState<MaterialDraft>(emptyMaterialDraft);
+  const [newCaseDraft, setNewCaseDraft] = useState<NewCaseDraft>(emptyNewCaseDraft);
+  const [newCaseError, setNewCaseError] = useState<string | null>(null);
+  const [isNewCaseOpen, setIsNewCaseOpen] = useState(false);
+  const [isCaseCreating, setIsCaseCreating] = useState(false);
+  const [caseParticipants, setCaseParticipants] = useState<CaseParticipant[]>([]);
+  const [participantDraft, setParticipantDraft] = useState("");
+  const [isParticipantSubmitting, setIsParticipantSubmitting] = useState(false);
   const [materialVerifications, setMaterialVerifications] = useState<Record<string, MaterialVerification>>({});
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
   const [activeWorkMode, setActiveWorkMode] = useState<WorkMode>("interview");
@@ -707,10 +730,11 @@ export function App() {
     setStatusKey("connecting");
 
     try {
-      const [catalog, caseReview, starterMaterials] = await Promise.all([
+      const [catalog, caseReview, starterMaterials, participants] = await Promise.all([
         loadCaseCatalog(config, requestLocale).catch(() => ({ cases: seedCaseCatalog[requestLocale] })),
         loadCaseReview(config, requestLocale),
         loadCaseStarterMaterials(config, requestLocale).catch(() => ({ case_id: config.caseId, materials: [] })),
+        loadCaseParticipants(config).catch(() => ({ case_id: config.caseId, participants: [] })),
       ]);
       if (localeRef.current !== requestLocale) {
         return;
@@ -719,6 +743,7 @@ export function App() {
       setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
       setCaseStarterMaterials(starterMaterials.materials);
+      setCaseParticipants(participants.participants);
       setActiveQuestionId(firstQuestionId);
       setIndicators(caseReview.indicators);
       setReview(caseReview.review);
@@ -745,6 +770,7 @@ export function App() {
       console.warn("Local API unavailable, using static sample data.", error);
       setCaseCatalog(seedCaseCatalog[requestLocale]);
       setCaseStarterMaterials([]);
+      setCaseParticipants([]);
       setReview(null);
       setReportMarkdown(null);
       setApiMode("offline");
@@ -1065,6 +1091,7 @@ export function App() {
         catalog,
         caseReview,
         starterMaterials,
+        participants,
         sessionReview,
         draftList,
         materialList,
@@ -1077,6 +1104,7 @@ export function App() {
         loadCaseCatalog(config, requestLocale).catch(() => ({ cases: seedCaseCatalog[requestLocale] })),
         loadCaseReview(config, requestLocale),
         loadCaseStarterMaterials(config, requestLocale).catch(() => ({ case_id: config.caseId, materials: [] })),
+        loadCaseParticipants(config).catch(() => ({ case_id: config.caseId, participants: [] })),
         loadSessionReview(config, requestLocale),
         loadQuestionDraftsOrEmpty(),
         loadWorkspaceMaterials(config),
@@ -1092,6 +1120,7 @@ export function App() {
       setCaseCatalog(catalog.cases);
       setCaseData(caseReview.case);
       setCaseStarterMaterials(starterMaterials.materials);
+      setCaseParticipants(participants.participants);
       if (!caseReview.case.questions.some((question) => question.id === activeQuestionId)) {
         setActiveQuestionId(caseReview.case.questions[0]?.id ?? activeQuestionId);
       }
@@ -1116,6 +1145,7 @@ export function App() {
       console.warn("Could not refresh localized API state.", error);
       setCaseCatalog(seedCaseCatalog[requestLocale]);
       setCaseStarterMaterials([]);
+      setCaseParticipants([]);
       setReview(null);
       setReportMarkdown(null);
       setApiMode("offline");
@@ -1580,6 +1610,88 @@ export function App() {
     void refreshLocalizedApiState(nextLocale);
   }
 
+  function navigateToRuntime(runtime: {
+    case_id: string;
+    session_id: string;
+    workspace_id: string;
+    participant_id: string;
+  }) {
+    const nextUrl = new URL(window.location.href);
+    const currentApiParam = new URLSearchParams(window.location.search).get("api");
+    nextUrl.searchParams.set("case", runtime.case_id);
+    nextUrl.searchParams.set("session", runtime.session_id);
+    nextUrl.searchParams.set("workspace", runtime.workspace_id);
+    nextUrl.searchParams.set("participant", runtime.participant_id);
+    if (currentApiParam) {
+      nextUrl.searchParams.set("api", currentApiParam);
+    }
+    window.location.assign(nextUrl.toString());
+  }
+
+  async function submitNewCase() {
+    const title = newCaseDraft.title.trim();
+    if (!title || isCaseCreating) {
+      setNewCaseError(text(locale, "newCaseTitleRequired"));
+      return;
+    }
+    setIsCaseCreating(true);
+    setNewCaseError(null);
+    try {
+      const response = await createLocalCase(config, {
+        title,
+        description: newCaseDraft.description.trim(),
+        participant_name: newCaseDraft.participantName.trim(),
+        locale,
+      });
+      setStatusKey("newCaseCreated");
+      setIsNewCaseOpen(false);
+      setNewCaseDraft(emptyNewCaseDraft);
+      navigateToRuntime(response.runtime);
+    } catch (error) {
+      console.error("Could not create local case.", error);
+      setNewCaseError(text(locale, "newCaseCreateFailed"));
+      setStatusKey("newCaseCreateFailed");
+    } finally {
+      setIsCaseCreating(false);
+    }
+  }
+
+  async function submitParticipant() {
+    const name = participantDraft.trim();
+    if (!name || isParticipantSubmitting) {
+      return;
+    }
+    setIsParticipantSubmitting(true);
+    try {
+      const response = await addCaseParticipant(config, { name });
+      setCaseParticipants(response.participants);
+      setParticipantDraft("");
+      setStatusKey("participantAdded");
+    } catch (error) {
+      console.error("Could not add participant.", error);
+      setStatusKey("participantAddFailed");
+    } finally {
+      setIsParticipantSubmitting(false);
+    }
+  }
+
+  function openParticipantInterview(participantId: string) {
+    if (!participantId || participantId === config.participantId) {
+      return;
+    }
+    const nextUrl = new URL(window.location.href);
+    const currentApiParam = new URLSearchParams(window.location.search).get("api");
+    const stamp = Date.now();
+    nextUrl.searchParams.set("case", config.caseId);
+    nextUrl.searchParams.set("participant", participantId);
+    nextUrl.searchParams.set("session", `${config.caseId}-session-${stamp}`);
+    nextUrl.searchParams.set("workspace", config.workspaceId);
+    if (currentApiParam) {
+      nextUrl.searchParams.set("api", currentApiParam);
+    }
+    window.location.assign(nextUrl.toString());
+  }
+
   function openCase(caseId: string) {
     if (caseId === config.caseId) {
       return;
@@ -1918,6 +2030,10 @@ export function App() {
         </div>
 
         <div className="topbar-actions">
+          <button className="topbar-primary-action" type="button" onClick={() => setIsNewCaseOpen(true)}>
+            <Plus size={15} />
+            <span>{text(locale, "newCase")}</span>
+          </button>
           <TutorialLaunchButton locale={locale} onStart={startTutorial} />
           <StatusStrip
             apiMode={apiMode}
@@ -2047,6 +2163,7 @@ export function App() {
                   cases={caseCatalog}
                   currentCaseId={config.caseId}
                   locale={locale}
+                  onCreateCase={() => setIsNewCaseOpen(true)}
                   onOpenCase={openCase}
                 />
                 <CaseDossierPanel
@@ -2056,6 +2173,17 @@ export function App() {
                   review={review}
                   starterMaterials={caseStarterMaterials}
                   onOpenMaterials={() => openWorkMode("materials")}
+                />
+                <CaseParticipantsPanel
+                  canEdit={config.caseId.startsWith("case-local-")}
+                  currentParticipantId={config.participantId}
+                  draft={participantDraft}
+                  isSubmitting={isParticipantSubmitting}
+                  locale={locale}
+                  participants={caseParticipants}
+                  onDraftChange={setParticipantDraft}
+                  onInterviewParticipant={openParticipantInterview}
+                  onSubmit={() => void submitParticipant()}
                 />
               </>
             ) : null}
@@ -2646,6 +2774,70 @@ export function App() {
           </aside>
         </WorkspaceZone>
       </main>
+
+      {isNewCaseOpen ? (
+        <Modal
+          locale={locale}
+          subtitle={text(locale, "newCaseModalSubtitle")}
+          title={text(locale, "newCaseModalTitle")}
+          onClose={() => {
+            if (!isCaseCreating) {
+              setIsNewCaseOpen(false);
+              setNewCaseError(null);
+            }
+          }}
+        >
+          <form
+            className="new-case-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitNewCase();
+            }}
+          >
+            <label>
+              <span>{text(locale, "newCaseTitle")}</span>
+              <input
+                autoFocus
+                placeholder={text(locale, "newCaseTitlePlaceholder")}
+                value={newCaseDraft.title}
+                onChange={(event) => setNewCaseDraft((current) => ({ ...current, title: event.target.value }))}
+              />
+            </label>
+            <label>
+              <span>{text(locale, "newCaseDescription")}</span>
+              <textarea
+                placeholder={text(locale, "newCaseDescriptionPlaceholder")}
+                rows={4}
+                value={newCaseDraft.description}
+                onChange={(event) =>
+                  setNewCaseDraft((current) => ({ ...current, description: event.target.value }))
+                }
+              />
+            </label>
+            <label>
+              <span>{text(locale, "firstParticipant")}</span>
+              <input
+                placeholder={text(locale, "firstParticipantPlaceholder")}
+                value={newCaseDraft.participantName}
+                onChange={(event) =>
+                  setNewCaseDraft((current) => ({ ...current, participantName: event.target.value }))
+                }
+              />
+            </label>
+            {newCaseError ? <p className="form-error">{newCaseError}</p> : null}
+            <div className="new-case-actions">
+              <button disabled={isCaseCreating} type="button" onClick={() => setIsNewCaseOpen(false)}>
+                <X size={14} />
+                {text(locale, "closeModal")}
+              </button>
+              <button disabled={isCaseCreating || !newCaseDraft.title.trim()} type="submit">
+                <Plus size={14} />
+                {isCaseCreating ? text(locale, "creatingCase") : text(locale, "createCase")}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       {activeMaterialPreviewId ? (
         <Modal
@@ -4416,11 +4608,13 @@ function CaseCatalogPanel({
   cases,
   currentCaseId,
   locale,
+  onCreateCase,
   onOpenCase,
 }: {
   cases: CaseCatalogItem[];
   currentCaseId: string;
   locale: Locale;
+  onCreateCase: () => void;
   onOpenCase: (caseId: string) => void;
 }) {
   return (
@@ -4434,6 +4628,10 @@ function CaseCatalogPanel({
       })}
       title={text(locale, "caseCatalog")}
     >
+      <button className="case-catalog-create" type="button" onClick={onCreateCase}>
+        <Plus size={15} />
+        <span>{text(locale, "newCase")}</span>
+      </button>
       <div className="case-catalog-list">
         {cases.map((caseItem) => {
           const isActive = caseItem.id === currentCaseId;
@@ -4453,7 +4651,7 @@ function CaseCatalogPanel({
                   {caseItem.id}
                   <em>{isActive ? text(locale, "currentCase") : text(locale, "openCase")}</em>
                 </span>
-                <CaseCatalogBadges caseId={caseItem.id} locale={locale} />
+                <CaseCatalogBadges caseId={caseItem.id} locale={locale} source={caseItem.source} />
                 <strong>{caseItem.title}</strong>
                 <span className="case-catalog-description">{caseItem.description}</span>
                 <span className="case-catalog-stats">
@@ -4584,6 +4782,87 @@ function CaseDossierPanel({
           </button>
         </div>
       </div>
+    </CollapsibleSection>
+  );
+}
+
+function CaseParticipantsPanel({
+  canEdit,
+  currentParticipantId,
+  draft,
+  isSubmitting,
+  locale,
+  participants,
+  onDraftChange,
+  onInterviewParticipant,
+  onSubmit,
+}: {
+  canEdit: boolean;
+  currentParticipantId: string;
+  draft: string;
+  isSubmitting: boolean;
+  locale: Locale;
+  participants: CaseParticipant[];
+  onDraftChange: (value: string) => void;
+  onInterviewParticipant: (participantId: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <CollapsibleSection
+      className="case-participants-panel"
+      hint={canEdit ? text(locale, "caseParticipantsHint") : text(locale, "caseParticipantsReadOnly")}
+      meta={formatCount(participants.length, locale, {
+        singular: text(locale, "participantSingular"),
+        pluralFew: text(locale, "participantPluralFew"),
+        pluralMany: text(locale, "participantPluralMany"),
+      })}
+      title={text(locale, "caseParticipants")}
+    >
+      {participants.length ? (
+        <div className="case-participant-list">
+          {participants.map((participant) => (
+            <article
+              className="case-participant-item"
+              data-active={participant.id === currentParticipantId}
+              key={participant.id}
+            >
+              <strong>{participant.name}</strong>
+              <span>{participant.id === currentParticipantId ? text(locale, "currentParticipant") : participant.role}</span>
+              {participant.notes ? <p>{participant.notes}</p> : null}
+              {canEdit && participant.id !== currentParticipantId ? (
+                <button type="button" onClick={() => onInterviewParticipant(participant.id)}>
+                  <Send size={13} />
+                  {text(locale, "interviewParticipant")}
+                </button>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-state">{text(locale, "caseParticipantsEmpty")}</p>
+      )}
+      {canEdit ? (
+        <form
+          className="case-participant-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          <label>
+            <span>{text(locale, "participantName")}</span>
+            <input
+              placeholder={text(locale, "participantNamePlaceholder")}
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value)}
+            />
+          </label>
+          <button disabled={isSubmitting || !draft.trim()} type="submit">
+            <Plus size={14} />
+            {text(locale, "addParticipant")}
+          </button>
+        </form>
+      ) : null}
     </CollapsibleSection>
   );
 }
