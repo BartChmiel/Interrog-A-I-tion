@@ -149,6 +149,23 @@ POST /ai/local-model/smoke
 
 The default runtime is deterministic. Ollama and OpenAI-compatible bridge endpoints can be configured through environment variables, but real model execution requires explicit enablement. Live grounded suggestions use a real provider only when the provider is selected and all real-output gates are set.
 
+One-command developer startup from the repository root:
+
+```powershell
+.\scripts\start-dev.ps1 -AiMode deterministic
+.\scripts\start-dev.ps1 -AiMode bridge-mock
+.\scripts\start-dev.ps1 -AiMode ollama
+.\scripts\start-dev.ps1 -AiMode bridge -BridgeBaseUrl "http://127.0.0.1:8080/v1"
+```
+
+`bridge-mock` starts the developer-only `interrogaition.ai.mock_bridge_server`, which implements
+an OpenAI-compatible `/v1/chat/completions` endpoint for smoke and UI integration checks.
+Inspect the active backend runtime with:
+
+```powershell
+.\scripts\check-ai-runtime.ps1
+```
+
 Ollama developer shell:
 
 ```powershell

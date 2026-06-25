@@ -41,6 +41,30 @@ The current guided workflow uses synthetic data only. Run instructions, workspac
 tutorial launch (`&tutorial=1`), and ethical boundaries are documented in
 [Guided Workflow](docs/24-guided-workflow.md).
 
+## Quick Local Start
+
+Run the full developer stack from the repository root:
+
+```powershell
+.\scripts\start-dev.ps1
+```
+
+Useful AI modes:
+
+```powershell
+.\scripts\start-dev.ps1 -AiMode deterministic
+.\scripts\start-dev.ps1 -AiMode bridge-mock
+.\scripts\start-dev.ps1 -AiMode ollama
+.\scripts\start-dev.ps1 -AiMode bridge -BridgeBaseUrl "http://127.0.0.1:8080/v1"
+```
+
+`bridge-mock` starts a local OpenAI-compatible mock at `/v1/chat/completions` so the bridge
+path can be exercised without installing a model runtime. Check the running runtime with:
+
+```powershell
+.\scripts\check-ai-runtime.ps1
+```
+
 ## Language Policy
 
 Engineering artifacts are English-first:
