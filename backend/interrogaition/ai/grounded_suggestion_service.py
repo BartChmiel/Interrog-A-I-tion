@@ -17,6 +17,10 @@ from interrogaition.ai.suggestion_quality import (
     SuggestionQualityReport,
     evaluate_grounded_suggestion_quality,
 )
+from interrogaition.ai.suggestion_support import (
+    SuggestionSupportReport,
+    build_suggestion_support_report,
+)
 from interrogaition.ai.suggestion_triage import (
     SuggestionTriageReport,
     build_suggestion_triage_report,
@@ -39,6 +43,7 @@ class GroundedSuggestionResult:
     batch: ParsedSuggestionBatch
     warnings: tuple[GroundedSuggestionWarning, ...]
     quality_report: SuggestionQualityReport
+    support_report: SuggestionSupportReport
     triage_report: SuggestionTriageReport
     prompt_version: str
     prompt_hash: str
@@ -80,6 +85,10 @@ def generate_grounded_suggestions(
         batch=batch,
         grounding_pack=grounding_pack,
     )
+    support_report = build_suggestion_support_report(
+        batch=batch,
+        grounding_pack=grounding_pack,
+    )
     triage_report = build_suggestion_triage_report(
         batch=batch,
         grounding_pack=grounding_pack,
@@ -94,6 +103,7 @@ def generate_grounded_suggestions(
         batch=batch,
         warnings=warnings,
         quality_report=quality_report,
+        support_report=support_report,
         triage_report=triage_report,
         prompt_version=PROMPT_VERSION,
         prompt_hash=hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),

@@ -22,6 +22,8 @@ import type {
   GroundedSuggestion,
   GroundedSuggestionDecision,
   GroundedSuggestionQualityReport,
+  GroundedSuggestionSupportRecord,
+  GroundedSuggestionSupportReport,
   GroundedSuggestionTriageRecord,
   GroundedSuggestionTriageReport,
   GroundedSuggestionWarning,
@@ -37,6 +39,7 @@ export type GroundedSuggestionMeta = {
   outputArtifact: ModelArtifactSummary | null;
   artifactWarning: string | null;
   qualityReport: GroundedSuggestionQualityReport | null;
+  supportReport: GroundedSuggestionSupportReport | null;
   triageReport: GroundedSuggestionTriageReport | null;
 } | null;
 
@@ -50,6 +53,19 @@ function shortArtifact(artifact: ModelArtifactSummary): string {
 
 function formatConfidence(value: number | null): string {
   return value === null ? "-" : value.toFixed(2);
+}
+
+function confidenceLabel(value: number | null, locale: Locale): string {
+  if (value === null) {
+    return text(locale, "unknown");
+  }
+  const band =
+    value >= 0.8
+      ? text(locale, "confidenceHigh")
+      : value >= 0.55
+        ? text(locale, "confidenceMedium")
+        : text(locale, "confidenceLow");
+  return `${band} ${formatConfidence(value)}`;
 }
 
 function formatSuggestionTime(value: string): string {
@@ -121,6 +137,56 @@ function suggestionTypeLabel(type: string, locale: Locale): string {
     },
   };
   return labels[locale][type] ?? type.replace(/_/g, " ");
+}
+
+function sourceTypeLabel(type: string, locale: Locale): string {
+  const labels: Record<Locale, Record<string, string>> = {
+    pl: {
+      answer: "odpowiedź",
+      claim: "twierdzenie",
+      finding: "ustalenie",
+      indicator: "wskaźnik",
+      material: "materiał",
+      question: "pytanie",
+      unknown: "źródło",
+    },
+    en: {
+      answer: "answer",
+      claim: "claim",
+      finding: "finding",
+      indicator: "indicator",
+      material: "material",
+      question: "question",
+      unknown: "source",
+    },
+  };
+  return labels[locale][type] ?? type.replace(/_/g, " ");
+}
+
+function supportStateLabel(state: GroundedSuggestionSupportRecord["support_state"], locale: Locale): string {
+  const labels: Record<Locale, Record<GroundedSuggestionSupportRecord["support_state"], string>> = {
+    pl: {
+      missing: "brak źródeł",
+      partial: "częściowe źródła",
+      supported: "źródła OK",
+    },
+    en: {
+      missing: "missing sources",
+      partial: "partial sources",
+      supported: "sources OK",
+    },
+  };
+  return labels[locale][state];
+}
+
+function supportTone(state: GroundedSuggestionSupportRecord["support_state"]): "default" | "ok" | "warning" | "danger" {
+  if (state === "supported") {
+    return "ok";
+  }
+  if (state === "partial") {
+    return "warning";
+  }
+  return "danger";
 }
 
 function triageTone(record: GroundedSuggestionTriageRecord): "default" | "ok" | "warning" | "danger" {
@@ -223,6 +289,9 @@ export function GroundedSuggestionsPanel({
     }
     return grouped;
   }, [warnings]);
+  const supportBySuggestion = useMemo(() => {
+    return new Map((meta?.supportReport?.records ?? []).map((record) => [record.suggestion_id, record]));
+  }, [meta?.supportReport?.records]);
 
   const providerLabel = groundedAiProviderLabel(localModelConfig, locale);
   const canRegenerate = apiMode === "online" && !isLoading;
@@ -254,6 +323,22 @@ export function GroundedSuggestionsPanel({
               tone: warnings.length ? "warning" : "ok",
               value: String(warnings.length),
             },
+            ...(meta?.supportReport
+              ? [
+                  {
+                    icon: <BookOpen size={13} />,
+                    key: "support",
+                    label: text(locale, "sourceIds"),
+                    tone:
+                      meta.supportReport.state === "ready"
+                        ? "ok"
+                        : meta.supportReport.state === "warning"
+                          ? "warning"
+                          : "danger",
+                    value: String(meta.supportReport.summary.supported ?? 0),
+                  } as const,
+                ]
+              : []),
           ]}
         />
       </div>
@@ -275,42 +360,47 @@ export function GroundedSuggestionsPanel({
       ) : null}
       {meta ? (
         <ContextWindow
+          className="auditor-only"
           icon={<Fingerprint size={14} />}
           meta={`${meta.model} / ${meta.promptVersion}`}
-          title={text(locale, "groundedAiTrace")}
+          title={text(locale, "materialTechnicalDetails")}
         >
-          <div className="grounded-ai-meta">
-            <span>
-              {text(locale, "modelLabel")}: <strong>{meta.model}</strong>
-            </span>
-            <span>
-              {text(locale, "promptVersion")}: <strong>{meta.promptVersion}</strong>
-            </span>
-            {meta.promptArtifact ? (
+          <div className="grounded-ai-technical-stack">
+            <div className="grounded-ai-meta">
               <span>
-                {text(locale, "promptArtifact")}: <strong>{shortArtifact(meta.promptArtifact)}</strong>
+                {text(locale, "modelLabel")}: <strong>{meta.model}</strong>
               </span>
-            ) : null}
-            {meta.contextArtifact ? (
               <span>
-                {text(locale, "contextArtifact")}: <strong>{shortArtifact(meta.contextArtifact)}</strong>
+                {text(locale, "promptVersion")}: <strong>{meta.promptVersion}</strong>
               </span>
+              {meta.promptArtifact ? (
+                <span>
+                  {text(locale, "promptArtifact")}: <strong>{shortArtifact(meta.promptArtifact)}</strong>
+                </span>
+              ) : null}
+              {meta.contextArtifact ? (
+                <span>
+                  {text(locale, "contextArtifact")}: <strong>{shortArtifact(meta.contextArtifact)}</strong>
+                </span>
+              ) : null}
+              {meta.outputArtifact ? (
+                <span>
+                  {text(locale, "outputArtifact")}: <strong>{shortArtifact(meta.outputArtifact)}</strong>
+                </span>
+              ) : null}
+              {meta.artifactWarning ? (
+                <span>
+                  {text(locale, "artifactWarning")}: <strong>{meta.artifactWarning}</strong>
+                </span>
+              ) : null}
+            </div>
+            {meta.triageReport ? (
+              <GroundedAiTriagePanel locale={locale} report={meta.triageReport} suggestions={suggestions} />
             ) : null}
-            {meta.outputArtifact ? (
-              <span>
-                {text(locale, "outputArtifact")}: <strong>{shortArtifact(meta.outputArtifact)}</strong>
-              </span>
-            ) : null}
-            {meta.artifactWarning ? (
-              <span>
-                {text(locale, "artifactWarning")}: <strong>{meta.artifactWarning}</strong>
-              </span>
-            ) : null}
+            {meta.qualityReport ? <GroundedAiQualityPanel locale={locale} report={meta.qualityReport} /> : null}
           </div>
         </ContextWindow>
       ) : null}
-      {meta?.triageReport ? <GroundedAiTriagePanel locale={locale} report={meta.triageReport} /> : null}
-      {meta?.qualityReport ? <GroundedAiQualityPanel locale={locale} report={meta.qualityReport} /> : null}
       {isLoading && !suggestions.length ? (
         <p className="empty-state grounded-ai-loading">
           <Loader2 className="spin" size={16} />
@@ -324,6 +414,7 @@ export function GroundedSuggestionsPanel({
             key={suggestion.id}
             locale={locale}
             suggestion={suggestion}
+            support={supportBySuggestion.get(suggestion.id)}
             warnings={warningsBySuggestion.get(suggestion.id) ?? []}
             onDraftChange={onDraftChange}
             onEdit={onEdit}
@@ -356,12 +447,19 @@ export function GroundedSuggestionsPanel({
 function GroundedAiTriagePanel({
   locale,
   report,
+  suggestions,
 }: {
   locale: Locale;
   report: GroundedSuggestionTriageReport;
+  suggestions: GroundedSuggestion[];
 }) {
   const topRecords = report.records.slice(0, 3);
   const topRecord = report.records.find((record) => record.suggestion_id === report.top_suggestion_id) ?? report.records[0];
+  const suggestionsById = new Map(suggestions.map((suggestion) => [suggestion.id, suggestion]));
+  const suggestionLabel = (suggestionId: string) => {
+    const suggestion = suggestionsById.get(suggestionId);
+    return suggestion ? suggestion.text : suggestionId;
+  };
   return (
     <section className="grounded-ai-triage" data-state={report.state}>
       <div className="grounded-ai-quality-header">
@@ -392,7 +490,7 @@ function GroundedAiTriagePanel({
             key: "top",
             label: text(locale, "aiTriageTop"),
             tone: topRecord ? triageTone(topRecord) : "default",
-            value: topRecord ? topRecord.suggestion_id : "-",
+            value: topRecord ? String(topRecord.priority_score) : "-",
           },
         ]}
       />
@@ -415,7 +513,7 @@ function GroundedAiTriagePanel({
             {topRecords.map((record) => (
               <article data-tone={triageTone(record)} key={record.suggestion_id}>
                 <div>
-                  <strong>{record.suggestion_id}</strong>
+                  <strong>{suggestionLabel(record.suggestion_id)}</strong>
                   <span>
                     {triagePriorityLabel(record.priority, locale)} / {triageActionLabel(record.recommended_action, locale)}
                   </span>
@@ -506,6 +604,7 @@ function GroundedSuggestionCard({
   draft,
   locale,
   suggestion,
+  support,
   warnings,
   onDraftChange,
   onEdit,
@@ -517,6 +616,7 @@ function GroundedSuggestionCard({
   draft?: string;
   locale: Locale;
   suggestion: GroundedSuggestion;
+  support?: GroundedSuggestionSupportRecord;
   warnings: GroundedSuggestionWarning[];
   onDraftChange: (suggestionId: string, value: string) => void;
   onEdit: (suggestion: GroundedSuggestion) => void;
@@ -602,13 +702,14 @@ function GroundedSuggestionCard({
             key: "confidence",
             label: text(locale, "suggestionConfidence"),
             tone: confidenceTone,
-            value: formatConfidence(suggestion.confidence),
+            value: confidenceLabel(suggestion.confidence, locale),
           },
           {
             icon: <BookOpen size={13} />,
             key: "evidence",
-            label: text(locale, "sourceIds"),
-            value: String(suggestion.linked_evidence.length),
+            label: support ? supportStateLabel(support.support_state, locale) : text(locale, "sourceIds"),
+            tone: support ? supportTone(support.support_state) : "default",
+            value: String(support?.known_source_count ?? suggestion.linked_evidence.length),
           },
           {
             icon: <Network size={13} />,
@@ -651,7 +752,18 @@ function GroundedSuggestionCard({
         <div className="grounded-suggestion-context-grid">
           <div>
             <span>{text(locale, "sourceIds")}</span>
-            {suggestion.linked_evidence.length ? (
+            {support?.source_cards.length ? (
+              <div className="grounded-source-card-list">
+                {support.source_cards.map((source) => (
+                  <article key={`${suggestion.id}-${source.source_id}`}>
+                    <span>{sourceTypeLabel(source.source_type, locale)}</span>
+                    <strong>{source.label}</strong>
+                    <p>{source.detail}</p>
+                    <em className="auditor-only-inline">{source.source_id}</em>
+                  </article>
+                ))}
+              </div>
+            ) : suggestion.linked_evidence.length ? (
               <div className="grounded-token-list">
                 {suggestion.linked_evidence.map((sourceId, index) => (
                   <em key={`${sourceId}-${index}`}>{sourceId}</em>
@@ -660,6 +772,18 @@ function GroundedSuggestionCard({
             ) : (
               <p>{text(locale, "noLinkedEvidence")}</p>
             )}
+            {support?.unknown_source_ids.length ? (
+              <div className="grounded-warning-list">
+                <span>{text(locale, "unknownSources")}</span>
+                <article>
+                  <AlertTriangle size={14} />
+                  <div>
+                    <strong>{support.unknown_source_ids.join(", ")}</strong>
+                    <p>{text(locale, "unknownSourcesDetail")}</p>
+                  </div>
+                </article>
+              </div>
+            ) : null}
           </div>
           <div>
             <span>{text(locale, "suggestionTopics")}</span>

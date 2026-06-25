@@ -64,17 +64,19 @@ export function ActionMenu({
 
 export function ContextWindow({
   children,
+  className = "",
   icon,
   meta,
   title,
 }: {
   children: ReactNode;
+  className?: string;
   icon?: ReactNode;
   meta?: string;
   title: string;
 }) {
   return (
-    <details className="ui-context-window">
+    <details className={`ui-context-window ${className}`.trim()}>
       <summary>
         {icon}
         <span>{title}</span>

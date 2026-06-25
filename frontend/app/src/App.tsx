@@ -17,6 +17,7 @@ import {
   Languages,
   ListChecks,
   MoreHorizontal,
+  Moon,
   Network,
   Pencil,
   Plus,
@@ -26,6 +27,7 @@ import {
   ShieldCheck,
   ShieldQuestion,
   Sparkles,
+  Sun,
   Wifi,
   WifiOff,
   X,
@@ -72,7 +74,7 @@ import {
   type ApiError,
 } from "./api";
 import { AiRuntimeStatusCard } from "./ai-status-card";
-import { CaseCatalogBadges, CaseWorkflowProgress, WorkspaceEmptyState, type CaseWorkflowStage } from "./case-workflow";
+import { CaseCatalogBadges, WorkspaceEmptyState } from "./case-workflow";
 import { evidenceStatusLabel } from "./evidence-labels";
 import { GroundingPackPanel } from "./grounding-pack-panel";
 import {
@@ -105,6 +107,7 @@ import type {
   GroundedSuggestionDecision,
   GroundedSuggestion,
   GroundedSuggestionQualityReport,
+  GroundedSuggestionSupportReport,
   GroundedSuggestionTriageReport,
   GroundedSuggestionsResponse,
   GroundedSuggestionWarning,
@@ -169,6 +172,10 @@ type MaterialDraft = {
 
 type OperationsTab = "monitor" | "ai" | "materials" | "review";
 type WorkMode = "interview" | OperationsTab;
+type WorkspacePerspective = "operator" | "auditor";
+type ReviewTab = "report" | "quality" | "stop" | "audit" | "analytics";
+type UiTheme = "light" | "dark";
+type UiDensity = "comfortable" | "compact";
 
 type WorkModeDescriptor = {
   id: WorkMode;
@@ -241,6 +248,39 @@ const materialSourceTypes: MaterialSourceType[] = [
 
 const config = runtimeConfig();
 
+const uiStorageKeys = {
+  density: "interrogaition.ui.density",
+  leftRailCollapsed: "interrogaition.ui.leftRailCollapsed",
+  rightRailCollapsed: "interrogaition.ui.rightRailCollapsed",
+  theme: "interrogaition.ui.theme",
+} as const;
+
+function readStoredOption<T extends string>(key: string, fallback: T, allowed: readonly T[]): T {
+  try {
+    const value = window.localStorage.getItem(key);
+    return allowed.includes(value as T) ? (value as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const value = window.localStorage.getItem(key);
+    return value === null ? fallback : value === "true";
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredValue(key: string, value: string | boolean): void {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Local storage is a progressive enhancement for UI preferences.
+  }
+}
+
 export function App() {
   const [locale, setLocale] = useState<Locale>("pl");
   const [apiMode, setApiMode] = useState<ApiMode>("offline");
@@ -291,6 +331,7 @@ export function App() {
     outputArtifact: ModelArtifactSummary | null;
     artifactWarning: string | null;
     qualityReport: GroundedSuggestionQualityReport | null;
+    supportReport: GroundedSuggestionSupportReport | null;
     triageReport: GroundedSuggestionTriageReport | null;
   } | null>(null);
   const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
@@ -316,6 +357,7 @@ export function App() {
           outputArtifact: ModelArtifactSummary | null;
           artifactWarning: string | null;
           qualityReport: GroundedSuggestionQualityReport | null;
+          supportReport: GroundedSuggestionSupportReport | null;
           triageReport: GroundedSuggestionTriageReport | null;
         } | null;
         decisions: Record<string, GroundedSuggestionDecision>;
@@ -328,22 +370,64 @@ export function App() {
   const [activeQuestionId, setActiveQuestionId] = useState("q-001");
   const [activeWorkMode, setActiveWorkMode] = useState<WorkMode>("interview");
   const [activeOperationsTab, setActiveOperationsTab] = useState<OperationsTab>("monitor");
+  const [workspacePerspective, setWorkspacePerspective] = useState<WorkspacePerspective>("operator");
+  const [activeReviewTab, setActiveReviewTab] = useState<ReviewTab>("report");
   const [dismissedOperatorActionIds, setDismissedOperatorActionIds] = useState<Set<string>>(new Set());
   const [answerText, setAnswerText] = useState("");
   const [localAnswers, setLocalAnswers] = useState<Answer[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reviewingClaimIds, setReviewingClaimIds] = useState<Set<string>>(new Set());
+  const [claimEditDraft, setClaimEditDraft] = useState<ClaimEditDraft>(null);
   const [isMaterialSubmitting, setIsMaterialSubmitting] = useState(false);
   const [isQuestionDraftSubmitting, setIsQuestionDraftSubmitting] = useState(false);
   const [isArtifactIsolationSubmitting, setIsArtifactIsolationSubmitting] = useState(false);
   const [isModelSmokeRunning, setIsModelSmokeRunning] = useState(false);
   const didInitializeApi = useRef(false);
   const [workflowReviewVisited, setWorkflowReviewVisited] = useState(false);
-  const [leftRailCollapsed, setLeftRailCollapsed] = useState(false);
-  const [rightRailCollapsed, setRightRailCollapsed] = useState(true);
+  const [leftRailCollapsed, setLeftRailCollapsed] = useState(() =>
+    readStoredBoolean(uiStorageKeys.leftRailCollapsed, true),
+  );
+  const [rightRailCollapsed, setRightRailCollapsed] = useState(() =>
+    readStoredBoolean(uiStorageKeys.rightRailCollapsed, true),
+  );
   const [tutorialActive, setTutorialActive] = useState(false);
   const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [uiTheme, setUiTheme] = useState<UiTheme>(() =>
+    readStoredOption(uiStorageKeys.theme, "light", ["light", "dark"] as const),
+  );
+  const [uiDensity, setUiDensity] = useState<UiDensity>(() =>
+    readStoredOption(uiStorageKeys.density, "comfortable", ["comfortable", "compact"] as const),
+  );
   const localeRef = useRef<Locale>(locale);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = uiTheme;
+    writeStoredValue(uiStorageKeys.theme, uiTheme);
+  }, [uiTheme]);
+
+  useEffect(() => {
+    writeStoredValue(uiStorageKeys.density, uiDensity);
+  }, [uiDensity]);
+
+  useEffect(() => {
+    writeStoredValue(uiStorageKeys.leftRailCollapsed, leftRailCollapsed);
+  }, [leftRailCollapsed]);
+
+  useEffect(() => {
+    writeStoredValue(uiStorageKeys.rightRailCollapsed, rightRailCollapsed);
+  }, [rightRailCollapsed]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen((current) => !current);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const questions = useMemo<QuestionView[]>(() => {
     const caseQuestions = caseData?.questions.length ? caseData.questions.map(toQuestionView) : seedQuestions;
@@ -352,6 +436,7 @@ export function App() {
   }, [caseData, locale, questionDrafts]);
 
   const activeQuestion = questions.find((question) => question.id === activeQuestionId) ?? questions[0];
+  const activeQuestionIndex = Math.max(0, questions.findIndex((question) => question.id === activeQuestion?.id));
   const materialsById = useMemo(() => {
     return new Map(workspaceMaterials.map((material) => [material.id, material]));
   }, [workspaceMaterials]);
@@ -494,6 +579,9 @@ export function App() {
     }
     if (mode === "review") {
       setWorkflowReviewVisited(true);
+    }
+    if (mode === "interview") {
+      setLeftRailCollapsed(true);
     }
     setRightRailCollapsed(true);
   }
@@ -937,6 +1025,7 @@ export function App() {
             outputArtifact: response.output_artifact ?? null,
             artifactWarning: response.artifact_warning ?? null,
             qualityReport: response.quality_report ?? null,
+            supportReport: response.support_report ?? null,
             triageReport: response.triage_report ?? null,
           }
         : null,
@@ -1491,27 +1580,6 @@ export function App() {
     void refreshLocalizedApiState(nextLocale);
   }
 
-  function navigateCaseWorkflow(stage: CaseWorkflowStage) {
-    if (stage === "dossier" || stage === "interview") {
-      setLeftRailCollapsed(false);
-    }
-    if (stage === "interview") {
-      setActiveWorkMode("interview");
-      setRightRailCollapsed(true);
-      return;
-    }
-
-    if (stage === "materials") {
-      openWorkMode("materials");
-      return;
-    }
-    if (stage === "ai") {
-      openWorkMode("ai");
-      return;
-    }
-    openWorkMode("review");
-  }
-
   function openCase(caseId: string) {
     if (caseId === config.caseId) {
       return;
@@ -1830,14 +1898,20 @@ export function App() {
   ];
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      data-density={uiDensity}
+      data-perspective={workspacePerspective}
+      data-theme={uiTheme}
+      data-work-mode={activeWorkMode}
+    >
       <header className="topbar" data-tutorial="topbar">
         <div className="brand-block">
           <img className="brand-mark" src="/brand/logo-mark.svg" alt="InterrogA(I)tion" width={44} height={44} />
           <div>
             <h1>InterrogA(I)tion</h1>
             <p>{caseData?.title ?? text(locale, "caseFallback")}</p>
-            <p className="topbar-session-meta">
+            <p className="topbar-session-meta auditor-only">
               {config.caseId} · {config.sessionId} · {config.participantId}
             </p>
           </div>
@@ -1851,6 +1925,56 @@ export function App() {
             statusKey={statusKey}
             onReconnect={() => void initializeApiWorkflow()}
           />
+          <div className="view-options-toggle" aria-label={text(locale, "viewOptions")}>
+            <button
+              title={text(locale, "commandPaletteHint")}
+              type="button"
+              onClick={() => setCommandPaletteOpen(true)}
+            >
+              <MoreHorizontal size={15} />
+              <span>{text(locale, "commandPalette")}</span>
+            </button>
+            <button
+              aria-pressed={uiTheme === "dark"}
+              title={text(locale, uiTheme === "dark" ? "themeLight" : "themeDark")}
+              type="button"
+              onClick={() => setUiTheme((current) => (current === "dark" ? "light" : "dark"))}
+            >
+              {uiTheme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+              <span>{text(locale, uiTheme === "dark" ? "themeLight" : "themeDark")}</span>
+            </button>
+            <button
+              aria-pressed={uiDensity === "compact"}
+              title={text(locale, uiDensity === "compact" ? "densityComfortable" : "densityCompact")}
+              type="button"
+              onClick={() => setUiDensity((current) => (current === "compact" ? "comfortable" : "compact"))}
+            >
+              <ListChecks size={15} />
+              <span>{text(locale, uiDensity === "compact" ? "densityComfortable" : "densityCompact")}</span>
+            </button>
+          </div>
+          <div className="perspective-toggle" aria-label={text(locale, "perspectiveToggle")}>
+            <button
+              aria-pressed={workspacePerspective === "operator"}
+              className={workspacePerspective === "operator" ? "is-active" : ""}
+              title={text(locale, "operatorPerspectiveDetail")}
+              type="button"
+              onClick={() => setWorkspacePerspective("operator")}
+            >
+              <Eye size={15} />
+              {text(locale, "operatorPerspective")}
+            </button>
+            <button
+              aria-pressed={workspacePerspective === "auditor"}
+              className={workspacePerspective === "auditor" ? "is-active" : ""}
+              title={text(locale, "auditorPerspectiveDetail")}
+              type="button"
+              onClick={() => setWorkspacePerspective("auditor")}
+            >
+              <Fingerprint size={15} />
+              {text(locale, "auditorPerspective")}
+            </button>
+          </div>
           <div className="language-toggle" aria-label="Language">
             <button
               className={locale === "pl" ? "is-active" : ""}
@@ -1869,6 +1993,9 @@ export function App() {
               EN
             </button>
           </div>
+        </div>
+        <div className="sr-live-region" aria-live="polite" aria-atomic="true">
+          {text(locale, statusKey)}
         </div>
       </header>
 
@@ -1895,32 +2022,9 @@ export function App() {
           onToggleCollapse={() => setLeftRailCollapsed((current) => !current)}
         >
           <aside className="case-sidebar">
-            <CaseCatalogPanel
-              cases={caseCatalog}
-              currentCaseId={config.caseId}
-              locale={locale}
-              onOpenCase={openCase}
-            />
-            <CaseWorkflowProgress
-              answerCount={answerViews.length}
-              apiMode={apiMode}
-              groundedCount={groundedSuggestions.length}
-              locale={locale}
-              materialCount={workspaceMaterials.length}
-              reportExported={sessionReportExported}
-              reviewVisited={workflowReviewVisited}
-              onNavigate={navigateCaseWorkflow}
-            />
-            <CaseDossierPanel
-              answerCount={answerViews.length}
-              caseData={caseData}
-              locale={locale}
-              review={review}
-              starterMaterials={caseStarterMaterials}
-              onOpenMaterials={() => openWorkMode("materials")}
-            />
             <WorkflowPathPanel
               checklist={workflowChecklist}
+              compact={activeWorkMode === "interview"}
               locale={locale}
               onCopySummary={() => void copyWorkflowBrief()}
               onOpenAi={() => openWorkMode("ai")}
@@ -1937,6 +2041,24 @@ export function App() {
               onOpenReview={() => openWorkMode("review")}
               onStartFresh={startNewWorkflowSession}
             />
+            {activeWorkMode !== "interview" ? (
+              <>
+                <CaseCatalogPanel
+                  cases={caseCatalog}
+                  currentCaseId={config.caseId}
+                  locale={locale}
+                  onOpenCase={openCase}
+                />
+                <CaseDossierPanel
+                  answerCount={answerViews.length}
+                  caseData={caseData}
+                  locale={locale}
+                  review={review}
+                  starterMaterials={caseStarterMaterials}
+                  onOpenMaterials={() => openWorkMode("materials")}
+                />
+              </>
+            ) : null}
             <CollapsibleSection
               className="question-panel"
               hint={text(locale, "expandWhenNeeded")}
@@ -1976,7 +2098,6 @@ export function App() {
             {activeWorkMode === "interview" ? (
               <div className="interview-workspace">
             <InterviewContextStrip
-              activeQuestionLabel={localize(activeQuestion?.text, locale)}
               caseId={config.caseId}
               coverageLabel={questionCoverageLabel}
               locale={locale}
@@ -1987,27 +2108,31 @@ export function App() {
               urgentActionCount={urgentOperatorActionCount}
             />
 
-            <CollapsibleWorkspaceCard
-              defaultOpen={urgentOperatorActionCount > 0}
-              meta={`${visibleOperatorActions.length} · ${questionCoverageLabel}`}
-              title={text(locale, "operatorQueue")}
-            >
-              <OperatorWorkflowPanel
-                actions={visibleOperatorActions}
-                answeredCount={answeredQuestionCount}
-                compact
-                embedded
-                findingCount={visibleFindings.length}
-                locale={locale}
-                materialCount={workspaceMaterials.length}
-                questionCount={questions.length}
-                recentDecisions={operatorActionDecisions.slice(0, 4)}
-                onAction={runOperatorAction}
-                onDecision={markOperatorAction}
-              />
-            </CollapsibleWorkspaceCard>
+            {visibleOperatorActions.length ? (
+              <WorkspaceCard
+                className="operator-queue-card operator-queue-card--banner"
+                meta={`${visibleOperatorActions.length} · ${questionCoverageLabel}`}
+                title={text(locale, "operatorQueue")}
+              >
+                <OperatorWorkflowPanel
+                  actions={visibleOperatorActions}
+                  answeredCount={answeredQuestionCount}
+                  compact
+                  embedded
+                  findingCount={visibleFindings.length}
+                  locale={locale}
+                  materialCount={workspaceMaterials.length}
+                  maxVisibleActions={1}
+                  questionCount={questions.length}
+                  recentDecisions={operatorActionDecisions.slice(0, 4)}
+                  onAction={runOperatorAction}
+                  onDecision={markOperatorAction}
+                />
+              </WorkspaceCard>
+            ) : null}
 
             <WorkspaceCard
+              className="active-question-card"
               highlight
               meta={
                 activeQuestion
@@ -2031,6 +2156,7 @@ export function App() {
             </WorkspaceCard>
 
             <CollapsibleWorkspaceCard
+              className="answer-history-card"
               meta={String(answerViews.length)}
               scrollable
               title={text(locale, "answerHistory")}
@@ -2042,6 +2168,7 @@ export function App() {
                       answer={answer}
                       key={answer.id}
                       locale={locale}
+                      onEditClaim={(claim) => setClaimEditDraft({ answer, claim, value: claim.value })}
                       onReview={recordClaimReview}
                       question={questionsById.get(answer.questionId)}
                       reviewingClaimIds={reviewingClaimIds}
@@ -2134,7 +2261,10 @@ export function App() {
                   metrics={[
                     { label: text(locale, "operationsAi"), value: String(groundedSuggestions.length) },
                     { label: text(locale, "auditedAiDecisionsShort"), value: String(auditedGroundedDecisionCount) },
-                    { label: text(locale, "activeQuestion"), value: activeQuestion?.id ?? "-" },
+                    {
+                      label: text(locale, "activeQuestion"),
+                      value: activeQuestion ? `${activeQuestionIndex + 1}/${questions.length}` : "-",
+                    },
                   ]}
                   title={text(locale, "groundedAi")}
                 />
@@ -2147,7 +2277,6 @@ export function App() {
                 ) : (
                   <div className="mode-grid mode-grid--ai">
                     <section className="mode-section mode-section--main">
-                      <PanelHeader title={text(locale, "groundedAi")} meta={String(groundedSuggestions.length)} compact />
                       <GroundedSuggestionsPanel
                         apiMode={apiMode}
                         bare
@@ -2176,7 +2305,7 @@ export function App() {
                     <div className="mode-side-stack">
                       <CollapsibleSection
                         accordionGroup="mode-ai"
-                        className="mode-section"
+                        className="mode-section auditor-only"
                         defaultOpen
                         hint={text(locale, "expandWhenNeeded")}
                         meta={text(locale, "developerPreview")}
@@ -2231,50 +2360,56 @@ export function App() {
                     title={text(locale, "operationsOfflineTitle")}
                   />
                 ) : (
-                  <div className="mode-grid mode-grid--review">
-                    <section className="mode-section mode-section--main">
-                      <PanelHeader title={text(locale, "sessionReport")} meta={text(locale, "sessionReportMeta")} compact />
-                      <SessionReportPanel
-                        apiMode={apiMode}
-                        config={config}
-                        exportInput={sessionReportExportInput}
-                        locale={locale}
-                        preview={reportMarkdown}
-                        onExported={() => {
-                          setSessionReportExported(true);
-                          setStatusKey("sessionReportCopied");
-                          void refreshAuditTrails();
-                        }}
-                      />
-                    </section>
-                    <div className="mode-side-stack">
-                      <CollapsibleSection
-                        accordionGroup="mode-review"
-                        className="mode-section"
-                        defaultOpen
-                        hint={text(locale, "expandWhenNeeded")}
-                        meta={caseQuality ? `${caseQuality.quality_score}%` : text(locale, "unknown")}
-                        title={text(locale, "caseQuality")}
-                      >
-                        <CaseQualityPanel bare locale={locale} report={caseQuality} />
-                      </CollapsibleSection>
-                      <CollapsibleSection
-                        accordionGroup="mode-review"
-                        className="mode-section"
-                        defaultOpen
-                        hint={text(locale, "expandWhenNeeded")}
-                        meta={workflowReadiness ? environmentStateLabel(workflowReadiness.state, locale) : text(locale, "unknown")}
-                        title={text(locale, "workflowReadiness")}
-                      >
-                        <WorkflowReadinessPanel bare locale={locale} report={workflowReadiness} />
-                      </CollapsibleSection>
-                      <CollapsibleSection
-                        accordionGroup="mode-review"
-                        className="mode-section"
-                        hint={text(locale, "expandWhenNeeded")}
-                        meta={text(locale, "noAutomatedVerdict")}
-                        title={text(locale, "stopReadiness")}
-                      >
+                  <div className="review-workbench">
+                    <ReviewTabList
+                      activeTab={activeReviewTab}
+                      auditCount={(workspaceAudit?.events.length ?? 0) + (sessionAudit?.events.length ?? 0)}
+                      findingCount={visibleFindings.length}
+                      locale={locale}
+                      qualityScore={caseQuality?.quality_score ?? null}
+                      reportReady={Boolean(reportMarkdown)}
+                      onSelect={setActiveReviewTab}
+                    />
+                    {activeReviewTab === "report" ? (
+                      <section className="mode-section mode-section--main">
+                        <PanelHeader title={text(locale, "sessionReport")} meta={text(locale, "sessionReportMeta")} compact />
+                        <SessionReportPanel
+                          apiMode={apiMode}
+                          config={config}
+                          exportInput={sessionReportExportInput}
+                          locale={locale}
+                          preview={reportMarkdown}
+                          onExported={() => {
+                            setSessionReportExported(true);
+                            setStatusKey("sessionReportCopied");
+                            void refreshAuditTrails();
+                          }}
+                        />
+                      </section>
+                    ) : null}
+                    {activeReviewTab === "quality" ? (
+                      <div className="review-tab-grid">
+                        <section className="mode-section">
+                          <PanelHeader
+                            title={text(locale, "caseQuality")}
+                            meta={caseQuality ? `${caseQuality.quality_score}%` : text(locale, "unknown")}
+                            compact
+                          />
+                          <CaseQualityPanel bare locale={locale} report={caseQuality} />
+                        </section>
+                        <section className="mode-section">
+                          <PanelHeader
+                            title={text(locale, "workflowReadiness")}
+                            meta={workflowReadiness ? environmentStateLabel(workflowReadiness.state, locale) : text(locale, "unknown")}
+                            compact
+                          />
+                          <WorkflowReadinessPanel bare locale={locale} report={workflowReadiness} />
+                        </section>
+                      </div>
+                    ) : null}
+                    {activeReviewTab === "stop" ? (
+                      <section className="mode-section">
+                        <PanelHeader title={text(locale, "stopReadiness")} meta={text(locale, "noAutomatedVerdict")} compact />
                         <StopReadinessPanel
                           bare
                           encryptionStatus={encryptionStatus}
@@ -2285,69 +2420,63 @@ export function App() {
                           workspace={workspace}
                           workspaceAudit={workspaceAudit}
                         />
-                      </CollapsibleSection>
-                    </div>
-                    <CollapsibleSection
-                      accordionGroup="mode-review-secondary"
-                      className="mode-section"
-                      hint={text(locale, "expandWhenNeeded")}
-                      meta={text(locale, "reviewSignals")}
-                      title={text(locale, "investigativeBoard")}
-                    >
-                      <InvestigativeBoardPanel
-                        bare
-                        caseData={caseData}
-                        evidenceMap={evidenceMap}
-                        findings={visibleFindings}
-                        locale={locale}
-                        materialsById={materialsById}
-                        starterMaterialsById={starterMaterialsById}
-                      />
-                    </CollapsibleSection>
-                    <CollapsibleSection
-                      accordionGroup="mode-review-secondary"
-                      className="mode-section"
-                      hint={text(locale, "expandWhenNeeded")}
-                      meta={`${(workspaceAudit?.events.length ?? 0) + (sessionAudit?.events.length ?? 0)} ${text(locale, "auditEvents")}`}
-                      title={text(locale, "provenanceTimeline")}
-                    >
-                      <ProvenanceTimelinePanel
-                        bare
-                        locale={locale}
-                        sessionAudit={sessionAudit}
-                        workspaceAudit={workspaceAudit}
-                      />
-                    </CollapsibleSection>
-                    <CollapsibleSection
-                      accordionGroup="mode-review-secondary"
-                      className="mode-section"
-                      hint={text(locale, "expandWhenNeeded")}
-                      meta={text(locale, "visible")}
-                      title={text(locale, "indicators")}
-                    >
-                      <div className="indicator-list">
-                        {visibleIndicators.map((indicator) => (
-                          <IndicatorCard indicator={indicator} key={indicator.id} locale={locale} />
-                        ))}
+                      </section>
+                    ) : null}
+                    {activeReviewTab === "audit" ? (
+                      <section className="mode-section auditor-only">
+                        <PanelHeader
+                          title={text(locale, "provenanceTimeline")}
+                          meta={`${(workspaceAudit?.events.length ?? 0) + (sessionAudit?.events.length ?? 0)} ${text(locale, "auditEvents")}`}
+                          compact
+                        />
+                        <ProvenanceTimelinePanel
+                          bare
+                          locale={locale}
+                          sessionAudit={sessionAudit}
+                          workspaceAudit={workspaceAudit}
+                        />
+                      </section>
+                    ) : null}
+                    {activeReviewTab === "analytics" ? (
+                      <div className="review-tab-grid">
+                        <section className="mode-section">
+                          <PanelHeader title={text(locale, "investigativeBoard")} meta={text(locale, "reviewSignals")} compact />
+                          <InvestigativeBoardPanel
+                            bare
+                            caseData={caseData}
+                            evidenceMap={evidenceMap}
+                            findings={visibleFindings}
+                            locale={locale}
+                            materialsById={materialsById}
+                            starterMaterialsById={starterMaterialsById}
+                          />
+                        </section>
+                        <section className="mode-section">
+                          <PanelHeader title={text(locale, "indicators")} meta={text(locale, "visible")} compact />
+                          <div className="indicator-list">
+                            {visibleIndicators.map((indicator) => (
+                              <IndicatorCard indicator={indicator} key={indicator.id} locale={locale} />
+                            ))}
+                          </div>
+                        </section>
+                        <section className="mode-section">
+                          <PanelHeader
+                            title={text(locale, "findings")}
+                            meta={formatCount(visibleFindings.length, locale, {
+                              singular: text(locale, "findingSingular"),
+                              pluralFew: text(locale, "findingPluralFew"),
+                              pluralMany: text(locale, "findingPluralMany"),
+                            })}
+                            compact
+                          />
+                          <div className="finding-list">
+                            {visibleFindings.map((finding) => (
+                              <FindingCard finding={finding} key={`${finding.category}-${finding.title}`} locale={locale} />
+                            ))}
+                          </div>
+                        </section>
                       </div>
-                    </CollapsibleSection>
-                    <CollapsibleSection
-                      accordionGroup="mode-review-secondary"
-                      className="mode-section"
-                      hint={text(locale, "expandWhenNeeded")}
-                      meta={formatCount(visibleFindings.length, locale, {
-                        singular: text(locale, "findingSingular"),
-                        pluralFew: text(locale, "findingPluralFew"),
-                        pluralMany: text(locale, "findingPluralMany"),
-                      })}
-                      title={text(locale, "findings")}
-                    >
-                      <div className="finding-list">
-                        {visibleFindings.map((finding) => (
-                          <FindingCard finding={finding} key={`${finding.category}-${finding.title}`} locale={locale} />
-                        ))}
-                      </div>
-                    </CollapsibleSection>
+                    ) : null}
                   </div>
                 )}
               </>
@@ -2469,23 +2598,25 @@ export function App() {
               />
             )}
 
-            <CollapsibleSection
-              className="inspector-section"
-              defaultOpen
-              hint={text(locale, "expandWhenNeeded")}
-              meta={activeQuestion?.id ?? text(locale, "unknown")}
-              title={text(locale, "inspectorActiveQuestion")}
-            >
-              <div className="inspector-question">
-                <p>{localize(activeQuestion?.text, locale)}</p>
-                <LinkedMaterialStrip
-                  links={activeQuestionLinks}
-                  locale={locale}
-                  materialsById={materialsById}
-                  starterMaterialsById={starterMaterialsById}
-                />
-              </div>
-            </CollapsibleSection>
+            {activeWorkMode !== "interview" ? (
+              <CollapsibleSection
+                className="inspector-section"
+                defaultOpen
+                hint={text(locale, "expandWhenNeeded")}
+                meta={activeQuestion?.id ?? text(locale, "unknown")}
+                title={text(locale, "inspectorActiveQuestion")}
+              >
+                <div className="inspector-question">
+                  <p>{localize(activeQuestion?.text, locale)}</p>
+                  <LinkedMaterialStrip
+                    links={activeQuestionLinks}
+                    locale={locale}
+                    materialsById={materialsById}
+                    starterMaterialsById={starterMaterialsById}
+                  />
+                </div>
+              </CollapsibleSection>
+            ) : null}
 
             <CollapsibleSection
               className="inspector-section"
@@ -2530,6 +2661,103 @@ export function App() {
         </Modal>
       ) : null}
 
+      {claimEditDraft ? (
+        <Modal
+          locale={locale}
+          subtitle={claimEditDraft.claim.sourceText ?? text(locale, "claimReviewTitle")}
+          title={text(locale, "claimReviewEdit")}
+          onClose={() => setClaimEditDraft(null)}
+        >
+          <form
+            className="claim-edit-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = claimEditDraft.value.trim();
+              if (!value) {
+                return;
+              }
+              void recordClaimReview(claimEditDraft.answer, claimEditDraft.claim, "edited", {
+                ...claimEditDraft.claim,
+                value,
+              });
+              setClaimEditDraft(null);
+            }}
+          >
+            <label>
+              <span>{text(locale, "claimReviewEditPrompt")}</span>
+              <textarea
+                autoFocus
+                rows={5}
+                value={claimEditDraft.value}
+                onChange={(event) => setClaimEditDraft({ ...claimEditDraft, value: event.target.value })}
+              />
+            </label>
+            <div className="claim-edit-actions">
+              <button type="button" onClick={() => setClaimEditDraft(null)}>
+                <X size={14} />
+                {text(locale, "closeModal")}
+              </button>
+              <button disabled={!claimEditDraft.value.trim()} type="submit">
+                <Check size={14} />
+                {text(locale, "saveClaimEdit")}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      {commandPaletteOpen ? (
+        <Modal
+          locale={locale}
+          subtitle={text(locale, "commandPaletteHint")}
+          title={text(locale, "commandPalette")}
+          onClose={() => setCommandPaletteOpen(false)}
+        >
+          <div className="command-palette">
+            <section>
+              <span>{text(locale, "workModeNavigation")}</span>
+              {workModes.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => {
+                    openWorkMode(mode.id);
+                    setCommandPaletteOpen(false);
+                  }}
+                >
+                  {mode.icon}
+                  <strong>{mode.label}</strong>
+                  <em>{mode.value}</em>
+                </button>
+              ))}
+            </section>
+            <section>
+              <span>{text(locale, "operatorQueue")}</span>
+              {operationsGuidanceActions.filter((action) => !action.disabled).slice(0, 5).map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => {
+                    action.onClick();
+                    setCommandPaletteOpen(false);
+                  }}
+                >
+                  {action.icon}
+                  <strong>{action.label}</strong>
+                  <em>{action.detail}</em>
+                </button>
+              ))}
+            </section>
+          </div>
+        </Modal>
+      ) : null}
+
+      {statusKey !== "localMode" ? (
+        <div className="toast-stack" aria-live="polite" aria-atomic="true">
+          <span data-state={apiMode}>{text(locale, statusKey)}</span>
+        </div>
+      ) : null}
+
       <TutorialTour
         active={tutorialActive}
         locale={locale}
@@ -2554,13 +2782,15 @@ function WorkModeNavigation({
   onSelect: (mode: WorkMode) => void;
 }) {
   return (
-    <nav className="work-mode-nav" data-tutorial="operations-tabs" aria-label={text(locale, "workModeNavigation")}>
+    <nav className="work-mode-nav" data-tutorial="work-mode-nav" aria-label={text(locale, "workModeNavigation")}>
       {modes.map((mode) => (
         <button
+          aria-label={`${mode.label}: ${mode.value}`}
           aria-current={activeMode === mode.id ? "page" : undefined}
           className={activeMode === mode.id ? "is-active" : ""}
           data-tutorial={mode.id === "interview" ? "work-mode-interview" : `operations-tab-${mode.id}`}
           key={mode.id}
+          title={`${mode.label}: ${mode.detail}`}
           type="button"
           onClick={() => onSelect(mode.id)}
         >
@@ -2608,6 +2838,50 @@ function WorkModeHeader({
   );
 }
 
+function ReviewTabList({
+  activeTab,
+  auditCount,
+  findingCount,
+  locale,
+  onSelect,
+  qualityScore,
+  reportReady,
+}: {
+  activeTab: ReviewTab;
+  auditCount: number;
+  findingCount: number;
+  locale: Locale;
+  onSelect: (tab: ReviewTab) => void;
+  qualityScore: number | null;
+  reportReady: boolean;
+}) {
+  const tabs: Array<{ id: ReviewTab; label: string; value: string }> = [
+    { id: "report", label: text(locale, "reviewTabReport"), value: reportReady ? text(locale, "ready") : text(locale, "notReady") },
+    { id: "quality", label: text(locale, "reviewTabQuality"), value: qualityScore === null ? "-" : `${qualityScore}%` },
+    { id: "stop", label: text(locale, "reviewTabStop"), value: text(locale, "noAutomatedVerdict") },
+    { id: "audit", label: text(locale, "reviewTabAudit"), value: String(auditCount) },
+    { id: "analytics", label: text(locale, "reviewTabAnalytics"), value: String(findingCount) },
+  ];
+
+  return (
+    <div className="review-tab-list" role="tablist" aria-label={text(locale, "operationsReview")}>
+      {tabs.map((tab) => (
+        <button
+          aria-selected={activeTab === tab.id}
+          className={activeTab === tab.id ? "is-active" : ""}
+          key={tab.id}
+          role="tab"
+          type="button"
+          onClick={() => onSelect(tab.id)}
+        >
+          <span>{tab.label}</span>
+          <strong>{tab.value}</strong>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function OperationsGuidanceCard({
   activeTab,
   actions,
@@ -2652,6 +2926,14 @@ function OperationsGuidanceCard({
     },
   };
   const activeGuidance = guidance[activeTab];
+  const guidanceDetailKey: CopyKey =
+    activeTab === "review" && answeredCount > 0
+      ? "operationsGuideReviewReadyDetail"
+      : activeTab === "materials" && materialCount > 0
+        ? "operationsGuideMaterialsReadyDetail"
+        : activeTab === "ai" && suggestionCount > 0
+          ? "operationsGuideAiReadyDetail"
+          : activeGuidance.detailKey;
   const metrics = [
     {
       label: text(locale, "operatorAnswered"),
@@ -2674,6 +2956,9 @@ function OperationsGuidanceCard({
       value: reportExported ? text(locale, "ready") : text(locale, "notReady"),
     },
   ];
+  const actionableActions = actions.filter((action) => !action.disabled);
+  const primaryAction = actionableActions.find((action) => action.variant === "primary") ?? actionableActions[0];
+  const secondaryActions = actionableActions.filter((action) => action !== primaryAction);
 
   return (
     <div className="operations-guidance-card" data-tutorial="operations-guidance">
@@ -2682,19 +2967,41 @@ function OperationsGuidanceCard({
         <div>
           <small>{text(locale, "operationsGuideLabel")}</small>
           <strong>{text(locale, activeGuidance.titleKey)}</strong>
-          <p>{text(locale, activeGuidance.detailKey)}</p>
+          <p>{text(locale, guidanceDetailKey)}</p>
         </div>
       </div>
-      <div className="operations-guidance-metrics" aria-label={text(locale, "operationsGuideMetrics")}>
-        {metrics.map((metric) => (
-          <span key={metric.label}>
-            <strong>{metric.value}</strong>
-            {metric.label}
+      {primaryAction ? (
+        <button
+          className="operations-guidance-action operations-guidance-action--focus"
+          data-variant={primaryAction.variant ?? "secondary"}
+          disabled={primaryAction.disabled}
+          title={primaryAction.detail}
+          type="button"
+          onClick={primaryAction.onClick}
+        >
+          <span aria-hidden="true">{primaryAction.icon}</span>
+          <span>
+            <strong>{primaryAction.label}</strong>
+            <em>{primaryAction.detail}</em>
           </span>
-        ))}
-      </div>
-      <div className="operations-guidance-actions" aria-label={text(locale, "operationsGuideActions")}>
-        {actions.map((action) => (
+        </button>
+      ) : null}
+      {!primaryAction ? <p className="empty-state">{text(locale, "operatorNoActions")}</p> : null}
+      <details className="operations-guidance-details">
+        <summary>
+          <MoreHorizontal size={14} />
+          {text(locale, "moreActions")}
+        </summary>
+        <div className="operations-guidance-metrics" aria-label={text(locale, "operationsGuideMetrics")}>
+          {metrics.map((metric) => (
+            <span key={metric.label}>
+              <strong>{metric.value}</strong>
+              {metric.label}
+            </span>
+          ))}
+        </div>
+        <div className="operations-guidance-actions" aria-label={text(locale, "operationsGuideActions")}>
+          {secondaryActions.map((action) => (
           <button
             className="operations-guidance-action"
             data-variant={action.variant ?? "secondary"}
@@ -2710,8 +3017,9 @@ function OperationsGuidanceCard({
               <em>{action.detail}</em>
             </span>
           </button>
-        ))}
-      </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }
@@ -2811,6 +3119,7 @@ function OperatorWorkflowPanel({
   findingCount,
   locale,
   materialCount,
+  maxVisibleActions,
   onAction,
   onDecision,
   questionCount,
@@ -2823,11 +3132,54 @@ function OperatorWorkflowPanel({
   findingCount: number;
   locale: Locale;
   materialCount: number;
+  maxVisibleActions?: number;
   onAction: (action: OperatorAction) => void;
   onDecision: (action: OperatorAction, decisionType: "skipped" | "dismissed") => void;
   questionCount: number;
   recentDecisions: OperatorActionDecision[];
 }) {
+  const visibleActions =
+    maxVisibleActions && maxVisibleActions > 0 ? actions.slice(0, maxVisibleActions) : actions;
+  const hiddenActions =
+    maxVisibleActions && maxVisibleActions > 0 ? actions.slice(maxVisibleActions) : [];
+  const hiddenActionCount = Math.max(actions.length - visibleActions.length, 0);
+  const renderActionRow = (action: OperatorAction) => {
+    const priorityLabel = operatorPriorityLabel(action.priority, locale);
+    return (
+      <div className="operator-action-row" key={action.id}>
+        <button
+          aria-label={`${action.title}: ${action.detail} (${priorityLabel})`}
+          className="operator-action"
+          data-action-id={action.id}
+          data-kind={action.kind}
+          data-priority={action.priority}
+          data-target-question-id={action.targetQuestionId}
+          type="button"
+          onClick={() => onAction(action)}
+        >
+          <span className="operator-action-icon">{operatorActionIcon(action.kind)}</span>
+          <span className="operator-action-body">
+            <strong>{action.title}</strong>
+            <em>{action.detail}</em>
+          </span>
+          <span className="operator-action-priority">{priorityLabel}</span>
+        </button>
+        <div className="operator-action-controls">
+          <button type="button" onClick={() => onDecision(action, "skipped")}>
+            {text(locale, "operatorSkipAction")}
+          </button>
+          <button
+            aria-label={`${text(locale, "operatorDismissAction")}: ${action.title}`}
+            type="button"
+            onClick={() => onDecision(action, "dismissed")}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <section className={`operator-workflow ${embedded ? "is-embedded" : ""} ${compact ? "is-compact" : ""}`}>
       {compact ? null : (
@@ -2850,48 +3202,23 @@ function OperatorWorkflowPanel({
       </div>
       )}
       <div className="operator-action-list">
-        {actions.length ? (
-          actions.map((action) => {
-            const priorityLabel = operatorPriorityLabel(action.priority, locale);
-            return (
-              <div className="operator-action-row" key={action.id}>
-                <button
-                  aria-label={`${action.title}: ${action.detail} (${priorityLabel})`}
-                  className="operator-action"
-                  data-action-id={action.id}
-                  data-kind={action.kind}
-                  data-priority={action.priority}
-                  data-target-question-id={action.targetQuestionId}
-                  type="button"
-                  onClick={() => onAction(action)}
-                >
-                  <span className="operator-action-icon">{operatorActionIcon(action.kind)}</span>
-                  <span className="operator-action-body">
-                    <strong>{action.title}</strong>
-                    <em>{action.detail}</em>
-                  </span>
-                  <span className="operator-action-priority">{priorityLabel}</span>
-                </button>
-                <div className="operator-action-controls">
-                  <button type="button" onClick={() => onDecision(action, "skipped")}>
-                    {text(locale, "operatorSkipAction")}
-                  </button>
-                  <button
-                    aria-label={`${text(locale, "operatorDismissAction")}: ${action.title}`}
-                    type="button"
-                    onClick={() => onDecision(action, "dismissed")}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              </div>
-            );
-          })
+        {visibleActions.length ? (
+          visibleActions.map(renderActionRow)
         ) : (
           <p className="empty-state">{text(locale, "operatorNoActions")}</p>
         )}
       </div>
-      {recentDecisions.length ? (
+      {hiddenActionCount > 0 ? (
+        <details className="operator-action-more">
+          <summary>
+            +{hiddenActionCount} {text(locale, "operatorMoreActions")}
+          </summary>
+          <div className="operator-action-list operator-action-list--secondary">
+            {hiddenActions.map(renderActionRow)}
+          </div>
+        </details>
+      ) : null}
+      {!compact && recentDecisions.length ? (
         <div className="operator-decision-trail">
           <span>{text(locale, "operatorDecisionTrail")}</span>
           {recentDecisions.map((decision) => (
@@ -2917,6 +3244,10 @@ function CaseQualityPanel({
   report: CaseQualityReport | null;
 }) {
   const state = report?.state ?? "unknown";
+  const visibleRecommendedActions =
+    report?.recommended_actions.filter(
+      (action) => !(action.id === "session_capture" && Boolean(report.session_id)),
+    ) ?? [];
   async function copyBrief() {
     if (!report) {
       return;
@@ -2942,10 +3273,10 @@ function CaseQualityPanel({
         <span>{text(locale, "warning")}: {report.summary.warning ?? 0}</span>
         <span>{text(locale, "blocked")}: {report.summary.blocked ?? 0}</span>
       </div>
-      {report.recommended_actions.length ? (
+      {visibleRecommendedActions.length ? (
         <div className="case-quality-actions">
           <span>{text(locale, "caseQualityNextActions")}</span>
-          {report.recommended_actions.map((action) => (
+          {visibleRecommendedActions.map((action) => (
             <article data-state={action.state} key={action.id}>
               <strong>{action.label}</strong>
               <p>{action.action}</p>
@@ -3556,10 +3887,10 @@ function auditActionLabel(action: string, locale: Locale): string {
     pl: {
       session_started: "Rozpoczęto sesję",
       answer_added: "Dodano odpowiedź",
-      review_refreshed: "Odświeżono review",
+      review_refreshed: "Odświeżono przegląd",
       material_question_link_accepted: "Zaakceptowano link materiału",
       material_question_link_rejected: "Odrzucono link materiału",
-      grounded_suggestions_generated: "Wygenerowano sugestie grounded",
+      grounded_suggestions_generated: "Wygenerowano sugestie ze źródłami",
       grounded_suggestion_accepted: "Zaakceptowano sugestię AI",
       grounded_suggestion_edited: "Edytowano sugestię AI",
       grounded_suggestion_rejected: "Odrzucono sugestię AI",
@@ -3617,7 +3948,7 @@ function auditScopeLabel(scope: "workspace" | "session", locale: Locale): string
   const labels: Record<Locale, Record<"workspace" | "session", string>> = {
     pl: {
       session: "sesja",
-      workspace: "workspace",
+      workspace: "obszar roboczy",
     },
     en: {
       session: "session",
@@ -3852,8 +4183,9 @@ function buildMaterialTasks({
       id: `verify-${unverifiedMaterial.id}`,
       kind: "verify_material",
       title: text(locale, "materialTaskVerifyIntegrity"),
-      detail: `${materialDisplayTitle(unverifiedMaterial, starterMaterialsById)} / ${shortHash(
-        unverifiedMaterial.sha256,
+      detail: `${materialDisplayTitle(unverifiedMaterial, starterMaterialsById)} / ${materialSourceLabel(
+        unverifiedMaterial.source_type,
+        locale,
       )}`,
       priority: "medium",
       materialId: unverifiedMaterial.id,
@@ -3990,7 +4322,7 @@ function buildOperatorActions({
       id: `ask-${nextUnansweredQuestion.id}`,
       kind: "ask",
       title: text(locale, "operatorAskNext"),
-      detail: `${nextUnansweredQuestion.id}: ${localize(nextUnansweredQuestion.text, locale)}`,
+      detail: localize(nextUnansweredQuestion.text, locale),
       priority: "high",
       targetQuestionId: nextUnansweredQuestion.id,
       sourceObjectIds: [nextUnansweredQuestion.id, ...nextUnansweredQuestion.topicIds],
@@ -4222,7 +4554,7 @@ function CaseDossierPanel({
             <div className="topic-chip-list">
               {focusTopics.map((topic) => (
                 <span data-priority={topic.priority} key={topic.id}>
-                  {topic.label}
+                  {domainLabel(topic.label, locale)}
                   <em>{topicPriorityLabel(topic, locale)}</em>
                 </span>
               ))}
@@ -4264,6 +4596,7 @@ type WorkflowChecklistItem = {
 
 function WorkflowPathPanel({
   checklist,
+  compact = false,
   locale,
   onCopySummary,
   onOpenAi,
@@ -4274,6 +4607,7 @@ function WorkflowPathPanel({
   onStartFresh,
 }: {
   checklist: WorkflowChecklistItem[];
+  compact?: boolean;
   locale: Locale;
   onCopySummary: () => void;
   onOpenAi: () => void;
@@ -4323,11 +4657,14 @@ function WorkflowPathPanel({
 
   const checklistDoneCount = checklist.filter((item) => item.done).length;
   const checklistProgress = checklist.length ? Math.round((checklistDoneCount / checklist.length) * 100) : 0;
+  const nextStep = steps[Math.min(checklistDoneCount, steps.length - 1)];
+  const remainingCount = Math.max(checklist.length - checklistDoneCount, 0);
 
   return (
     <CollapsibleSection
-      className="workflow-path-panel"
-      hint={text(locale, "expandWhenNeeded")}
+      className={`workflow-path-panel ${compact ? "is-compact" : ""}`}
+      defaultOpen={compact}
+      hint={compact ? text(locale, "workflowPathCompactHint") : text(locale, "expandWhenNeeded")}
       meta={`${checklistDoneCount}/${checklist.length} · ${text(locale, "workflowPathReady")}`}
       title={text(locale, "workflowPath")}
       tutorialId="workflow-path"
@@ -4335,6 +4672,15 @@ function WorkflowPathPanel({
       <div className="workflow-progress-meter" aria-label={text(locale, "workflowChecklist")}>
         <span style={{ width: `${checklistProgress}%` }} />
       </div>
+      {compact ? (
+        <button className="workflow-next-step" type="button" onClick={nextStep.onClick}>
+          <span>{nextStep.icon}</span>
+          <strong>{nextStep.label}</strong>
+          <em>
+            {remainingCount} {text(locale, "workflowPathRemaining")}
+          </em>
+        </button>
+      ) : null}
       <div className="workflow-tool-row">
         <button type="button" onClick={onStartFresh} title={text(locale, "workflowNewSessionDetail")}>
           <RefreshCw size={14} />
@@ -4345,7 +4691,7 @@ function WorkflowPathPanel({
           {text(locale, "workflowCopyBrief")}
         </button>
       </div>
-      <div className="workflow-checklist">
+      <div className={`workflow-checklist ${compact ? "auditor-only" : ""}`}>
         <span>
           {text(locale, "workflowChecklist")} ({checklistDoneCount}/{checklist.length})
         </span>
@@ -4358,7 +4704,7 @@ function WorkflowPathPanel({
           ))}
         </ul>
       </div>
-      <div className="workflow-step-list">
+      <div className={`workflow-step-list ${compact ? "auditor-only" : ""}`}>
         {steps.map((step) => (
           <button key={step.id} type="button" onClick={step.onClick}>
             <span>{step.icon}</span>
@@ -4407,14 +4753,20 @@ function buildWorkflowBriefText(input: WorkflowBriefInput): string {
       ? `${text(input.locale, "environmentHealth")}: ${environmentStateShortLabel(input.environmentState, input.locale)}`
       : "",
     input.modelProvider ? `${text(input.locale, "localModelRuntime")}: ${input.modelProvider}` : "",
-    `${text(input.locale, "operationsAi")}: ${input.groundedCount} grounded suggestions`,
+    `${text(input.locale, "operationsAi")}: ${input.groundedCount} ${
+      input.locale === "pl" ? "sugestii" : "grounded suggestions"
+    }`,
     `${text(input.locale, "operatorDecisionTrail")}: ${input.operatorDecisionCount}`,
-    `${text(input.locale, "workspaceAudit")}: ${input.workspaceAuditCount} events${
+    `${text(input.locale, "workspaceAudit")}: ${input.workspaceAuditCount} ${
+      input.locale === "pl" ? "zdarzeń" : "events"
+    }${
       input.workspaceAuditValid === null
         ? ""
         : ` (${input.workspaceAuditValid ? text(input.locale, "chainValid") : text(input.locale, "chainInvalid")})`
     }`,
-    `${text(input.locale, "sessionAudit")}: ${input.sessionAuditCount} events`,
+    `${text(input.locale, "sessionAudit")}: ${input.sessionAuditCount} ${
+      input.locale === "pl" ? "zdarzeń" : "events"
+    }`,
     "",
     text(input.locale, "workflowBriefBoundary"),
   ];
@@ -4660,6 +5012,7 @@ function MaterialsPanel({
   previews: Record<string, MaterialPreview>;
   verifications: Record<string, MaterialVerification>;
 }) {
+  const [activeMaterialView, setActiveMaterialView] = useState<"tasks" | "register" | "add">("tasks");
   const disabled = apiMode !== "online" || isSubmitting;
   const acceptedLinkCount = Object.values(decisions).filter((decision) => decision === "accepted").length;
   const pendingLinkCount = Math.max(0, links.length - Object.keys(decisions).length);
@@ -4696,42 +5049,68 @@ function MaterialsPanel({
         </div>
       </div>
 
-      <MaterialTasksPanel
-        locale={locale}
-        tasks={tasks}
-        isQuestionDraftSubmitting={isQuestionDraftSubmitting}
-        onDecideLink={onDecideLink}
-        onCreateQuestionDraft={onCreateQuestionDraft}
-        onOpenQuestion={onOpenQuestion}
-        onPreview={onPreview}
-      />
-
-      <div className="material-list">
-        {materials.length ? (
-          materials.map((material) => (
-            <MaterialCard
-              decisions={decisions}
-              key={material.id}
-              links={links.filter((link) => link.material_id === material.id)}
-              locale={locale}
-              material={material}
-              starterMaterialsById={starterMaterialsById}
-              onDecideLink={onDecideLink}
-              onPreview={onPreview}
-              onVerify={onVerify}
-              verification={verifications[material.id]}
-            />
-          ))
-        ) : (
-          <p className="empty-state">{text(locale, "noMaterials")}</p>
-        )}
+      <div className="material-view-tabs" role="tablist" aria-label={text(locale, "materialWorkspace")}>
+        {[
+          { id: "tasks" as const, label: text(locale, "materialTasks"), value: String(tasks.length) },
+          { id: "register" as const, label: text(locale, "materialRegister"), value: String(materials.length) },
+          { id: "add" as const, label: text(locale, "addOwnMaterial"), value: "+" },
+        ].map((tab) => (
+          <button
+            aria-selected={activeMaterialView === tab.id}
+            className={activeMaterialView === tab.id ? "is-active" : ""}
+            key={tab.id}
+            role="tab"
+            type="button"
+            onClick={() => setActiveMaterialView(tab.id)}
+          >
+            <span>{tab.label}</span>
+            <strong>{tab.value}</strong>
+          </button>
+        ))}
       </div>
-      <details className="material-add-panel">
-        <summary>
-          <Plus size={15} />
-          <span>{text(locale, "addOwnMaterial")}</span>
-          <em>{text(locale, "syntheticTextOnly")}</em>
-        </summary>
+
+      {activeMaterialView === "tasks" ? (
+        <MaterialTasksPanel
+          locale={locale}
+          tasks={tasks}
+          isQuestionDraftSubmitting={isQuestionDraftSubmitting}
+          onDecideLink={onDecideLink}
+          onCreateQuestionDraft={onCreateQuestionDraft}
+          onOpenQuestion={onOpenQuestion}
+          onPreview={onPreview}
+        />
+      ) : null}
+
+      {activeMaterialView === "register" ? (
+        <div className="material-list">
+          {materials.length ? (
+            materials.map((material) => (
+              <MaterialCard
+                decisions={decisions}
+                key={material.id}
+                links={links.filter((link) => link.material_id === material.id)}
+                locale={locale}
+                material={material}
+                starterMaterialsById={starterMaterialsById}
+                onDecideLink={onDecideLink}
+                onPreview={onPreview}
+                onVerify={onVerify}
+                verification={verifications[material.id]}
+              />
+            ))
+          ) : (
+            <p className="empty-state">{text(locale, "noMaterials")}</p>
+          )}
+        </div>
+      ) : null}
+
+      {activeMaterialView === "add" ? (
+        <section className="material-add-panel">
+          <div className="material-add-header">
+            <Plus size={15} />
+            <span>{text(locale, "addOwnMaterial")}</span>
+            <em>{text(locale, "syntheticTextOnly")}</em>
+          </div>
         <form
           className="material-form"
           onSubmit={(event) => {
@@ -4788,7 +5167,8 @@ function MaterialsPanel({
             {isSubmitting ? "..." : text(locale, "addMaterial")}
           </button>
         </form>
-      </details>
+        </section>
+      ) : null}
     </>
   );
 
@@ -4917,6 +5297,12 @@ type MaterialTaskAction = {
   label: string;
   onClick: () => void;
 };
+
+type ClaimEditDraft = {
+  answer: AnswerView;
+  claim: ClaimView;
+  value: string;
+} | null;
 
 function buildMaterialTaskActions({
   isQuestionDraftSubmitting,
@@ -5047,7 +5433,8 @@ function MaterialCard({
         <div>
           <strong>{displayTitle}</strong>
           <span className="material-meta">
-            {material.id} / {materialSourceLabel(material.source_type, locale)}
+            <span className="auditor-only-inline">{material.id} / </span>
+            {materialSourceLabel(material.source_type, locale)}
           </span>
         </div>
         <span className="material-status-pill" data-state={state}>
@@ -5106,7 +5493,7 @@ function MaterialCard({
         />
       </details>
 
-      <details className="material-context-window">
+      <details className="material-context-window auditor-only">
         <summary>
           <Database size={14} />
           <span>{text(locale, "materialTechnicalDetails")}</span>
@@ -5133,14 +5520,21 @@ function MaterialCard({
       </details>
 
       <div className="material-card-footer">
-        <button type="button" onClick={() => onPreview(material.id)}>
+        <button className="material-card-primary-action" type="button" onClick={() => onPreview(material.id)}>
           <Eye size={14} />
           {text(locale, "previewMaterial")}
         </button>
-        <button type="button" onClick={() => onVerify(material.id)}>
-          <CheckCircle2 size={14} />
-          {text(locale, "verifyMaterial")}
-        </button>
+        <details className="material-card-more">
+          <summary aria-label={text(locale, "moreActions")} title={text(locale, "moreActions")}>
+            <MoreHorizontal size={14} />
+          </summary>
+          <div>
+            <button type="button" onClick={() => onVerify(material.id)}>
+              <CheckCircle2 size={14} />
+              {text(locale, "verifyMaterial")}
+            </button>
+          </div>
+        </details>
       </div>
     </article>
   );
@@ -5570,11 +5964,14 @@ function StopReviewPanel({
   const decisionLabel = latest
     ? stopReviewDecisionLabel(latest.decision, locale)
     : text(locale, "stopReviewMissing");
-  const latestMeta = latest
-    ? `${latest.created_by} / ${formatDecisionTime(latest.created_at)}${
-        latest.event_hash ? ` / ${shortHash(latest.event_hash)}` : ""
-      }`
-    : text(locale, "stopReviewMissingDetail");
+  const latestMeta: ReactNode = latest ? (
+    <>
+      {latest.created_by} / {formatDecisionTime(latest.created_at)}
+      {latest.event_hash ? <span className="auditor-only-inline"> / {shortHash(latest.event_hash)}</span> : null}
+    </>
+  ) : (
+    text(locale, "stopReviewMissingDetail")
+  );
 
   return (
     <div className="stop-review-panel" data-state={state}>
@@ -5604,7 +6001,7 @@ function StopReviewPanel({
               <History size={13} />
               <strong>{stopReviewDecisionLabel(decision.decision, locale)}</strong>
               <em>{formatDecisionTime(decision.created_at)}</em>
-              {decision.event_hash ? <small>{shortHash(decision.event_hash)}</small> : null}
+              {decision.event_hash ? <small className="auditor-only-inline">{shortHash(decision.event_hash)}</small> : null}
             </article>
           ))}
         </div>
@@ -5648,9 +6045,14 @@ function ModelSmokeAuditPanel({
   const issueCodes = Array.isArray(latestDetail.issue_codes)
     ? latestDetail.issue_codes.filter((value): value is string => typeof value === "string")
     : [];
-  const latestMeta = latest
-    ? `${formatDecisionTime(latest.timestamp)}${latest.event_hash ? ` / ${shortHash(latest.event_hash)}` : ""}`
-    : text(locale, "modelSmokeAuditEmpty");
+  const latestMeta: ReactNode = latest ? (
+    <>
+      {formatDecisionTime(latest.timestamp)}
+      {latest.event_hash ? <span className="auditor-only-inline"> / {shortHash(latest.event_hash)}</span> : null}
+    </>
+  ) : (
+    text(locale, "modelSmokeAuditEmpty")
+  );
   const latestModel = typeof latestDetail.result_model === "string" && latestDetail.result_model
     ? latestDetail.result_model
     : typeof latestDetail.configured_model === "string" && latestDetail.configured_model
@@ -5687,7 +6089,7 @@ function ModelSmokeAuditPanel({
                 <History size={13} />
                 <strong>{auditActionLabel(event.action, locale)}</strong>
                 <em>{formatDecisionTime(event.timestamp)}</em>
-                {event.event_hash ? <small>{shortHash(event.event_hash)}</small> : null}
+                {event.event_hash ? <small className="auditor-only-inline">{shortHash(event.event_hash)}</small> : null}
               </article>
             ))}
           </div>
@@ -5747,14 +6149,17 @@ function ModelArtifactIsolationPanel({
           ) : null}
           {lastRecord ? (
             <p>
-              {text(locale, "lastArtifact")}: {lastRecord.artifact_type} / {shortHash(lastRecord.sha256)}
+              {text(locale, "lastArtifact")}: {lastRecord.artifact_type}
+              <span className="auditor-only-inline"> / {shortHash(lastRecord.sha256)}</span>
             </p>
           ) : null}
           {manifest ? (
             <p>
               {text(locale, "artifactChain")}:{" "}
               {manifest.chain_valid ? text(locale, "chainValid") : text(locale, "chainInvalid")}
-              {manifest.latest_record_hash ? ` / ${shortHash(manifest.latest_record_hash)}` : ""}
+              {manifest.latest_record_hash ? (
+                <span className="auditor-only-inline"> / {shortHash(manifest.latest_record_hash)}</span>
+              ) : null}
             </p>
           ) : null}
         </>
@@ -5800,16 +6205,99 @@ function EnvironmentHealthPanel({
         {health.checks.map((check) => (
           <details data-state={check.state} key={check.id}>
             <summary>
-              <span>{check.label}</span>
+              <span>{environmentCheckLabel(check.id, check.label, locale)}</span>
               <em>{environmentStateLabel(check.state, locale)}</em>
             </summary>
-            <p>{check.detail}</p>
-            {check.remediation ? <p>{check.remediation}</p> : null}
+            <p title={check.detail}>
+              <span className="operator-only-inline">{compactDiagnosticText(check.detail, locale)}</span>
+              <span className="auditor-only-inline">{check.detail}</span>
+            </p>
+            {check.remediation ? (
+              <p title={check.remediation}>
+                <span className="operator-only-inline">{compactDiagnosticText(check.remediation, locale)}</span>
+                <span className="auditor-only-inline">{check.remediation}</span>
+              </p>
+            ) : null}
           </details>
         ))}
       </div>
     </div>
   );
+}
+
+function compactDiagnosticText(value: string, locale: Locale): string {
+  const operatorText = localizeDiagnosticText(value, locale);
+  const pathLabel = text(locale, "localPathHidden");
+  return operatorText
+    .replace(/[A-Za-z]:[\\/][^\s,;)]+/g, pathLabel)
+    .replace(/\\\\[^\s,;)]+/g, pathLabel)
+    .replace(/\b\/(?:Users|home|tmp|var|opt|mnt)\/[^\s,;)]+/g, pathLabel);
+}
+
+function localizeDiagnosticText(value: string, locale: Locale): string {
+  if (locale !== "pl") {
+    return value;
+  }
+
+  return value
+    .replace(/^Local API process is responding\.$/, "Lokalne API odpowiada.")
+    .replace(/^Synthetic case root does not exist:/, "Brakuje katalogu spraw syntetycznych:")
+    .replace(/^No synthetic case\.json files found under/, "Nie znaleziono plików case.json w")
+    .replace(/^(\d+) synthetic case fixture\(s\) available\.$/, "Dostępne sprawy syntetyczne: $1.")
+    .replace(/^Workspace root exists:/, "Katalog obszaru roboczego istnieje:")
+    .replace(/^Workspace root is not created yet:/, "Katalog obszaru roboczego nie został jeszcze utworzony:")
+    .replace(/^Workspace parent does not exist:/, "Katalog nadrzędny obszaru roboczego nie istnieje:")
+    .replace(
+      /^Restore data\/synthetic before running prototype workflows\.$/,
+      "Przywróć dane syntetyczne przed uruchomieniem workflow prototypu.",
+    )
+    .replace(
+      /^Create or open a workspace to initialize the directory\.$/,
+      "Utwórz albo otwórz obszar roboczy, aby zainicjalizować katalog.",
+    )
+    .replace(
+      /^Create the local data directory before workspace operations\.$/,
+      "Utwórz lokalny katalog danych przed operacjami obszaru roboczego.",
+    )
+    .replace(/^Encrypted storage is unavailable:/, "Szyfrowane dane są niedostępne:")
+    .replace(
+      /^Use synthetic\/plain prototype data only, or install SQLCipher before sensitive imports\.$/,
+      "Używaj tylko syntetycznych danych prototypowych albo zainstaluj SQLCipher przed importem danych wrażliwych.",
+    )
+    .replace(
+      /^Real model live output is enabled before institutional STOP review\.$/,
+      "Wyjście realnego modelu live jest włączone przed przeglądem STOP.",
+    )
+    .replace(
+      /^Disable live model output until the STOP review is complete\.$/,
+      "Wyłącz wyjście modelu live do czasu zakończenia przeglądu STOP.",
+    )
+    .replace(/^Ollama real-model execution is enabled for (.+)\.$/, "Realny model Ollama jest włączony dla $1.")
+    .replace(
+      /^Use only smoke tests until model governance and evaluation are reviewed\.$/,
+      "Używaj tylko testów smoke do czasu przeglądu governance i ewaluacji modelu.",
+    )
+    .replace(/^(.+) runtime active; live real-model output is blocked\.$/, "Aktywny runtime: $1; wyjście live jest zablokowane.");
+}
+
+function environmentCheckLabel(id: string, fallback: string, locale: Locale): string {
+  const labels: Record<Locale, Record<string, string>> = {
+    pl: {
+      api: "Lokalne API",
+      synthetic_cases: "Sprawy syntetyczne",
+      workspace_root: "Katalog obszaru roboczego",
+      encryption: "Szyfrowane dane",
+      local_model: "Runtime modelu lokalnego",
+    },
+    en: {
+      api: "Local API",
+      synthetic_cases: "Synthetic cases",
+      workspace_root: "Workspace root",
+      encryption: "Encrypted storage",
+      local_model: "Local model runtime",
+    },
+  };
+  return labels[locale][id] ?? fallback;
 }
 
 function SecurityItem({
@@ -6084,7 +6572,7 @@ function QuestionListItem({
   const sourceLabel = questionSourceLabel(question.source);
   const topicLabels = question.topicIds
     .slice(0, 2)
-    .map((topicId) => topicsById.get(topicId)?.label ?? topicId);
+    .map((topicId) => domainLabel(topicsById.get(topicId)?.label ?? topicId, locale));
 
   return (
     <button
@@ -6119,12 +6607,14 @@ function QuestionListItem({
 function AnswerHistoryCard({
   answer,
   locale,
+  onEditClaim,
   onReview,
   question,
   reviewingClaimIds,
 }: {
   answer: AnswerView;
   locale: Locale;
+  onEditClaim: (claim: ClaimView) => void;
   onReview: (
     answer: AnswerView,
     claim: ClaimView,
@@ -6134,18 +6624,6 @@ function AnswerHistoryCard({
   question: QuestionView | undefined;
   reviewingClaimIds: Set<string>;
 }) {
-  function editClaim(claim: ClaimView) {
-    const nextValue = window.prompt(text(locale, "claimReviewEditPrompt"), claim.value);
-    if (nextValue === null) {
-      return;
-    }
-    const value = nextValue.trim();
-    if (!value) {
-      return;
-    }
-    void onReview(answer, claim, "edited", { ...claim, value });
-  }
-
   return (
     <article className="answer-card">
       <div className="answer-card-header">
@@ -6174,15 +6652,15 @@ function AnswerHistoryCard({
                 <div className="claim-review-main">
                   <span className="claim-review-status">{claimReviewStatusLabel(claim.reviewStatus, locale)}</span>
                   <strong>
-                    {claim.subject} / {claim.attribute}
+                    {domainLabel(claim.subject, locale)} / {domainLabel(claim.attribute.replaceAll("_", " "), locale)}
                   </strong>
-                  <span>{claim.value}</span>
+                  <span>{domainLabel(claim.value, locale)}</span>
                   {claim.sourceText ? <em title={claim.sourceText}>{claim.sourceText}</em> : null}
                 </div>
                 <div className="claim-review-actions">
                   <button
                     type="button"
-                    aria-label={`${text(locale, "claimReviewAccept")}: ${claim.value}`}
+                    aria-label={`${text(locale, "claimReviewAccept")}: ${domainLabel(claim.value, locale)}`}
                     title={text(locale, "claimReviewAccept")}
                     disabled={disabled}
                     onClick={() => void onReview(answer, claim, "accepted")}
@@ -6191,16 +6669,16 @@ function AnswerHistoryCard({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${text(locale, "claimReviewEdit")}: ${claim.value}`}
+                    aria-label={`${text(locale, "claimReviewEdit")}: ${domainLabel(claim.value, locale)}`}
                     title={text(locale, "claimReviewEdit")}
                     disabled={disabled}
-                    onClick={() => editClaim(claim)}
+                    onClick={() => onEditClaim(claim)}
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     type="button"
-                    aria-label={`${text(locale, "claimReviewReject")}: ${claim.value}`}
+                    aria-label={`${text(locale, "claimReviewReject")}: ${domainLabel(claim.value, locale)}`}
                     title={text(locale, "claimReviewReject")}
                     disabled={disabled}
                     onClick={() => void onReview(answer, claim, "rejected")}
@@ -6301,14 +6779,16 @@ function findingTitle(finding: ReviewFinding, locale: Locale): string {
   }
 
   if (finding.category === "missing_topic") {
-    const topic = typeof finding.metadata?.topic_label === "string" ? finding.metadata.topic_label : "";
+    const topic =
+      typeof finding.metadata?.topic_label === "string" ? domainLabel(finding.metadata.topic_label, locale) : "";
     return `${text(locale, "missingTopicTitlePrefix")}: ${topic}`.trim();
   }
   if (finding.category === "question_neutrality") {
     return text(locale, "questionNeutralityTitle");
   }
   if (finding.category === "potential_inconsistency") {
-    const attribute = typeof finding.metadata?.attribute === "string" ? finding.metadata.attribute : "";
+    const attribute =
+      typeof finding.metadata?.attribute === "string" ? domainLabel(finding.metadata.attribute, locale) : "";
     return `${text(locale, "potentialInconsistencyTitlePrefix")}: ${attribute}`.trim();
   }
 

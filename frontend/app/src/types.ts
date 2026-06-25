@@ -671,6 +671,7 @@ export type GroundingTopicContext = {
   claim_ids: string[];
   material_ids: string[];
   finding_ids: string[];
+  indicator_ids: string[];
 };
 
 export type GroundingMaterialReference = {
@@ -683,6 +684,14 @@ export type GroundingMaterialReference = {
   tags: string[];
 };
 
+export type GroundingSourceReference = {
+  source_id: string;
+  source_type: string;
+  label: string;
+  detail: string;
+  topic_ids: string[];
+};
+
 export type GroundingContextPack = {
   case_id: string;
   focus_question_id: string | null;
@@ -690,6 +699,7 @@ export type GroundingContextPack = {
   allowed_source_ids: string[];
   topic_contexts: GroundingTopicContext[];
   material_references: GroundingMaterialReference[];
+  source_references: GroundingSourceReference[];
   rules: GroundingPackRule[];
   operator_review_required: boolean;
 };
@@ -828,6 +838,29 @@ export type GroundedSuggestionTriageReport = {
   summary: Record<string, number>;
 };
 
+export type GroundedSuggestionSourceCard = {
+  source_id: string;
+  source_type: string;
+  label: string;
+  detail: string;
+  topic_ids: string[];
+};
+
+export type GroundedSuggestionSupportRecord = {
+  suggestion_id: string;
+  support_state: "supported" | "partial" | "missing";
+  cited_source_count: number;
+  known_source_count: number;
+  unknown_source_ids: string[];
+  source_cards: GroundedSuggestionSourceCard[];
+};
+
+export type GroundedSuggestionSupportReport = {
+  state: EnvironmentHealthState;
+  records: GroundedSuggestionSupportRecord[];
+  summary: Record<string, number>;
+};
+
 export type GroundedSuggestionDecision = "accepted" | "edited" | "rejected";
 
 export type GroundedSuggestionDecisionResponse = {
@@ -851,6 +884,7 @@ export type GroundedSuggestionsResponse = {
   output_hash: string;
   warnings: GroundedSuggestionWarning[];
   quality_report: GroundedSuggestionQualityReport;
+  support_report: GroundedSuggestionSupportReport;
   triage_report: GroundedSuggestionTriageReport;
   prompt_artifact?: ModelArtifactSummary | null;
   context_artifact?: ModelArtifactSummary | null;

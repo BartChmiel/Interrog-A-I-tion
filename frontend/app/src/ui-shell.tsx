@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { text, type CopyKey } from "./i18n";
 import type { Locale } from "./types";
@@ -89,7 +89,6 @@ export function CollapsibleWorkspaceCard({
 }
 
 export function InterviewContextStrip({
-  activeQuestionLabel,
   caseId,
   coverageLabel,
   locale,
@@ -99,7 +98,6 @@ export function InterviewContextStrip({
   topicCoverageLabel,
   urgentActionCount,
 }: {
-  activeQuestionLabel: string;
   caseId: string;
   coverageLabel: string;
   locale: Locale;
@@ -109,16 +107,11 @@ export function InterviewContextStrip({
   topicCoverageLabel: string | null;
   urgentActionCount: number;
 }) {
+  const compactToken = (value: string) => (value.length > 22 ? `${value.slice(0, 10)}...${value.slice(-6)}` : value);
+
   return (
     <div className="interview-context-strip" data-tutorial="interview-context" role="status">
       <div className="interview-context-pills">
-        <span className="context-pill">{caseId}</span>
-        <span className="context-pill">
-          {text(locale, "contextSession")}: {sessionId}
-        </span>
-        <span className="context-pill">
-          {text(locale, "contextParticipant")}: {participantId}
-        </span>
         <span className="context-pill">{roleLabel}</span>
         <span className="context-pill">
           {coverageLabel} {text(locale, "contextCoverage")}
@@ -134,7 +127,16 @@ export function InterviewContextStrip({
           </span>
         ) : null}
       </div>
-      <p className="interview-context-focus">{activeQuestionLabel}</p>
+      <details className="interview-context-technical auditor-only">
+        <summary>{text(locale, "materialTechnicalDetails")}</summary>
+        <span title={caseId}>{compactToken(caseId)}</span>
+        <span title={sessionId}>
+          {text(locale, "contextSession")}: {compactToken(sessionId)}
+        </span>
+        <span title={participantId}>
+          {text(locale, "contextParticipant")}: {compactToken(participantId)}
+        </span>
+      </details>
       <span className="interview-context-hint">{text(locale, "disclosureHint")}</span>
     </div>
   );
@@ -256,30 +258,57 @@ export function Modal({
   title: string;
 }) {
   const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+      if (event.key !== "Tab") {
+        return;
+      }
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable?.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
     window.addEventListener("keydown", onKeyDown);
+    const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+      'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    firstFocusable?.focus();
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
     };
   }, [onClose]);
 
   return (
-    <div className="modal-root" role="presentation" onClick={onClose}>
+    <div className="modal-root" role="presentation">
       <div
         aria-labelledby={titleId}
         aria-modal="true"
         className="modal-dialog"
+        ref={dialogRef}
         role="dialog"
-        onClick={(event) => event.stopPropagation()}
       >
         <header className="modal-header">
           <div>

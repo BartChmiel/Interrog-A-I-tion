@@ -74,9 +74,9 @@ export const tutorialStepDefinitions: TutorialStepDefinition[] = [
     bodyKey: "tutorialZoneOpsBody",
   },
   {
-    id: "operations-tabs",
+    id: "work-mode-nav",
     placement: "bottom",
-    target: "operations-tabs",
+    target: "work-mode-nav",
     titleKey: "tutorialTabsTitle",
     bodyKey: "tutorialTabsBody",
   },

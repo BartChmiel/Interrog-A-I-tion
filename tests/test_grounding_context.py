@@ -65,6 +65,7 @@ class GroundingContextTest(unittest.TestCase):
         rule_ids = {rule.id for rule in pack.rules}
         topic_ids = {topic.topic_id for topic in pack.topic_contexts}
         material = next(reference for reference in pack.material_references if reference.material_id == record.id)
+        source_references = {reference.source_id: reference for reference in pack.source_references}
 
         self.assertEqual(pack.task, "suggest_grounded_followup_questions")
         self.assertEqual(pack.focus_question_id, "q-001")
@@ -72,6 +73,10 @@ class GroundingContextTest(unittest.TestCase):
         self.assertIn("no-truthfulness-verdict", rule_ids)
         self.assertIn("cite-source-ids", rule_ids)
         self.assertIn("q-001", pack.allowed_source_ids)
+        self.assertIn("q-001", source_references)
+        self.assertEqual(source_references["q-001"].source_type, "question")
+        self.assertIn(record.id, source_references)
+        self.assertEqual(source_references[record.id].label, "Recording lead")
         self.assertIn("topic-recording", topic_ids)
         self.assertIn("topic-recording", material.topic_ids)
 

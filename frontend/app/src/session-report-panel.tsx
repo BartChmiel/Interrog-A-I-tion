@@ -284,6 +284,7 @@ export function SessionReportPanel({
           {bundleError ? <p className="grounding-pack-error">{bundleError}</p> : null}
           {bundleReceipt ? (
             <ContextWindow
+              className="auditor-only"
               icon={<FileArchive size={14} />}
               meta={
                 bundleReceipt.verified && bundleReceipt.chainValid
@@ -336,6 +337,7 @@ export function SessionReportPanel({
             </ContextWindow>
           ) : null}
           <ContextWindow
+            className="auditor-only"
             icon={<Fingerprint size={14} />}
             meta={integrityStateLabel}
             title={text(locale, "exportIntegrityPreview")}

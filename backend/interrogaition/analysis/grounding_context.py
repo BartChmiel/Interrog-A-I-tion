@@ -29,6 +29,7 @@ class GroundedTopicContext:
     claim_ids: tuple[str, ...]
     material_ids: tuple[str, ...]
     finding_ids: tuple[str, ...]
+    indicator_ids: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,15 @@ class GroundedMaterialReference:
 
 
 @dataclass(frozen=True)
+class GroundingSourceReference:
+    source_id: str
+    source_type: str
+    label: str
+    detail: str
+    topic_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class GroundingContextPack:
     case_id: str
     focus_question_id: str | None
@@ -50,6 +60,7 @@ class GroundingContextPack:
     allowed_source_ids: tuple[str, ...]
     topic_contexts: tuple[GroundedTopicContext, ...]
     material_references: tuple[GroundedMaterialReference, ...]
+    source_references: tuple[GroundingSourceReference, ...]
     rules: tuple[GroundingRule, ...]
     operator_review_required: bool
 
@@ -132,27 +143,36 @@ def build_grounding_context_pack(
         )
     )
 
+    topic_contexts = tuple(
+        GroundedTopicContext(
+            topic_id=node.topic_id,
+            label=node.label,
+            status=node.status.value,
+            in_focus=node.topic_id in focus_topic_ids,
+            priority=node.priority,
+            question_ids=node.question_ids,
+            answer_ids=node.answer_ids,
+            claim_ids=node.claim_ids,
+            material_ids=node.material_ids,
+            finding_ids=node.finding_ids,
+            indicator_ids=node.indicator_ids,
+        )
+        for node in selected_nodes
+    )
+
     return GroundingContextPack(
         case_id=case.id,
         focus_question_id=focus_question_id,
         task=task,
         allowed_source_ids=allowed_source_ids,
-        topic_contexts=tuple(
-            GroundedTopicContext(
-                topic_id=node.topic_id,
-                label=node.label,
-                status=node.status.value,
-                in_focus=node.topic_id in focus_topic_ids,
-                priority=node.priority,
-                question_ids=node.question_ids,
-                answer_ids=node.answer_ids,
-                claim_ids=node.claim_ids,
-                material_ids=node.material_ids,
-                finding_ids=node.finding_ids,
-            )
-            for node in selected_nodes
-        ),
+        topic_contexts=topic_contexts,
         material_references=material_references,
+        source_references=_source_references(
+            case=case,
+            allowed_source_ids=allowed_source_ids,
+            topic_contexts=topic_contexts,
+            material_references=material_references,
+        ),
         rules=DEFAULT_GROUNDING_RULES,
         operator_review_required=True,
     )
@@ -209,3 +229,122 @@ def _material_references(
         )
 
     return tuple(sorted(references, key=lambda reference: reference.material_id))
+
+
+def _source_references(
+    *,
+    case: Case,
+    allowed_source_ids: tuple[str, ...],
+    topic_contexts: tuple[GroundedTopicContext, ...],
+    material_references: tuple[GroundedMaterialReference, ...],
+) -> tuple[GroundingSourceReference, ...]:
+    questions = {question.id: question for question in case.questions}
+    answers = {answer.id: answer for answer in case.answers}
+    claims = {claim.id: claim for answer in case.answers for claim in answer.claims}
+    materials = {material.material_id: material for material in material_references}
+    topic_ids_by_source = _topic_ids_by_source(topic_contexts)
+    references: list[GroundingSourceReference] = []
+
+    for source_id in allowed_source_ids:
+        topic_ids = topic_ids_by_source.get(source_id, ())
+        if source_id in questions:
+            question = questions[source_id]
+            references.append(
+                GroundingSourceReference(
+                    source_id=source_id,
+                    source_type="question",
+                    label=f"Question {source_id}",
+                    detail=_clip(question.text),
+                    topic_ids=topic_ids,
+                )
+            )
+        elif source_id in answers:
+            answer = answers[source_id]
+            references.append(
+                GroundingSourceReference(
+                    source_id=source_id,
+                    source_type="answer",
+                    label=f"Answer {source_id}",
+                    detail=_clip(answer.text),
+                    topic_ids=topic_ids,
+                )
+            )
+        elif source_id in claims:
+            claim = claims[source_id]
+            references.append(
+                GroundingSourceReference(
+                    source_id=source_id,
+                    source_type="claim",
+                    label=f"Claim {source_id}",
+                    detail=_clip(f"{claim.subject}.{claim.attribute}: {claim.value}"),
+                    topic_ids=topic_ids,
+                )
+            )
+        elif source_id in materials:
+            material = materials[source_id]
+            detail_parts = [material.source_type]
+            if material.tags:
+                detail_parts.append(", ".join(material.tags[:4]))
+            references.append(
+                GroundingSourceReference(
+                    source_id=source_id,
+                    source_type="material",
+                    label=material.title,
+                    detail=_clip(" / ".join(detail_parts)),
+                    topic_ids=topic_ids or material.topic_ids,
+                )
+            )
+        elif source_id.startswith("finding-"):
+            references.append(
+                GroundingSourceReference(
+                    source_id=source_id,
+                    source_type="finding",
+                    label=f"Finding {source_id}",
+                    detail="Review finding linked to this topic.",
+                    topic_ids=topic_ids,
+                )
+            )
+        elif source_id.startswith("indicator-"):
+            references.append(
+                GroundingSourceReference(
+                    source_id=source_id,
+                    source_type="indicator",
+                    label=f"Indicator {source_id}",
+                    detail="Derived review indicator linked to this topic.",
+                    topic_ids=topic_ids,
+                )
+            )
+        else:
+            references.append(
+                GroundingSourceReference(
+                    source_id=source_id,
+                    source_type="unknown",
+                    label=source_id,
+                    detail="Source id is allowed but has no typed reference in the current pack.",
+                    topic_ids=topic_ids,
+                )
+            )
+
+    return tuple(references)
+
+
+def _topic_ids_by_source(topic_contexts: tuple[GroundedTopicContext, ...]) -> dict[str, tuple[str, ...]]:
+    grouped: dict[str, set[str]] = {}
+    for topic in topic_contexts:
+        for source_id in (
+            *topic.question_ids,
+            *topic.answer_ids,
+            *topic.claim_ids,
+            *topic.material_ids,
+            *topic.finding_ids,
+            *topic.indicator_ids,
+        ):
+            grouped.setdefault(source_id, set()).add(topic.topic_id)
+    return {source_id: tuple(sorted(topic_ids)) for source_id, topic_ids in grouped.items()}
+
+
+def _clip(value: str, limit: int = 180) -> str:
+    normalized = " ".join(value.split())
+    if len(normalized) <= limit:
+        return normalized
+    return f"{normalized[: limit - 3]}..."

@@ -134,7 +134,7 @@ export function TutorialTour({
 
     onStepEnter(step);
     const delay =
-      step.id.startsWith("zone-") || step.id.startsWith("tab-") || step.id === "operations-tabs" ? 220 : 60;
+      step.id.startsWith("zone-") || step.id.startsWith("tab-") || step.id === "work-mode-nav" ? 220 : 60;
     const timer = window.setTimeout(() => {
       if (step.target) {
         revealTutorialTarget(step.target);

@@ -42,6 +42,11 @@ class GroundedSuggestionServiceTest(unittest.TestCase):
         self.assertFalse(result.warnings)
         self.assertEqual(result.quality_report.state, "ready")
         self.assertEqual(result.quality_report.score, 100)
+        self.assertEqual(result.support_report.state, "ready")
+        self.assertTrue(all(record.source_cards for record in result.support_report.records))
+        self.assertTrue(
+            all(record.support_state == "supported" for record in result.support_report.records)
+        )
         self.assertEqual(result.triage_report.state, "ready")
         self.assertIsNotNone(result.triage_report.top_suggestion_id)
         self.assertGreaterEqual(result.triage_report.summary["high"], 1)
@@ -81,6 +86,9 @@ class GroundedSuggestionServiceTest(unittest.TestCase):
         self.assertEqual(result.warnings[0].warning_type, "unknown_source_id")
         self.assertEqual(result.quality_report.state, "warning")
         self.assertIn("unknown_source_id", {issue.code for issue in result.quality_report.issues})
+        self.assertEqual(result.support_report.state, "warning")
+        self.assertEqual(result.support_report.records[0].support_state, "partial")
+        self.assertEqual(result.support_report.records[0].unknown_source_ids, ("not-in-pack",))
         self.assertEqual(result.triage_report.records[0].recommended_action, "edit_before_use")
         self.assertEqual(result.triage_report.records[0].risk_level, "medium")
 
